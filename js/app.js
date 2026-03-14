@@ -589,12 +589,6 @@ window.appLogic = {
             invoices.unshift(this.pendingInvoice);
         }
 
-        // --- STRICT RULE: Keep only last 5 invoices ---
-        if (invoices.length > 5) {
-            invoices = invoices.slice(0, 5);
-        }
-        // ----------------------------------------------
-
         await localforage.setItem('invoices', invoices);
 
         this.currentInvoice = this.pendingInvoice;
