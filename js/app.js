@@ -37,31 +37,31 @@ const DefaultServices = [
 ];
 
 const AvailableIcons = [
-    'fa-shirt', 'fa-user-tie', 'fa-hat-cowboy', 'fa-vest', 'fa-box', 'fa-boxes-stacked', 
-    'fa-person', 'fa-user-secret', 'fa-user-shield', 'fa-user-nurse', 'fa-socks', 
+    'fa-shirt', 'fa-user-tie', 'fa-hat-cowboy', 'fa-vest', 'fa-box', 'fa-boxes-stacked',
+    'fa-person', 'fa-user-secret', 'fa-user-shield', 'fa-user-nurse', 'fa-socks',
     'fa-user-doctor', 'fa-rug', 'fa-bed', 'fa-person-dress', 'fa-mitten', 'fa-blanket', 'fa-tie'
 ];
 
 
 // ZATCA Phase 2 TLV & Base64 Encoder
 const zatcaEncoder = {
-    toHex: function(str) {
+    toHex: function (str) {
         return Array.from(new TextEncoder().encode(str)).map(b => b.toString(16).padStart(2, '0')).join('');
     },
-    generateTLV: function(tag, value) {
+    generateTLV: function (tag, value) {
         let valHex = this.toHex(value);
         let tagHex = tag.toString(16).padStart(2, '0');
         let lenHex = (valHex.length / 2).toString(16).padStart(2, '0');
         return tagHex + lenHex + valHex;
     },
-    generateZATCA_QR: function(sellerName, vatNumber, timestamp, total, vatTotal) {
+    generateZATCA_QR: function (sellerName, vatNumber, timestamp, total, vatTotal) {
         let isoTime = new Date(timestamp).toISOString();
-        let hexStr = this.generateTLV(1, sellerName) + 
-                     this.generateTLV(2, vatNumber) + 
-                     this.generateTLV(3, isoTime) + 
-                     this.generateTLV(4, total.toString()) + 
-                     this.generateTLV(5, vatTotal.toString());
-                     
+        let hexStr = this.generateTLV(1, sellerName) +
+            this.generateTLV(2, vatNumber) +
+            this.generateTLV(3, isoTime) +
+            this.generateTLV(4, total.toString()) +
+            this.generateTLV(5, vatTotal.toString());
+
         let bytes = new Uint8Array(hexStr.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
         let binaryStr = Array.from(bytes).map(b => String.fromCharCode(b)).join('');
         return btoa(binaryStr);
@@ -74,7 +74,7 @@ const accountingEngine = {
         const total = invoice.grandTotal;
         const subtotal = total / 1.15;
         const vat = total - subtotal;
-        
+
         invoice.vatAmount = vat;
         invoice.subtotalNet = subtotal;
 
@@ -106,20 +106,20 @@ const accountingEngine = {
         let inventory = await localforage.getItem('inventory') || [];
         // Future-proof: Logic to deduct raw materials if required
         await localforage.setItem('inventory', inventory);
-        
+
         return invoice;
     }
 };
 
 // --- FIREBASE CROSS-DEVICE SYNCHRONIZATION ---
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    databaseURL: "https://YOUR_PROJECT_ID.firebaseio.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "AIzaSyBTE1YodqeIKjG-RBCe8pHbnRM7EQNSemU",
+    authDomain: "sahab-3089b.firebaseapp.com",
+    databaseURL: "https://sahab-3089b-default-rtdb.firebaseio.com/",
+    projectId: "sahab-3089b",
+    storageBucket: "sahab-3089b.firebasestorage.app",
+    messagingSenderId: "236842364975",
+    appId: "1:236842364975:web:1ECD34c708e7a9096596da"
 };
 
 // Initialize Firebase only if not already initialized
@@ -131,7 +131,7 @@ const collectionsToSync = ['customers', 'invoices', 'journal_entries', 'tax_reco
 const originalSetItem = localforage.setItem;
 
 // Override localforage to seamlessly sync ALL saves to Firebase
-localforage.setItem = async function(key, value) {
+localforage.setItem = async function (key, value) {
     const result = await originalSetItem.call(localforage, key, value);
     if (collectionsToSync.includes(key) && !window.__syncingFromFirebase) {
         if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "YOUR_API_KEY") {
@@ -147,7 +147,7 @@ function initFirebaseSync() {
         console.warn("Firebase config is placeholder. Realtime Sync is currently disabled.");
         return;
     }
-    
+
     console.log("Firebase initialized! Syncing real-time updates across devices...");
 
     collectionsToSync.forEach(key => {
@@ -158,22 +158,22 @@ function initFirebaseSync() {
                 window.__syncingFromFirebase = true;
                 await originalSetItem.call(localforage, key, data);
                 window.__syncingFromFirebase = false; // reset flag
-                
+
                 // If it's services, update appLogic memory directly too
                 if (key === 'services' && window.appLogic) {
                     window.appLogic.services = data;
                     window.appLogic.filterItems(); // Will call renderItems
                 }
-                
+
                 // Re-render current active view so the user sees changes instantly
                 if (window.appLogic) {
                     const currentView = document.querySelector('.view-section.active');
                     if (currentView) {
                         const viewId = currentView.id.replace('view-', '');
-                        if(viewId === 'history') window.appLogic.renderHistory();
-                        else if(viewId === 'customers') window.appLogic.renderCustomers();
-                        else if(viewId === 'inventory') window.appLogic.renderInventory();
-                        else if(viewId === 'expenses') window.appLogic.renderExpenses();
+                        if (viewId === 'history') window.appLogic.renderHistory();
+                        else if (viewId === 'customers') window.appLogic.renderCustomers();
+                        else if (viewId === 'inventory') window.appLogic.renderInventory();
+                        else if (viewId === 'expenses') window.appLogic.renderExpenses();
                     }
                 }
             }
@@ -195,16 +195,16 @@ window.appLogic = {
     async init() {
         // Init localforage DB
         localforage.config({ name: 'SahabPOS', storeName: 'pos_data' });
-        
+
         // Ensure collections exist
         if (!(await localforage.getItem('customers'))) await localforage.setItem('customers', []);
         if (!(await localforage.getItem('invoices'))) await localforage.setItem('invoices', []);
-        
+
         // Wafeq Acc DBs
         if (!(await localforage.getItem('journal_entries'))) await localforage.setItem('journal_entries', []);
         if (!(await localforage.getItem('tax_records'))) await localforage.setItem('tax_records', []);
         if (!(await localforage.getItem('inventory'))) await localforage.setItem('inventory', []);
-        
+
         // Dynamic Services (Initialize only if empty to preserve Firebase synced custom pricing)
         if (!(await localforage.getItem('services'))) {
             await localforage.setItem('services', DefaultServices);
@@ -236,7 +236,7 @@ window.appLogic = {
             // Remove active from all views and nav buttons
             document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
-            
+
             // Show target view
             const targetView = document.getElementById('view-' + viewId);
             if (targetView) {
@@ -245,20 +245,20 @@ window.appLogic = {
             } else {
                 console.error('Target view NOT found:', 'view-' + viewId);
             }
-            
+
             // Highlight matching nav button
-            let matchingBtn = document.querySelector(`.nav-btn[onclick*="switchView('${viewId}')"]`) || 
-                              document.querySelector(`.nav-btn[onclick*='switchView("${viewId}")']`);
+            let matchingBtn = document.querySelector(`.nav-btn[onclick*="switchView('${viewId}')"]`) ||
+                document.querySelector(`.nav-btn[onclick*='switchView("${viewId}")']`);
             if (matchingBtn) matchingBtn.classList.add('active');
 
             // Trigger rendering
             console.log('Rendering content for:', viewId);
-            if(viewId === 'history') this.renderHistory();
-            else if(viewId === 'customers') this.renderCustomers();
-            else if(viewId === 'inventory') this.renderInventory();
-            else if(viewId === 'reports') this.renderReports();
-            else if(viewId === 'expenses') this.renderExpenses();
-            
+            if (viewId === 'history') this.renderHistory();
+            else if (viewId === 'customers') this.renderCustomers();
+            else if (viewId === 'inventory') this.renderInventory();
+            else if (viewId === 'reports') this.renderReports();
+            else if (viewId === 'expenses') this.renderExpenses();
+
         } catch (err) {
             console.error('Routing Error:', err);
         }
@@ -275,15 +275,15 @@ window.appLogic = {
     filterItems() {
         const term = document.getElementById('item-search').value.toLowerCase();
         let filtered = this.services;
-        
+
         if (this.currentCategory !== 'all') {
             filtered = filtered.filter(i => i.cat === this.currentCategory);
         }
-        
+
         if (term) {
             filtered = filtered.filter(i => i.name.includes(term));
         }
-        
+
         this.renderItems(filtered);
     },
 
@@ -305,7 +305,7 @@ window.appLogic = {
     openModal(item) {
         this.modalState = { item: item, type: 'iron', speed: 'normal', qty: 1, price: 0 };
         document.getElementById('modal-item-name').innerText = item.name;
-        
+
         // reset buttons visually
         document.querySelectorAll('#item-modal .btn-toggle').forEach(b => b.classList.remove('active'));
         document.getElementById('btn-type-iron').classList.add('active');
@@ -345,7 +345,7 @@ window.appLogic = {
 
     setQty(val) {
         let newQty = parseInt(val);
-        if(isNaN(newQty) || newQty < 1) newQty = 1;
+        if (isNaN(newQty) || newQty < 1) newQty = 1;
         this.modalState.qty = newQty;
         document.getElementById('qty-input').value = newQty;
         this.evalModalPrice();
@@ -354,7 +354,7 @@ window.appLogic = {
     evalModalPrice() {
         const { item, type, speed, qty } = this.modalState;
         let basePrice = 0;
-        
+
         if (item.prices) {
             basePrice = parseFloat(item.prices[type]) || 0;
             if (speed === 'express') {
@@ -385,8 +385,8 @@ window.appLogic = {
 
     // Cart Operations
     addToCart() {
-        if(this.modalState.price <= 0) return alert('هذه الخدمة غير متوفرة.');
-        
+        if (this.modalState.price <= 0) return alert('هذه الخدمة غير متوفرة.');
+
         let existing = this.cart.find(i => i.id === this.modalState.item.id && i.type === this.modalState.type && i.speed === this.modalState.speed);
         if (existing) {
             existing.qty += this.modalState.qty;
@@ -400,7 +400,7 @@ window.appLogic = {
                 unitPrice: this.modalState.price
             });
         }
-        
+
         this.updateCartUI();
         this.closeModal();
     },
@@ -411,7 +411,7 @@ window.appLogic = {
     },
 
     clearCart() {
-        if(confirm('إفراغ السلة؟')) {
+        if (confirm('إفراغ السلة؟')) {
             this.cart = [];
             this.editingInvoiceId = null; // Reset edit mode
             this.updateCartUI();
@@ -428,7 +428,7 @@ window.appLogic = {
     updateCartUI() {
         const container = document.getElementById('cart-items');
         container.innerHTML = '';
-        
+
         if (this.cart.length === 0) {
             container.innerHTML = '<div class="empty-cart-msg">السلة فارغة، يرجى اختيار أصناف.</div>';
         } else {
@@ -458,10 +458,10 @@ window.appLogic = {
     // Customer
     async handleCustomerPhoneBlur(phone) {
         this.customer.phone = phone.trim();
-        if(this.customer.phone) {
+        if (this.customer.phone) {
             const list = await localforage.getItem('customers') || [];
             const found = list.find(c => c.phone === this.customer.phone);
-            if(found) {
+            if (found) {
                 document.getElementById('customer-name').value = found.name;
                 this.customer.name = found.name;
             }
@@ -474,32 +474,32 @@ window.appLogic = {
     // Checkout & Invoice
     async previewCheckout() {
         console.log('Button Clicked: previewCheckout - Start processing checkout preview');
-        if(this.cart.length === 0) return alert('السلة فارغة!');
-        
+        if (this.cart.length === 0) return alert('السلة فارغة!');
+
         let cName = this.customer.name || 'عميل نقدي';
         let cPhone = this.customer.phone || '0000000000';
 
         // Generate Invoice Num
         let invoices = await localforage.getItem('invoices') || [];
         let newInvId = this.editingInvoiceId;
-        
+
         if (!newInvId) {
             let max = 100;
-            invoices.forEach(i => { 
+            invoices.forEach(i => {
                 if (i && i.id) {
-                    let num = parseInt(i.id.replace('INV-', '')); 
-                    if(num > max) max = num; 
+                    let num = parseInt(i.id.replace('INV-', ''));
+                    if (num > max) max = num;
                 }
             });
-            newInvId = `INV-${String(max+1).padStart(6, '0')}`;
+            newInvId = `INV-${String(max + 1).padStart(6, '0')}`;
         }
 
         // Prepare Invoice Details (Not Saved Yet)
         let subT = this.cart.reduce((s, i) => s + (i.unitPrice * i.qty), 0);
         let grT = subT + this.deliveryFee;
-        
+
         let invoiceData = {
-            id: newInvId, timestamp: Date.now(), customer: {phone: cPhone, name: cName},
+            id: newInvId, timestamp: Date.now(), customer: { phone: cPhone, name: cName },
             items: [...this.cart], deliveryFee: this.deliveryFee, grandTotal: grT,
             status: 'completed',
             paymentMethod: 'cash'
@@ -513,34 +513,34 @@ window.appLogic = {
 
         // Render Thermal HTML into Preview Container
         document.getElementById('invoice-preview-container').innerHTML = this.generateThermalHTML(invoiceData, 'preview-qr-render');
-        
+
         // Render QR in Preview (ZATCA Base64 TLV Format)
         const zatcaQRBase64 = zatcaEncoder.generateZATCA_QR("غسلة سحاب", "000000000000000", invoiceData.timestamp, invoiceData.grandTotal, invoiceData.vatAmount);
-        
-        new QRCode(document.getElementById('preview-qr-render'), { 
-            text: zatcaQRBase64, 
-            width:100, height:100, 
-            colorDark: "#000000", colorLight: "#ffffff", correctLevel : QRCode.CorrectLevel.L
+
+        new QRCode(document.getElementById('preview-qr-render'), {
+            text: zatcaQRBase64,
+            width: 100, height: 100,
+            colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L
         });
 
         // Setup UI State for Preview
         document.getElementById('modal-actions-preview').classList.remove('hidden');
         document.getElementById('modal-actions-success').classList.add('hidden');
-        
+
         document.getElementById('preview-invoice-id').innerText = invoiceData.id;
         document.getElementById('invoice-preview-modal').classList.remove('hidden');
     },
 
     async confirmCheckout() {
         console.log('Button Clicked: confirmCheckout - Start confirming invoice');
-        if(!this.pendingInvoice) return;
-        
+        if (!this.pendingInvoice) return;
+
         // Save Customer intelligently
-        if(this.customer.phone && this.customer.phone !== '0000000000') {
+        if (this.customer.phone && this.customer.phone !== '0000000000') {
             let customers = await localforage.getItem('customers') || [];
             let cIdx = customers.findIndex(c => c.phone === this.customer.phone);
             let cData = { phone: this.customer.phone, name: this.customer.name || 'عميل نقدي', date: Date.now() };
-            if(cIdx >= 0) customers[cIdx] = cData; else customers.push(cData);
+            if (cIdx >= 0) customers[cIdx] = cData; else customers.push(cData);
             await localforage.setItem('customers', customers);
         }
 
@@ -549,7 +549,7 @@ window.appLogic = {
 
         // Save Invoice to DB
         let invoices = await localforage.getItem('invoices') || [];
-        
+
         if (this.editingInvoiceId) {
             let idx = invoices.findIndex(i => i.id === this.editingInvoiceId);
             if (idx >= 0) invoices[idx] = this.pendingInvoice;
@@ -558,7 +558,7 @@ window.appLogic = {
         } else {
             invoices.unshift(this.pendingInvoice);
         }
-        
+
         await localforage.setItem('invoices', invoices);
 
         this.currentInvoice = this.pendingInvoice;
@@ -568,10 +568,10 @@ window.appLogic = {
         document.getElementById('success-invoice-ref').innerText = this.currentInvoice.id;
         document.getElementById('modal-actions-preview').classList.add('hidden');
         document.getElementById('modal-actions-success').classList.remove('hidden');
-        
+
         // Reset POS background
         this.cart = [];
-        this.customer = {phone:'', name:''};
+        this.customer = { phone: '', name: '' };
         document.getElementById('customer-phone').value = '';
         document.getElementById('customer-name').value = '';
         this.updateCartUI();
@@ -586,19 +586,19 @@ window.appLogic = {
     },
 
     printThermalReceipt() {
-        if(!this.currentInvoice) return;
+        if (!this.currentInvoice) return;
         this.printInvoice(this.currentInvoice);
     },
 
     async downloadDigitalPDF(event) {
         console.log('Button Clicked: downloadDigitalPDF - Generating ERP Invoice');
-        if(!this.currentInvoice) return;
-        
+        if (!this.currentInvoice) return;
+
         const data = this.currentInvoice;
         const dStr = new Date(data.timestamp).toLocaleDateString('ar-SA', { year: 'numeric', month: '2-digit', day: '2-digit' });
         const subtotal = data.items.reduce((acc, item) => acc + (item.unitPrice * item.qty), 0);
         const vatRate = 0; // Tax Removed
-        const vatAmount = 0; 
+        const vatAmount = 0;
         const grandTotal = subtotal;
 
         // Professional Items Table
@@ -607,7 +607,7 @@ window.appLogic = {
             let tLbl = item.type === 'iron' ? 'كوي' : (item.type === 'wash_iron' ? 'غسيل وكوي' : 'غسيل فقط');
             let sLbl = item.speed === 'normal' ? 'عادي' : 'سريع';
             let lineTotal = (item.unitPrice * item.qty).toFixed(2);
-            
+
             itemsHtml += `
             <tr style="border-bottom: 1px solid #edf2f7;">
                 <td style="padding: 12px; text-align: center; border-right: 1px solid #edf2f7; font-weight: bold;">${lineTotal}</td>
@@ -617,7 +617,7 @@ window.appLogic = {
                     <strong style="display: block; color: #1a202c;">${item.name}</strong>
                     <span style="font-size: 11px; color: #718096;">${tLbl} - ${sLbl}</span>
                 </td>
-                <td style="padding: 12px; text-align: center; border-left: 1px solid #edf2f7; color: #a0aec0;">${i+1}</td>
+                <td style="padding: 12px; text-align: center; border-left: 1px solid #edf2f7; color: #a0aec0;">${i + 1}</td>
             </tr>`;
         });
 
@@ -627,7 +627,7 @@ window.appLogic = {
         container.style.top = '0';
         container.style.width = '210mm'; // Fixed A4 width
         container.style.background = '#fff';
-        
+
         container.innerHTML = `
         <div class="formal-invoice-wrapper" style="width: 210mm; margin: 0 auto; padding: 40px; box-sizing: border-box; font-family: 'Tajawal', sans-serif; direction: rtl; color: #2d3748; line-height: 1.6; background: #fff;">
             
@@ -727,18 +727,18 @@ window.appLogic = {
         // Standard ZATCA QR (Updated with zero tax)
         const zatcaQRBase64 = zatcaEncoder.generateZATCA_QR("غسلة سحاب", "000000000000000", data.timestamp, data.grandTotal, 0);
         new QRCode(container.querySelector('#pdf-qr-container'), {
-            text: zatcaQRBase64, 
+            text: zatcaQRBase64,
             width: 140, height: 140,
-            colorDark: "#000000", colorLight: "#ffffff", correctLevel : QRCode.CorrectLevel.M
+            colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.M
         });
 
         const opt = {
-            margin:       0,
-            filename:     `Invoice_${data.id}.pdf`,
-            image:        { type: 'jpeg', quality: 1.0 },
-            html2canvas:  { 
-                scale: 2, 
-                useCORS: true, 
+            margin: 0,
+            filename: `Invoice_${data.id}.pdf`,
+            image: { type: 'jpeg', quality: 1.0 },
+            html2canvas: {
+                scale: 2,
+                useCORS: true,
                 width: 794, // ~210mm in pixels at 96dpi
                 windowWidth: 794,
                 x: 0,
@@ -746,12 +746,12 @@ window.appLogic = {
                 scrollX: 0,
                 scrollY: 0
             },
-            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 
         let originalBtn = null;
         let originalText = '';
-        if(event && event.currentTarget) {
+        if (event && event.currentTarget) {
             originalBtn = event.currentTarget;
             originalText = originalBtn.innerHTML;
             originalBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري التجهيز...';
@@ -761,19 +761,19 @@ window.appLogic = {
         try {
             // Force wait for images/fonts if any
             await new Promise(r => setTimeout(r, 600));
-            
+
             await html2pdf().set(opt).from(container.firstElementChild).save();
-            
+
             document.body.removeChild(container);
-            if(originalBtn) {
+            if (originalBtn) {
                 originalBtn.innerHTML = originalText;
                 originalBtn.disabled = false;
             }
             this.showToast(`تم إصدار الفاتورة رقم ${data.id} بنجاح`);
         } catch (err) {
             console.error('PDF Error:', err);
-            if(container.parentNode) document.body.removeChild(container);
-            if(originalBtn) {
+            if (container.parentNode) document.body.removeChild(container);
+            if (originalBtn) {
                 originalBtn.innerHTML = originalText;
                 originalBtn.disabled = false;
             }
@@ -784,7 +784,7 @@ window.appLogic = {
     // Toast Message Fix
     showToast(msg) {
         let t = document.getElementById('toast-msg');
-        if(!t) {
+        if (!t) {
             t = document.createElement('div');
             t.id = 'toast-msg';
             t.style.cssText = 'position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#4CAF50;color:#fff;padding:15px 30px;border-radius:30px;font-weight:bold;z-index:9999;box-shadow:0 10px 30px rgba(0,0,0,0.5);opacity:0;transition:opacity 0.3s; pointer-events:none; font-family:"Tajawal",sans-serif; text-align:center; min-width:300px;';
@@ -854,14 +854,14 @@ window.appLogic = {
     // 80mm Thermal Receipt Layout
     printInvoice(data) {
         document.getElementById('invoice-print-container').innerHTML = this.generateThermalHTML(data, 'print-qr-render');
-        
+
         const zatcaQRBase64 = zatcaEncoder.generateZATCA_QR("غسلة سحاب", "000000000000000", data.timestamp, data.grandTotal, 0);
-        new QRCode(document.getElementById('print-qr-render'), { 
-            text: zatcaQRBase64, 
-            width:120, height:120, 
-            colorDark: "#000000", colorLight: "#ffffff", correctLevel : QRCode.CorrectLevel.L
+        new QRCode(document.getElementById('print-qr-render'), {
+            text: zatcaQRBase64,
+            width: 120, height: 120,
+            colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L
         });
-        
+
         window.print();
     },
 
@@ -875,7 +875,7 @@ window.appLogic = {
         try {
             const invs = await localforage.getItem('invoices') || [];
             let filtered = invs;
-            if(searchTerm) {
+            if (searchTerm) {
                 const term = searchTerm.toLowerCase();
                 filtered = invs.filter(i => {
                     if (!i) return false;
@@ -889,8 +889,8 @@ window.appLogic = {
 
             let html = '<table style="width:100%; border-collapse:collapse; background:var(--bg-surface); border-radius:12px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.5)">';
             html += '<tr style="background:#111; color:var(--primary)"><th style="padding:15px; text-align:right;">رقم الفاتورة</th><th style="padding:15px; text-align:right;">العميل</th><th style="padding:15px; text-align:right;">المبلغ</th><th style="padding:15px; text-align:right;">التاريخ</th><th style="padding:15px; text-align:center;">إجراءات</th></tr>';
-            
-            if(filtered.length === 0) {
+
+            if (filtered.length === 0) {
                 html += '<tr><td colspan="5" style="padding:20px; text-align:center;">لا توجد فواتير مطابقة للبحث.</td></tr>';
             } else {
                 filtered.forEach(i => {
@@ -927,16 +927,16 @@ window.appLogic = {
     async reprintInvoice(id) {
         const invs = await localforage.getItem('invoices') || [];
         const invoiceData = invs.find(i => i.id === id);
-        if(!invoiceData) return;
-        
+        if (!invoiceData) return;
+
         this.currentInvoice = invoiceData;
         document.getElementById('invoice-preview-container').innerHTML = this.generateThermalHTML(invoiceData, 'preview-qr-render');
-        
+
         const zatcaQRBase64 = zatcaEncoder.generateZATCA_QR("غسلة سحاب", "000000000000000", invoiceData.timestamp, invoiceData.grandTotal, invoiceData.vatAmount || 0);
-        new QRCode(document.getElementById('preview-qr-render'), { 
-            text: zatcaQRBase64, 
-            width:100, height:100, 
-            colorDark: "#000000", colorLight: "#ffffff", correctLevel : QRCode.CorrectLevel.L
+        new QRCode(document.getElementById('preview-qr-render'), {
+            text: zatcaQRBase64,
+            width: 100, height: 100,
+            colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L
         });
 
         document.getElementById('modal-actions-preview').classList.add('hidden');
@@ -948,7 +948,7 @@ window.appLogic = {
     },
 
     async deleteInvoice(id) {
-        if(!confirm(`هل أنت متأكد من حذف الفاتورة ${id} نهائياً؟`)) return;
+        if (!confirm(`هل أنت متأكد من حذف الفاتورة ${id} نهائياً؟`)) return;
         let invs = await localforage.getItem('invoices') || [];
         invs = invs.filter(i => i.id !== id);
         await localforage.setItem('invoices', invs);
@@ -956,25 +956,25 @@ window.appLogic = {
     },
 
     async editInvoice(id) {
-        if(!confirm(`تعديل الفاتورة سيقوم بإلغائها الحالية ونقل محتوياتها إلى نقطة البيع لإنشاء فاتورة جديدة. هل تود المتابعة؟`)) return;
-        
+        if (!confirm(`تعديل الفاتورة سيقوم بإلغائها الحالية ونقل محتوياتها إلى نقطة البيع لإنشاء فاتورة جديدة. هل تود المتابعة؟`)) return;
+
         let invs = await localforage.getItem('invoices') || [];
         const invoiceData = invs.find(i => i.id === id);
-        if(!invoiceData) return;
+        if (!invoiceData) return;
 
         // Load to cart
         this.cart = [...invoiceData.items];
         this.customer = { phone: invoiceData.customer.phone || '', name: invoiceData.customer.name || '' };
         this.deliveryFee = invoiceData.deliveryFee || 0;
         this.editingInvoiceId = id; // Flag that we are updating this specific ID
-        
+
         document.getElementById('customer-phone').value = this.customer.phone === '0000000000' ? '' : this.customer.phone;
         document.getElementById('customer-name').value = this.customer.name === 'عميل نقدي' ? '' : this.customer.name;
-        
+
         // UI updates
         this.updateCartUI();
         this.switchView('pos');
-        
+
         // ensure category is refreshed
         document.querySelector(`.nav-btn[onclick="appLogic.switchView('pos')"]`).classList.add('active');
     },
@@ -1004,12 +1004,12 @@ window.appLogic = {
             console.error('Filter Customers Error:', err);
         }
     },
-    
+
     renderCustomersList(customersArray) {
         try {
             let html = '<table style="width:100%; border-collapse:collapse; margin-top:20px; background:var(--bg-surface); border-radius:12px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.5)">';
             html += '<tr style="background:#111; color:var(--primary)"><th style="padding:15px; text-align:right;">الجوال</th><th style="padding:15px; text-align:right;">الاسم</th><th style="padding:15px; text-align:right;">آخر تاريخ</th><th style="padding:15px; text-align:center;">إجراءات</th></tr>';
-            if(customersArray.length === 0) {
+            if (customersArray.length === 0) {
                 html += '<tr><td colspan="4" style="padding:20px; text-align:center;">لا توجد بيانات للعملاء حتى الآن.</td></tr>';
             } else {
                 customersArray.forEach(c => {
@@ -1054,11 +1054,11 @@ window.appLogic = {
         let sku = document.getElementById('inv-sku').value;
         let qty = parseFloat(document.getElementById('inv-qty').value);
         let cost = parseFloat(document.getElementById('inv-cost').value);
-        if(!name || !sku) { alert('يرجى تعبئة الحقول الأساسية!'); return; }
-        
+        if (!name || !sku) { alert('يرجى تعبئة الحقول الأساسية!'); return; }
+
         let inv = await localforage.getItem('inventory') || [];
         let itemIdx = inv.findIndex(i => i.sku === sku);
-        if(itemIdx >= 0) {
+        if (itemIdx >= 0) {
             inv[itemIdx].qty += qty;
             inv[itemIdx].cost = cost;
         } else {
@@ -1072,14 +1072,14 @@ window.appLogic = {
 
     async renderInventory() {
         let trackedInv = await localforage.getItem('inventory') || [];
-        
+
         let html = `
         <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px; margin-bottom:20px;">
             <h3 style="margin-bottom:15px; border-bottom:1px solid var(--border); padding-bottom:10px;">المواد الاستهلاكية (Consumables)</h3>
             ${trackedInv.length === 0 ? '<p style="color:var(--text-muted); text-align:center;">لا توجد مواد استهلاكية مضافة حالياً. أضف الجِير، الأكياس، الشماعات ليتم خصمها آلياً يدوياً.</p>' : ''}
         `;
-        
-        if(trackedInv.length > 0) {
+
+        if (trackedInv.length > 0) {
             html += `<table style="width:100%; border-collapse:collapse; text-align:right; margin-bottom:20px;">
                 <thead>
                     <tr style="border-bottom:2px solid var(--border); color:var(--text-muted);">
@@ -1104,7 +1104,7 @@ window.appLogic = {
             html += `</tbody></table>`;
         }
         html += `</div>`;
-        
+
         // Laundry Services Section
         html += `
         <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px;">
@@ -1145,7 +1145,7 @@ window.appLogic = {
                 </tr>`;
         });
         html += `</tbody></table></div></div>`;
-        
+
         const container = document.getElementById('inventory-content');
         if (container) container.innerHTML = html;
     },
@@ -1162,7 +1162,7 @@ window.appLogic = {
     openEditServiceModal(id) {
         this.resetServiceForm();
         const service = this.services.find(s => s.id === id);
-        if(!service) return;
+        if (!service) return;
 
         document.getElementById('service-modal-title').innerHTML = '<i class="fa-solid fa-edit"></i> تعديل الخدمة';
         document.getElementById('service-id').value = service.id;
@@ -1217,7 +1217,7 @@ window.appLogic = {
         const pWash = parseFloat(document.getElementById('price-wash').value);
         const pExpFee = parseFloat(document.getElementById('price-express-fee').value);
 
-        if(!name) { alert('يرجى إدخال اسم الخدمة'); return; }
+        if (!name) { alert('يرجى إدخال اسم الخدمة'); return; }
 
         let newService = {
             id: id || `SRV-${Date.now()}`,
@@ -1226,9 +1226,9 @@ window.appLogic = {
             expressFee: pExpFee
         };
 
-        if(id) {
+        if (id) {
             const idx = this.services.findIndex(s => s.id === id);
-            if(idx !== -1) this.services[idx] = newService;
+            if (idx !== -1) this.services[idx] = newService;
         } else {
             this.services.unshift(newService);
         }
@@ -1248,31 +1248,31 @@ window.appLogic = {
         let amount = parseFloat(document.getElementById('exp-amount').value);
         let desc = document.getElementById('exp-desc').value;
         let date = document.getElementById('exp-date').value;
-        
-        if(!amount || !desc || !date) { alert('يرجى تعبئة كافة الحقول لحفظ التقييد المحاسبي!'); return; }
-        
+
+        if (!amount || !desc || !date) { alert('يرجى تعبئة كافة الحقول لحفظ التقييد المحاسبي!'); return; }
+
         let exps = await localforage.getItem('expenses') || [];
         exps.push({ id: Date.now(), category: cat, amount: amount, desc: desc, date: date });
         await localforage.setItem('expenses', exps);
-        
+
         this.closeExpenseModal();
         this.renderExpenses();
         this.showToast('تم تقييد المصروف بنجاح وتسجيله بالدفتر');
-        
+
         // Reset fields
         document.getElementById('exp-amount').value = 0;
         document.getElementById('exp-desc').value = '';
     },
-    
+
     async renderExpenses() {
         let exps = await localforage.getItem('expenses') || [];
-        
+
         let html = `
         <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px; margin-bottom:20px;">
             ${exps.length === 0 ? '<p style="color:var(--text-muted); text-align:center;">لا توجد مصروفات مقيدة في النظام</p>' : ''}
         `;
-        
-        if(exps.length > 0) {
+
+        if (exps.length > 0) {
             let totalExps = 0;
             html += `<table style="width:100%; border-collapse:collapse; text-align:right;">
                 <thead>
@@ -1285,7 +1285,7 @@ window.appLogic = {
                 </thead>
                 <tbody>`;
             // Sort Descending
-            exps.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(e => {
+            exps.sort((a, b) => new Date(b.date) - new Date(a.date)).forEach(e => {
                 totalExps += e.amount;
                 html += `
                 <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
@@ -1300,7 +1300,7 @@ window.appLogic = {
                 <h3 style="color:#e91e63;">إجمالي المصروفات: <span style="direction:ltr; display:inline-block;">${totalExps.toFixed(2)} SAR</span></h3>
             </div>`;
         }
-        
+
         html += `</div>`;
         document.getElementById('expenses-content').innerHTML = html;
     },
@@ -1309,7 +1309,7 @@ window.appLogic = {
     async renderReports() {
         const taxRecords = await localforage.getItem('tax_records') || [];
         const exps = await localforage.getItem('expenses') || [];
-        
+
         let totalGross = 0;
         let totalNet = 0;
         let totalVat = 0;
@@ -1327,7 +1327,7 @@ window.appLogic = {
             totalGross += r.grossTotal || 0;
             totalNet += r.netTotal || 0;
             totalVat += r.vatCollected || 0;
-            
+
             const rTime = new Date(r.date).getTime();
             const rNet = r.netTotal || 0;
             if (rTime >= today) salesToday += rNet;
@@ -1335,11 +1335,11 @@ window.appLogic = {
             if (rTime >= monthAgo) salesMonth += rNet;
             if (rTime >= yearAgo) salesYear += rNet;
         });
-        
+
         exps.forEach(e => {
             totalExpensesCost += e.amount || 0;
         });
-        
+
         let netProfit = totalNet - totalExpensesCost;
 
         let html = `
