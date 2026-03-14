@@ -677,4 +677,75 @@ button:active { transform: scale(0.97); }
     #invoice-preview-modal .modal-body > div {
         width: 100% !important;
     }
+
+    /* Convert History/Customer Tables to Cards on Mobile */
+    #history-content table, 
+    #customers-content table {
+        display: block;
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+    
+    #history-content thead, 
+    #customers-content thead {
+        display: none; /* Hide table headers */
+    }
+    
+    #history-content tbody, 
+    #customers-content tbody {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    #history-content tr, 
+    #customers-content tr {
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: 15px;
+        position: relative;
+    }
+
+    #history-content td, 
+    #customers-content td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+        text-align: left; /* Align values to the left on mobile for rtl mode */
+    }
+
+    #history-content td:last-child, 
+    #customers-content td:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+
+    /* Inject labels explicitly using CSS pseudo-elements for mobile context */
+    /* Customers */
+    #customers-content td:nth-of-type(1)::before { content: "رقم الجوال:"; color: var(--primary); font-weight: bold; }
+    #customers-content td:nth-of-type(2)::before { content: "الاسم:"; color: var(--primary); font-weight: bold; }
+    #customers-content td:nth-of-type(3)::before { content: "تاريخ التسجيل:"; color: var(--text-muted); font-size: 13px; }
+    
+    /* History/Invoices */
+    #history-content td:nth-of-type(1)::before { content: "رقم الفاتورة:"; color: var(--primary); font-weight: bold; }
+    #history-content td:nth-of-type(2)::before { content: "العميل:"; color: var(--primary); font-weight: bold; }
+    #history-content td:nth-of-type(3)::before { content: "المبلغ:"; color: var(--primary); font-weight: bold; }
+    #history-content td:nth-of-type(4)::before { content: "التاريخ:"; color: var(--text-muted); font-size: 13px; }
+
+    /* Action Buttons in Mobile Cards */
+    #history-content td:last-child,
+    #customers-content td:last-child {
+        margin-top: 10px;
+        padding-top: 15px;
+        border-top: 1px solid var(--border);
+        display: flex;
+        justify-content: flex-end; /* Align actions to the bottom right */
+        gap: 10px;
+    }
 }
+

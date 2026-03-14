@@ -138,7 +138,7 @@ const originalSetItem = localforage.setItem;
 localforage.setItem = async function (key, value) {
     const result = await originalSetItem.call(localforage, key, value);
     if (collectionsToSync.includes(key) && !window.__syncingFromFirebase) {
-        if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "YOUR_API_KEY") {
+        if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "YOUR_API_KEY" && !!firebaseConfig.apiKey) {
             // Upload to firebase (only if it's an explicit local update)
             firebase.database().ref(key).set(value).catch(e => console.error("Firebase sync write error:", e));
         }
