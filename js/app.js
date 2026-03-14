@@ -124,10 +124,14 @@ const firebaseConfig = {
 
 // Initialize Firebase only if not already initialized
 if (typeof firebase !== 'undefined' && !firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
+    try {
+        firebase.initializeApp(firebaseConfig);
+    } catch (err) {
+        console.error("Firebase init error:", err);
+    }
 }
 
-const collectionsToSync = ['customers', 'invoices', 'journal_entries', 'tax_records', 'inventory', 'services'];
+const collectionsToSync = ['customers', 'invoices', 'journal_entries', 'tax_records', 'inventory', 'services', 'expenses'];
 const originalSetItem = localforage.setItem;
 
 // Override localforage to seamlessly sync ALL saves to Firebase
@@ -135,6 +139,7 @@ localforage.setItem = async function (key, value) {
     const result = await originalSetItem.call(localforage, key, value);
     if (collectionsToSync.includes(key) && !window.__syncingFromFirebase) {
         if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "YOUR_API_KEY") {
+            // Upload to firebase (only if it's an explicit local update)
             firebase.database().ref(key).set(value).catch(e => console.error("Firebase sync write error:", e));
         }
     }
@@ -147,34 +152,44 @@ function initFirebaseSync() {
         console.warn("Firebase config is placeholder. Realtime Sync is currently disabled.");
         return;
     }
-
-    console.log("Firebase initialized! Syncing real-time updates across devices...");
+    
+    console.log("Firebase initialized! Linking two-way Realtime Sync...");
 
     collectionsToSync.forEach(key => {
-        firebase.database().ref(key).on('value', async (snapshot) => {
-            const data = snapshot.val();
-            if (data) {
-                // We received updated data from the cloud (another device)
-                window.__syncingFromFirebase = true;
-                await originalSetItem.call(localforage, key, data);
-                window.__syncingFromFirebase = false; // reset flag
-
-                // If it's services, update appLogic memory directly too
-                if (key === 'services' && window.appLogic) {
-                    window.appLogic.services = data;
-                    window.appLogic.filterItems(); // Will call renderItems
-                }
-
-                // Re-render current active view so the user sees changes instantly
+        const dbRef = firebase.database().ref(key);
+        dbRef.on('value', async (snapshot) => {
+            const cloudData = snapshot.val();
+            
+            if (cloudData !== null) {
+                // 1. Data exists in Cloud -> Sync to local storage securely
+                window.__syncingFromFirebase = true; // Prevent bounce back to cloud
+                await originalSetItem.call(localforage, key, cloudData);
+                window.__syncingFromFirebase = false;
+                
+                // 2. Refresh active UI
                 if (window.appLogic) {
+                    if (key === 'services') {
+                        window.appLogic.services = cloudData;
+                        window.appLogic.filterItems(); 
+                    }
+                    
                     const currentView = document.querySelector('.view-section.active');
                     if (currentView) {
                         const viewId = currentView.id.replace('view-', '');
-                        if (viewId === 'history') window.appLogic.renderHistory();
-                        else if (viewId === 'customers') window.appLogic.renderCustomers();
-                        else if (viewId === 'inventory') window.appLogic.renderInventory();
-                        else if (viewId === 'expenses') window.appLogic.renderExpenses();
+                        // Preserve search state by calling filter functions instead of render directly
+                        if (viewId === 'history' && key === 'invoices') window.appLogic.filterHistory();
+                        else if (viewId === 'customers' && key === 'customers') window.appLogic.filterCustomers();
+                        else if (viewId === 'inventory' && (key === 'inventory' || key === 'services')) window.appLogic.renderInventory();
+                        else if (viewId === 'expenses' && key === 'expenses') window.appLogic.renderExpenses();
+                        else if (viewId === 'reports') window.appLogic.renderReports();
                     }
+                }
+            } else {
+                // 3. Data is NULL in Cloud -> Seed Cloud from Local Storage (First time setup)
+                const localData = await localforage.getItem(key);
+                if (localData && Array.isArray(localData) && localData.length > 0) {
+                    console.log(`[Sync] Seeding empty cloud collection: ${key}`);
+                    dbRef.set(localData).catch(e => console.error("Firebase seed error:", e));
                 }
             }
         });
