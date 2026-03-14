@@ -255,27 +255,20 @@ window.appLogic = {
     editingInvoiceId: null,
     services: [],
     async init() {
-        console.log("[App] Starting POS initialization...");
+        console.log("[App] !!! STARTING CRITICAL INITIALIZATION !!!");
+        console.log("[App] Waiting strictly for Firebase Heartbeat...");
+        
         localforage.config({ name: 'SahabPOS', storeName: 'pos_data' });
 
-        // BEG FIREBASE: This is the heartbeat. We wait for cloud before doing anything.
+        // 1. BEG FIREBASE: We do not touch local storage until we hear from the cloud.
+        // This prevents "Default to empty" from wiping your business data.
         await initFirebaseSync();
 
-        // ONLY AFTER Cloud sync is done, we ensure local defaults exist for new users
-        if (!(await localforage.getItem('customers'))) await localforage.setItem('customers', []);
-        if (!(await localforage.getItem('invoices'))) await localforage.setItem('invoices', []);
-        if (!(await localforage.getItem('journal_entries'))) await localforage.setItem('journal_entries', []);
-        if (!(await localforage.getItem('tax_records'))) await localforage.setItem('tax_records', []);
-        if (!(await localforage.getItem('inventory'))) await localforage.setItem('inventory', []);
-        if (!(await localforage.getItem('expenses'))) await localforage.setItem('expenses', []);
-
-        // Dynamic Services (Initialize only if empty to preserve Firebase synced custom pricing)
-        if (!(await localforage.getItem('services'))) {
-            await localforage.setItem('services', DefaultServices);
-        }
-        this.services = await localforage.getItem('services');
-
-        console.log("[App] Initialization complete. Rendering UI.");
+        // 2. FETCH FINAL STATE: After Firebase has updated localforage, we pull it into memory.
+        this.services = await localforage.getItem('services') || DefaultServices;
+        
+        console.log("[App] Initialization pulse complete. Data is now protected and loaded.");
+        
         this.renderItems();
         this.updateCartUI();
     },
@@ -601,7 +594,7 @@ window.appLogic = {
         if (this.customer.phone && this.customer.phone !== '0000000000') {
             let customers = await localforage.getItem('customers') || [];
             let cIdx = customers.findIndex(c => c.phone === this.customer.phone);
-            let cData = { phone: this.customer.phone, name: this.customer.name || 'عميل نقدي', date: Date.now() };
+            let cData = { phone: this.customer.phone, name: this.customer.name || 'عميل نقدي', timestamp: Date.now() };
             if (cIdx >= 0) customers[cIdx] = cData; else customers.push(cData);
             await localforage.setItem('customers', customers);
         }
@@ -966,8 +959,8 @@ window.appLogic = {
             if (filtered.length === 0) {
                 html += '<tr><td colspan="5" style="padding:20px; text-align:center;">لا توجد فواتير مطابقة للبحث.</td></tr>';
             } else {
-                // Invoices are unshifted (newest first), so no need to reverse.
-                const displayInvoices = [...filtered];
+                // UNIFIED SORTING: Newest First based on timestamp
+                const displayInvoices = [...filtered].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
                 
                 displayInvoices.forEach(i => {
                     if (!i) return;
@@ -1088,14 +1081,14 @@ window.appLogic = {
             if (customersArray.length === 0) {
                 html += '<tr><td colspan="4" style="padding:20px; text-align:center;">لا توجد بيانات للعملاء حتى الآن.</td></tr>';
             } else {
-                // Customers are pushed/updated, so we sort them by date descending
-                const displayCustomers = [...customersArray].sort((a,b) => (b.date || 0) - (a.date || 0));
+                // UNIFIED SORTING: Newest First based on timestamp
+                const displayCustomers = [...customersArray].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
                 
                 displayCustomers.forEach(c => {
                     if (!c) return;
                     let n = c.name || 'غير معروف';
                     let p = c.phone || 'غير مسجل';
-                    let d = c.date ? new Date(c.date).toLocaleString('ar-SA') : '-';
+                    let d = c.timestamp ? new Date(c.timestamp).toLocaleString('ar-SA') : '-';
                     html += `<tr style="border-bottom:1px solid var(--border);">
                         <td style="padding:15px; font-weight:bold; direction:ltr; text-align:right;">${p}</td>
                         <td style="padding:15px; font-weight:bold;">${n}</td>
