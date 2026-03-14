@@ -133,11 +133,13 @@ if (typeof firebase !== 'undefined' && !firebase.apps.length) {
 
 const collectionsToSync = ['customers', 'invoices', 'journal_entries', 'tax_records', 'inventory', 'services', 'expenses'];
 const originalSetItem = localforage.setItem;
+window.__cloudChecked = {}; // Track each collection independently
 
 // Override localforage to seamlessly sync ALL saves to Firebase
 localforage.setItem = async function (key, value) {
     const result = await originalSetItem.call(localforage, key, value);
-    if (collectionsToSync.includes(key) && !window.__syncingFromFirebase && window.__initialSyncDone) {
+    // CRITICAL: Only sync if the cloud has BEEN FETCHED for this specific key
+    if (collectionsToSync.includes(key) && !window.__syncingFromFirebase && window.__cloudChecked[key]) {
         if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "YOUR_API_KEY" && !!firebaseConfig.apiKey) {
             try {
                 // EXTREME SANITIZATION: Firebase rejects undefined, functions, and deeply nested nulls
@@ -163,6 +165,8 @@ async function initFirebaseSync() {
         window.__initialSyncDone = true;
         return;
     }
+
+    console.log("Firebase connection established"); // Required Log
     
     // We create a promise for each collection to ensure we've checked the cloud before starting
     const syncPromises = collectionsToSync.map(key => {
@@ -174,7 +178,8 @@ async function initFirebaseSync() {
             // ONE-TIME FETCH: Get initial state from cloud
             dbRef.once('value', async (snapshot) => {
                 let cloudData = snapshot.val();
-                console.log(`[Firebase] Data received for ${key}:`, cloudData);
+                console.log("Data received from cloud"); // Required Log
+                console.log(`[Firebase] Detailed data for ${key}:`, cloudData);
                 
                 if (cloudData !== null) {
                     if (typeof cloudData === 'object' && !Array.isArray(cloudData)) cloudData = Object.values(cloudData);
@@ -184,9 +189,11 @@ async function initFirebaseSync() {
                     window.__syncingFromFirebase = true;
                     await originalSetItem.call(localforage, key, cloudData);
                     window.__syncingFromFirebase = false;
+                    window.__cloudChecked[key] = true; // Unlock syncing for this key
                     console.log(`[Firebase] Local storage updated with cloud data for: ${key}`);
                 } else {
                     console.log(`[Firebase] Collection ${key} is empty in cloud.`);
+                    window.__cloudChecked[key] = true; // Unlock syncing for this key
                     const localData = await localforage.getItem(key);
                     if (localData && Array.isArray(localData) && localData.length > 0) {
                         console.log(`[Firebase] Seeding cloud from local storage for: ${key}`);
@@ -196,7 +203,8 @@ async function initFirebaseSync() {
                 resolve();
             }, (err) => {
                 console.error(`[Firebase] Fetch Error for ${key}:`, err);
-                resolve(); // Resolve anyway to not hang the whole app if one fails
+                window.__cloudChecked[key] = true; // Unlock so app doesn't freeze, but warn
+                resolve(); 
             });
 
             // HEARTBEAT SYNC
@@ -256,9 +264,19 @@ window.appLogic = {
     services: [],
     async init() {
         console.log("[App] !!! STARTING CRITICAL INITIALIZATION !!!");
-        console.log("[App] Waiting strictly for Firebase Heartbeat...");
+        console.log("[App] Environment:", window.location.protocol);
         
         localforage.config({ name: 'SahabPOS', storeName: 'pos_data' });
+
+        // Required Log: Verify local storage is accessible
+        try {
+            await localforage.getItem('test');
+            console.log("Local storage loaded");
+        } catch (e) {
+            console.error("Local storage failed to load:", e);
+        }
+
+        console.log("[App] Waiting strictly for Firebase Heartbeat...");
 
         // 1. BEG FIREBASE: We do not touch local storage until we hear from the cloud.
         // This prevents "Default to empty" from wiping your business data.
