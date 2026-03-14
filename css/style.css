@@ -747,5 +747,68 @@ button:active { transform: scale(0.97); }
         justify-content: flex-end; /* Align actions to the bottom right */
         gap: 10px;
     }
+
+    /* Convert Inventory Tables to Cards on Mobile */
+    #inventory-content table {
+        display: block;
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+    
+    #inventory-content thead {
+        display: none; /* Hide table headers */
+    }
+    
+    #inventory-content tbody {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    #inventory-content tr {
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: 15px;
+        position: relative;
+    }
+
+    #inventory-content td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+        text-align: left; /* Align values to the left on mobile for rtl mode */
+    }
+
+    #inventory-content td:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+        margin-top: 10px;
+        padding-top: 15px;
+        border-top: 1px solid var(--border);
+        justify-content: flex-end;
+    }
+
+    /* Inject labels explicitly using CSS pseudo-elements for mobile context */
+    /* First Table: Consumables */
+    #inventory-content > div:nth-child(1) td:nth-of-type(1)::before { content: "SKU:"; color: var(--primary); font-weight: bold; }
+    #inventory-content > div:nth-child(1) td:nth-of-type(2)::before { content: "الاسم:"; color: var(--primary); font-weight: bold; }
+    #inventory-content > div:nth-child(1) td:nth-of-type(3)::before { content: "التكلفة:"; color: var(--primary); font-weight: bold; }
+    #inventory-content > div:nth-child(1) td:nth-of-type(4)::before { content: "الرصيد المتاح:"; color: var(--primary); font-weight: bold; }
+    #inventory-content > div:nth-child(1) td:nth-of-type(5)::before { content: "إجمالي القيمة:"; color: var(--primary); font-weight: bold; }
+    
+    /* Second Table: Laundry Services */
+    #inventory-content > div:nth-child(2) td:nth-of-type(1)::before { content: "الأيقونة:"; color: var(--text-muted); font-size: 13px; }
+    #inventory-content > div:nth-child(2) td:nth-of-type(2)::before { content: "اسم الخدمة:"; color: var(--primary); font-weight: bold; }
+    #inventory-content > div:nth-child(2) td:nth-of-type(3)::before { content: "الفئة:"; color: var(--primary); font-weight: bold; }
+    #inventory-content > div:nth-child(2) td:nth-of-type(4)::before { content: "كوي القطعة:"; color: var(--text-muted); font-size: 13px; }
+    #inventory-content > div:nth-child(2) td:nth-of-type(5)::before { content: "غسيل القطعة:"; color: var(--text-muted); font-size: 13px; }
+    #inventory-content > div:nth-child(2) td:nth-of-type(6)::before { content: "غسيل وكوي:"; color: var(--text-muted); font-size: 13px; }
+    #inventory-content > div:nth-child(2) td:nth-of-type(7)::before { content: "رسوم مستعجل:"; color: var(--text-muted); font-size: 13px; }
+    #inventory-content > div:nth-child(2) td:nth-of-type(8)::before { content: "إجراء:"; color: var(--primary); font-weight: bold; }
 }
 

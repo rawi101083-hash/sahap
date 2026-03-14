@@ -158,9 +158,19 @@ function initFirebaseSync() {
     collectionsToSync.forEach(key => {
         const dbRef = firebase.database().ref(key);
         dbRef.on('value', async (snapshot) => {
-            const cloudData = snapshot.val();
+            let cloudData = snapshot.val();
             
             if (cloudData !== null) {
+                // Firebase might convert sparse arrays into objects; convert them back
+                if (typeof cloudData === 'object' && !Array.isArray(cloudData)) {
+                    cloudData = Object.values(cloudData);
+                }
+                
+                // Strip out any null or ghost entries securely
+                if (Array.isArray(cloudData)) {
+                    cloudData = cloudData.filter(item => item !== null && item !== undefined && typeof item === 'object' && Object.keys(item).length > 0);
+                }
+
                 // 1. Data exists in Cloud -> Sync to local storage securely
                 window.__syncingFromFirebase = true; // Prevent bounce back to cloud
                 await originalSetItem.call(localforage, key, cloudData);
@@ -889,7 +899,11 @@ window.appLogic = {
     async renderHistory(searchTerm = '') {
         try {
             const invs = await localforage.getItem('invoices') || [];
-            let filtered = invs;
+            
+            // STRICT VALIDATION: Filter out undefined/empty invoices to kill ghosts
+            let filteredInvoices = Array.isArray(invs) ? invs : Object.values(invs);
+            let filtered = filteredInvoices.filter(i => i && i.id && typeof i.grandTotal !== 'undefined');
+
             if (searchTerm) {
                 const term = searchTerm.toLowerCase();
                 filtered = invs.filter(i => {
