@@ -134,22 +134,27 @@ if (typeof firebase !== 'undefined' && !firebase.apps.length) {
 const collectionsToSync = ['customers', 'invoices', 'journal_entries', 'tax_records', 'inventory', 'services', 'expenses'];
 const originalSetItem = localforage.setItem;
 window.__cloudChecked = {}; // Track each collection independently
+window.__syncingFromFirebase = false;
 
 // Override localforage to seamlessly sync ALL saves to Firebase
 localforage.setItem = async function (key, value) {
     const result = await originalSetItem.call(localforage, key, value);
-    // CRITICAL: Only sync if the cloud has BEEN FETCHED for this specific key
+    
+    // THE GATEKEEPER: Only push to Firebase if:
+    // 1. It's a syncable collection
+    // 2. We aren't currently pulling data FROM Firebase (infinite loop protection)
+    // 3. We have ALREADY fetched the cloud version for this specific key (Initialization protection)
     if (collectionsToSync.includes(key) && !window.__syncingFromFirebase && window.__cloudChecked[key]) {
         if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "YOUR_API_KEY" && !!firebaseConfig.apiKey) {
             try {
-                // EXTREME SANITIZATION: Firebase rejects undefined, functions, and deeply nested nulls
+                // EXTREME SANITIZATION: Clean data for Firebase
                 const safePayload = JSON.parse(JSON.stringify(value, (k, v) => (v === undefined ? null : v)));
-                console.log(`[Firebase] Sycning ${key} to cloud...`, safePayload);
+                console.log(`[Sync-Out] Sending ${key} to cloud...`, safePayload);
                 firebase.database().ref(key).set(safePayload)
-                    .then(() => console.log(`[Firebase] ${key} synced successfully.`))
-                    .catch(err => console.error(`[Firebase] Sync Error for ${key}:`, err));
+                    .then(() => console.log(`[Sync-Done] ${key} saved to cloud.`))
+                    .catch(err => console.error(`[Sync-Error] ${key} failed:`, err));
             } catch (err) {
-                console.error("[Firebase] Serialization Error:", err);
+                console.error("[Sync-Crash] Serialization Error:", err);
             }
         }
     }
@@ -158,82 +163,80 @@ localforage.setItem = async function (key, value) {
 
 // Listen to Firebase Realtime Database for updates from other devices
 async function initFirebaseSync() {
-    console.log("[Firebase] Attempting to fetch from Firebase...");
+    console.log("[Init] Connection Attempt...");
     
     if (typeof firebase === 'undefined' || firebaseConfig.apiKey === "YOUR_API_KEY") {
-        console.warn("[Firebase] Config is placeholder. Realtime Sync is currently disabled.");
-        window.__initialSyncDone = true;
+        console.warn("[Init] Firebase is disabled (Check config).");
+        collectionsToSync.forEach(k => window.__cloudChecked[k] = true); // Bypass for offline mode
         return;
     }
 
     console.log("Firebase connection established"); // Required Log
     
-    // We create a promise for each collection to ensure we've checked the cloud before starting
     const syncPromises = collectionsToSync.map(key => {
         return new Promise((resolve) => {
             const dbRef = firebase.database().ref(key);
+            console.log(`[Init] Fetching ${key}...`);
             
-            console.log(`[Firebase] Requesting initial data for: ${key}...`);
-            
-            // ONE-TIME FETCH: Get initial state from cloud
+            // 1. FETCH BEFORE WRITE: Get cloud state first
             dbRef.once('value', async (snapshot) => {
                 let cloudData = snapshot.val();
                 console.log("Data received from cloud"); // Required Log
-                console.log(`[Firebase] Detailed data for ${key}:`, cloudData);
                 
                 if (cloudData !== null) {
+                    console.log(`[Init] Using Cloud Version for ${key}`);
                     if (typeof cloudData === 'object' && !Array.isArray(cloudData)) cloudData = Object.values(cloudData);
                     if (Array.isArray(cloudData)) {
-                        cloudData = cloudData.filter(item => item !== null && item !== undefined && typeof item === 'object' && Object.keys(item).length > 0);
+                        cloudData = cloudData.filter(item => item !== null && typeof item === 'object');
                     }
                     window.__syncingFromFirebase = true;
                     await originalSetItem.call(localforage, key, cloudData);
                     window.__syncingFromFirebase = false;
-                    window.__cloudChecked[key] = true; // Unlock syncing for this key
-                    console.log(`[Firebase] Local storage updated with cloud data for: ${key}`);
                 } else {
-                    console.log(`[Firebase] Collection ${key} is empty in cloud.`);
-                    window.__cloudChecked[key] = true; // Unlock syncing for this key
+                    console.log(`[Init] Cloud is empty for ${key}. Checking local cache...`);
                     const localData = await localforage.getItem(key);
                     if (localData && Array.isArray(localData) && localData.length > 0) {
-                        console.log(`[Firebase] Seeding cloud from local storage for: ${key}`);
+                        console.log(`[Init] Seeding cloud from local data for ${key}`);
                         await dbRef.set(localData);
                     }
                 }
+                
+                // CRITICAL: ONLY UNLOCK SYNC AFTER FIRST SUCCESSFUL PULSE (FETCH BEFORE WRITE)
+                window.__cloudChecked[key] = true;
                 resolve();
             }, (err) => {
-                console.error(`[Firebase] Fetch Error for ${key}:`, err);
-                window.__cloudChecked[key] = true; // Unlock so app doesn't freeze, but warn
+                console.error(`[Init] ${key} fetch failed:`, err);
+                // DO NOT unlock sync on error to protect cloud from factory-reset wipe
                 resolve(); 
             });
 
-            // HEARTBEAT SYNC
+            // 2. REAL-TIME LISTENERS (HEARTBEAT)
             dbRef.on('value', async (snapshot) => {
-                if (!window.__initialSyncDone) return; 
-                let cloudData = snapshot.val();
-                if (cloudData !== null) {
-                    console.log(`[Sync] Real-time update received for: ${key}`);
-                    if (typeof cloudData === 'object' && !Array.isArray(cloudData)) cloudData = Object.values(cloudData);
-                    if (Array.isArray(cloudData)) {
-                        cloudData = cloudData.filter(item => item !== null && item !== undefined && typeof item === 'object' && Object.keys(item).length > 0);
-                    }
+                const cloudData = snapshot.val();
+                if (cloudData !== null && window.__cloudChecked[key]) {
+                    console.log(`[Heartbeat] Change detected on another device for: ${key}`);
+                    let sanitized = cloudData;
+                    if (typeof sanitized === 'object' && !Array.isArray(sanitized)) sanitized = Object.values(sanitized);
+                    if (Array.isArray(sanitized)) sanitized = sanitized.filter(item => item !== null);
+                    
                     window.__syncingFromFirebase = true;
-                    await originalSetItem.call(localforage, key, cloudData);
+                    await originalSetItem.call(localforage, key, sanitized);
                     window.__syncingFromFirebase = false;
                     
+                    // Instant UI Refresh
                     if (window.appLogic) {
                         if (key === 'services') {
-                            window.appLogic.services = cloudData;
+                            window.appLogic.services = sanitized;
                             window.appLogic.filterItems(); 
                         }
                         const currentView = document.querySelector('.view-section.active');
                         if (currentView) {
-                            const viewId = currentView.id.replace('view-', '');
-                            if (viewId === 'history' && key === 'invoices') window.appLogic.filterHistory();
-                            else if (viewId === 'customers' && key === 'customers') window.appLogic.filterCustomers();
-                            else if (viewId === 'inventory' && (key === 'inventory' || key === 'services')) window.appLogic.renderInventory();
-                            else if (viewId === 'expenses' && key === 'expenses') window.appLogic.renderExpenses();
-                            else if (viewId === 'reports') window.appLogic.renderReports();
+                            const vId = currentView.id.replace('view-', '');
+                            if (vId === 'history' && key === 'invoices') window.appLogic.filterHistory();
+                            else if (vId === 'customers' && key === 'customers') window.appLogic.filterCustomers();
+                            else if (vId === 'inventory' && (key === 'inventory' || key === 'services')) window.appLogic.renderInventory();
+                            else if (vId === 'expenses' && key === 'expenses') window.appLogic.renderExpenses();
+                            else if (vId === 'reports') window.appLogic.renderReports();
                         }
                     }
                 }
@@ -243,11 +246,9 @@ async function initFirebaseSync() {
 
     try {
         await Promise.all(syncPromises);
-        window.__initialSyncDone = true;
-        console.log("[Firebase] --- GLOBAL SYNC ESTABLISHED SUCCESSFULLY ---");
+        console.log("[Init] --- DATA PROTECTION ENGINE ACTIVE ---");
     } catch (err) {
-        console.error("[Firebase] Fatal Initialization Error:", err);
-        window.__initialSyncDone = true; // Fallback
+        console.error("[Init] Error establishing sync:", err);
     }
 }
 // ---------------------------------------------
@@ -1099,8 +1100,12 @@ window.appLogic = {
             if (customersArray.length === 0) {
                 html += '<tr><td colspan="4" style="padding:20px; text-align:center;">لا توجد بيانات للعملاء حتى الآن.</td></tr>';
             } else {
-                // UNIFIED SORTING: Newest First based on timestamp
-                const displayCustomers = [...customersArray].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+                // FIXED SORTING: Newest First (b.timestamp - a.timestamp)
+                const displayCustomers = [...customersArray].sort((a, b) => {
+                    const timeA = a.timestamp || 0;
+                    const timeB = b.timestamp || 0;
+                    return timeB - timeA;
+                });
                 
                 displayCustomers.forEach(c => {
                     if (!c) return;
