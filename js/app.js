@@ -137,14 +137,17 @@ const originalSetItem = localforage.setItem;
 // Override localforage to seamlessly sync ALL saves to Firebase
 localforage.setItem = async function (key, value) {
     const result = await originalSetItem.call(localforage, key, value);
-    if (collectionsToSync.includes(key) && !window.__syncingFromFirebase) {
+    if (collectionsToSync.includes(key) && !window.__syncingFromFirebase && window.__initialSyncDone) {
         if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "YOUR_API_KEY" && !!firebaseConfig.apiKey) {
             try {
-                // Sanitize undefined fields which completely crash Firebase Realtime Sync
-                const safePayload = JSON.parse(JSON.stringify(value));
-                firebase.database().ref(key).set(safePayload);
+                // EXTREME SANITIZATION: Firebase rejects undefined, functions, and deeply nested nulls
+                const safePayload = JSON.parse(JSON.stringify(value, (k, v) => (v === undefined ? null : v)));
+                console.log(`[Firebase] Sycning ${key} to cloud...`, safePayload);
+                firebase.database().ref(key).set(safePayload)
+                    .then(() => console.log(`[Firebase] ${key} synced successfully.`))
+                    .catch(err => console.error(`[Firebase] Sync Error for ${key}:`, err));
             } catch (err) {
-                console.error("Firebase sync payload error:", err);
+                console.error("[Firebase] Serialization Error:", err);
             }
         }
     }
@@ -152,63 +155,92 @@ localforage.setItem = async function (key, value) {
 };
 
 // Listen to Firebase Realtime Database for updates from other devices
-function initFirebaseSync() {
+async function initFirebaseSync() {
+    console.log("[Firebase] Attempting to fetch from Firebase...");
+    
     if (typeof firebase === 'undefined' || firebaseConfig.apiKey === "YOUR_API_KEY") {
-        console.warn("Firebase config is placeholder. Realtime Sync is currently disabled.");
+        console.warn("[Firebase] Config is placeholder. Realtime Sync is currently disabled.");
+        window.__initialSyncDone = true;
         return;
     }
     
-    console.log("Firebase initialized! Linking two-way Realtime Sync...");
-
-    collectionsToSync.forEach(key => {
-        const dbRef = firebase.database().ref(key);
-        dbRef.on('value', async (snapshot) => {
-            let cloudData = snapshot.val();
+    // We create a promise for each collection to ensure we've checked the cloud before starting
+    const syncPromises = collectionsToSync.map(key => {
+        return new Promise((resolve) => {
+            const dbRef = firebase.database().ref(key);
             
-            if (cloudData !== null) {
-                // Firebase might convert sparse arrays into objects; convert them back
-                if (typeof cloudData === 'object' && !Array.isArray(cloudData)) {
-                    cloudData = Object.values(cloudData);
-                }
+            console.log(`[Firebase] Requesting initial data for: ${key}...`);
+            
+            // ONE-TIME FETCH: Get initial state from cloud
+            dbRef.once('value', async (snapshot) => {
+                let cloudData = snapshot.val();
+                console.log(`[Firebase] Data received for ${key}:`, cloudData);
                 
-                // Strip out any null or ghost entries securely
-                if (Array.isArray(cloudData)) {
-                    cloudData = cloudData.filter(item => item !== null && item !== undefined && typeof item === 'object' && Object.keys(item).length > 0);
+                if (cloudData !== null) {
+                    if (typeof cloudData === 'object' && !Array.isArray(cloudData)) cloudData = Object.values(cloudData);
+                    if (Array.isArray(cloudData)) {
+                        cloudData = cloudData.filter(item => item !== null && item !== undefined && typeof item === 'object' && Object.keys(item).length > 0);
+                    }
+                    window.__syncingFromFirebase = true;
+                    await originalSetItem.call(localforage, key, cloudData);
+                    window.__syncingFromFirebase = false;
+                    console.log(`[Firebase] Local storage updated with cloud data for: ${key}`);
+                } else {
+                    console.log(`[Firebase] Collection ${key} is empty in cloud.`);
+                    const localData = await localforage.getItem(key);
+                    if (localData && Array.isArray(localData) && localData.length > 0) {
+                        console.log(`[Firebase] Seeding cloud from local storage for: ${key}`);
+                        await dbRef.set(localData);
+                    }
                 }
+                resolve();
+            }, (err) => {
+                console.error(`[Firebase] Fetch Error for ${key}:`, err);
+                resolve(); // Resolve anyway to not hang the whole app if one fails
+            });
 
-                // 1. Data exists in Cloud -> Sync to local storage securely
-                window.__syncingFromFirebase = true; // Prevent bounce back to cloud
-                await originalSetItem.call(localforage, key, cloudData);
-                window.__syncingFromFirebase = false;
-                
-                // 2. Refresh active UI
-                if (window.appLogic) {
-                    if (key === 'services') {
-                        window.appLogic.services = cloudData;
-                        window.appLogic.filterItems(); 
+            // HEARTBEAT SYNC
+            dbRef.on('value', async (snapshot) => {
+                if (!window.__initialSyncDone) return; 
+                let cloudData = snapshot.val();
+                if (cloudData !== null) {
+                    console.log(`[Sync] Real-time update received for: ${key}`);
+                    if (typeof cloudData === 'object' && !Array.isArray(cloudData)) cloudData = Object.values(cloudData);
+                    if (Array.isArray(cloudData)) {
+                        cloudData = cloudData.filter(item => item !== null && item !== undefined && typeof item === 'object' && Object.keys(item).length > 0);
                     }
+                    window.__syncingFromFirebase = true;
+                    await originalSetItem.call(localforage, key, cloudData);
+                    window.__syncingFromFirebase = false;
                     
-                    const currentView = document.querySelector('.view-section.active');
-                    if (currentView) {
-                        const viewId = currentView.id.replace('view-', '');
-                        // Preserve search state by calling filter functions instead of render directly
-                        if (viewId === 'history' && key === 'invoices') window.appLogic.filterHistory();
-                        else if (viewId === 'customers' && key === 'customers') window.appLogic.filterCustomers();
-                        else if (viewId === 'inventory' && (key === 'inventory' || key === 'services')) window.appLogic.renderInventory();
-                        else if (viewId === 'expenses' && key === 'expenses') window.appLogic.renderExpenses();
-                        else if (viewId === 'reports') window.appLogic.renderReports();
+                    if (window.appLogic) {
+                        if (key === 'services') {
+                            window.appLogic.services = cloudData;
+                            window.appLogic.filterItems(); 
+                        }
+                        const currentView = document.querySelector('.view-section.active');
+                        if (currentView) {
+                            const viewId = currentView.id.replace('view-', '');
+                            if (viewId === 'history' && key === 'invoices') window.appLogic.filterHistory();
+                            else if (viewId === 'customers' && key === 'customers') window.appLogic.filterCustomers();
+                            else if (viewId === 'inventory' && (key === 'inventory' || key === 'services')) window.appLogic.renderInventory();
+                            else if (viewId === 'expenses' && key === 'expenses') window.appLogic.renderExpenses();
+                            else if (viewId === 'reports') window.appLogic.renderReports();
+                        }
                     }
                 }
-            } else {
-                // 3. Data is NULL in Cloud -> Seed Cloud from Local Storage (First time setup)
-                const localData = await localforage.getItem(key);
-                if (localData && Array.isArray(localData) && localData.length > 0) {
-                    console.log(`[Sync] Seeding empty cloud collection: ${key}`);
-                    dbRef.set(localData).catch(e => console.error("Firebase seed error:", e));
-                }
-            }
+            });
         });
     });
+
+    try {
+        await Promise.all(syncPromises);
+        window.__initialSyncDone = true;
+        console.log("[Firebase] --- GLOBAL SYNC ESTABLISHED SUCCESSFULLY ---");
+    } catch (err) {
+        console.error("[Firebase] Fatal Initialization Error:", err);
+        window.__initialSyncDone = true; // Fallback
+    }
 }
 // ---------------------------------------------
 
@@ -223,17 +255,19 @@ window.appLogic = {
     editingInvoiceId: null,
     services: [],
     async init() {
-        // Init localforage DB
+        console.log("[App] Starting POS initialization...");
         localforage.config({ name: 'SahabPOS', storeName: 'pos_data' });
 
-        // Ensure collections exist
+        // BEG FIREBASE: This is the heartbeat. We wait for cloud before doing anything.
+        await initFirebaseSync();
+
+        // ONLY AFTER Cloud sync is done, we ensure local defaults exist for new users
         if (!(await localforage.getItem('customers'))) await localforage.setItem('customers', []);
         if (!(await localforage.getItem('invoices'))) await localforage.setItem('invoices', []);
-
-        // Wafeq Acc DBs
         if (!(await localforage.getItem('journal_entries'))) await localforage.setItem('journal_entries', []);
         if (!(await localforage.getItem('tax_records'))) await localforage.setItem('tax_records', []);
         if (!(await localforage.getItem('inventory'))) await localforage.setItem('inventory', []);
+        if (!(await localforage.getItem('expenses'))) await localforage.setItem('expenses', []);
 
         // Dynamic Services (Initialize only if empty to preserve Firebase synced custom pricing)
         if (!(await localforage.getItem('services'))) {
@@ -241,9 +275,7 @@ window.appLogic = {
         }
         this.services = await localforage.getItem('services');
 
-        // Start listening to Firebase Realtime Database
-        initFirebaseSync();
-
+        console.log("[App] Initialization complete. Rendering UI.");
         this.renderItems();
         this.updateCartUI();
     },
@@ -934,8 +966,8 @@ window.appLogic = {
             if (filtered.length === 0) {
                 html += '<tr><td colspan="5" style="padding:20px; text-align:center;">لا توجد فواتير مطابقة للبحث.</td></tr>';
             } else {
-                // Ensure newest invoices appear at the top
-                const displayInvoices = [...filtered].reverse();
+                // Invoices are unshifted (newest first), so no need to reverse.
+                const displayInvoices = [...filtered];
                 
                 displayInvoices.forEach(i => {
                     if (!i) return;
@@ -1056,8 +1088,8 @@ window.appLogic = {
             if (customersArray.length === 0) {
                 html += '<tr><td colspan="4" style="padding:20px; text-align:center;">لا توجد بيانات للعملاء حتى الآن.</td></tr>';
             } else {
-                // Ensure newest customers appear at the top
-                const displayCustomers = [...customersArray].reverse();
+                // Customers are pushed/updated, so we sort them by date descending
+                const displayCustomers = [...customersArray].sort((a,b) => (b.date || 0) - (a.date || 0));
                 
                 displayCustomers.forEach(c => {
                     if (!c) return;
@@ -1442,4 +1474,4 @@ window.appLogic = {
     }
 };
 
-window.onload = () => appLogic.init();
+document.addEventListener('DOMContentLoaded', () => appLogic.init());
