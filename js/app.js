@@ -139,8 +139,13 @@ localforage.setItem = async function (key, value) {
     const result = await originalSetItem.call(localforage, key, value);
     if (collectionsToSync.includes(key) && !window.__syncingFromFirebase) {
         if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "YOUR_API_KEY" && !!firebaseConfig.apiKey) {
-            // Upload to firebase (only if it's an explicit local update)
-            firebase.database().ref(key).set(value).catch(e => console.error("Firebase sync write error:", e));
+            try {
+                // Sanitize undefined fields which completely crash Firebase Realtime Sync
+                const safePayload = JSON.parse(JSON.stringify(value));
+                firebase.database().ref(key).set(safePayload);
+            } catch (err) {
+                console.error("Firebase sync payload error:", err);
+            }
         }
     }
     return result;
@@ -584,6 +589,12 @@ window.appLogic = {
             invoices.unshift(this.pendingInvoice);
         }
 
+        // --- STRICT RULE: Keep only last 5 invoices ---
+        if (invoices.length > 5) {
+            invoices = invoices.slice(0, 5);
+        }
+        // ----------------------------------------------
+
         await localforage.setItem('invoices', invoices);
 
         this.currentInvoice = this.pendingInvoice;
@@ -902,7 +913,14 @@ window.appLogic = {
             
             // STRICT VALIDATION: Filter out undefined/empty invoices to kill ghosts
             let filteredInvoices = Array.isArray(invs) ? invs : Object.values(invs);
-            let filtered = filteredInvoices.filter(i => i && i.id && typeof i.grandTotal !== 'undefined');
+            let validInvoices = filteredInvoices.filter(i => i && i.id && typeof i.grandTotal !== 'undefined');
+
+            // Cleanup corrupted ghosts permanently from DB
+            if (validInvoices.length !== (Array.isArray(invs) ? invs.length : Object.keys(invs).length)) {
+                await localforage.setItem('invoices', validInvoices);
+            }
+
+            let filtered = validInvoices;
 
             if (searchTerm) {
                 const term = searchTerm.toLowerCase();
@@ -917,7 +935,7 @@ window.appLogic = {
             }
 
             let html = '<table style="width:100%; border-collapse:collapse; background:var(--bg-surface); border-radius:12px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.5)">';
-            html += '<tr style="background:#111; color:var(--primary)"><th style="padding:15px; text-align:right;">رقم الفاتورة</th><th style="padding:15px; text-align:right;">العميل</th><th style="padding:15px; text-align:right;">المبلغ</th><th style="padding:15px; text-align:right;">التاريخ</th><th style="padding:15px; text-align:center;">إجراءات</th></tr>';
+            html += '<thead><tr style="background:#111; color:var(--primary)"><th style="padding:15px; text-align:right;">رقم الفاتورة</th><th style="padding:15px; text-align:right;">العميل</th><th style="padding:15px; text-align:right;">المبلغ</th><th style="padding:15px; text-align:right;">التاريخ</th><th style="padding:15px; text-align:center;">إجراءات</th></tr></thead><tbody>';
 
             if (filtered.length === 0) {
                 html += '<tr><td colspan="5" style="padding:20px; text-align:center;">لا توجد فواتير مطابقة للبحث.</td></tr>';
@@ -943,7 +961,7 @@ window.appLogic = {
                     </tr>`;
                 });
             }
-            html += '</table>';
+            html += '</tbody></table>';
             const container = document.getElementById('history-content');
             if (container) container.innerHTML = html;
         } catch (err) {
@@ -1037,7 +1055,7 @@ window.appLogic = {
     renderCustomersList(customersArray) {
         try {
             let html = '<table style="width:100%; border-collapse:collapse; margin-top:20px; background:var(--bg-surface); border-radius:12px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.5)">';
-            html += '<tr style="background:#111; color:var(--primary)"><th style="padding:15px; text-align:right;">الجوال</th><th style="padding:15px; text-align:right;">الاسم</th><th style="padding:15px; text-align:right;">آخر تاريخ</th><th style="padding:15px; text-align:center;">إجراءات</th></tr>';
+            html += '<thead><tr style="background:#111; color:var(--primary)"><th style="padding:15px; text-align:right;">الجوال</th><th style="padding:15px; text-align:right;">الاسم</th><th style="padding:15px; text-align:right;">آخر تاريخ</th><th style="padding:15px; text-align:center;">إجراءات</th></tr></thead><tbody>';
             if (customersArray.length === 0) {
                 html += '<tr><td colspan="4" style="padding:20px; text-align:center;">لا توجد بيانات للعملاء حتى الآن.</td></tr>';
             } else {
@@ -1058,7 +1076,7 @@ window.appLogic = {
                     </tr>`;
                 });
             }
-            html += '</table>';
+            html += '</tbody></table>';
             const container = document.getElementById('customers-content');
             if (container) container.innerHTML = html;
         } catch (err) {
