@@ -934,7 +934,10 @@ window.appLogic = {
             if (filtered.length === 0) {
                 html += '<tr><td colspan="5" style="padding:20px; text-align:center;">لا توجد فواتير مطابقة للبحث.</td></tr>';
             } else {
-                filtered.forEach(i => {
+                // Ensure newest invoices appear at the top
+                const displayInvoices = [...filtered].reverse();
+                
+                displayInvoices.forEach(i => {
                     if (!i) return;
                     let customerName = (i.customer && i.customer.name) ? i.customer.name : 'عميل نقدي';
                     let customerPhone = (i.customer && i.customer.phone) ? i.customer.phone : '0000000000';
@@ -1053,7 +1056,10 @@ window.appLogic = {
             if (customersArray.length === 0) {
                 html += '<tr><td colspan="4" style="padding:20px; text-align:center;">لا توجد بيانات للعملاء حتى الآن.</td></tr>';
             } else {
-                customersArray.forEach(c => {
+                // Ensure newest customers appear at the top
+                const displayCustomers = [...customersArray].reverse();
+                
+                displayCustomers.forEach(c => {
                     if (!c) return;
                     let n = c.name || 'غير معروف';
                     let p = c.phone || 'غير مسجل';
