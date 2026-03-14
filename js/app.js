@@ -111,9 +111,80 @@ const accountingEngine = {
     }
 };
 
-// Version: 1.0.2 (Debug Enabled)
+// --- FIREBASE CROSS-DEVICE SYNCHRONIZATION ---
+const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    databaseURL: "https://YOUR_PROJECT_ID.firebaseio.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+    appId: "YOUR_APP_ID"
+};
+
+// Initialize Firebase only if not already initialized
+if (typeof firebase !== 'undefined' && !firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
+
+const collectionsToSync = ['customers', 'invoices', 'journal_entries', 'tax_records', 'inventory', 'services'];
+const originalSetItem = localforage.setItem;
+
+// Override localforage to seamlessly sync ALL saves to Firebase
+localforage.setItem = async function(key, value) {
+    const result = await originalSetItem.call(localforage, key, value);
+    if (collectionsToSync.includes(key) && !window.__syncingFromFirebase) {
+        if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "YOUR_API_KEY") {
+            firebase.database().ref(key).set(value).catch(e => console.error("Firebase sync write error:", e));
+        }
+    }
+    return result;
+};
+
+// Listen to Firebase Realtime Database for updates from other devices
+function initFirebaseSync() {
+    if (typeof firebase === 'undefined' || firebaseConfig.apiKey === "YOUR_API_KEY") {
+        console.warn("Firebase config is placeholder. Realtime Sync is currently disabled.");
+        return;
+    }
+    
+    console.log("Firebase initialized! Syncing real-time updates across devices...");
+
+    collectionsToSync.forEach(key => {
+        firebase.database().ref(key).on('value', async (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                // We received updated data from the cloud (another device)
+                window.__syncingFromFirebase = true;
+                await originalSetItem.call(localforage, key, data);
+                window.__syncingFromFirebase = false; // reset flag
+                
+                // If it's services, update appLogic memory directly too
+                if (key === 'services' && window.appLogic) {
+                    window.appLogic.services = data;
+                    window.appLogic.filterItems(); // Will call renderItems
+                }
+                
+                // Re-render current active view so the user sees changes instantly
+                if (window.appLogic) {
+                    const currentView = document.querySelector('.view-section.active');
+                    if (currentView) {
+                        const viewId = currentView.id.replace('view-', '');
+                        if(viewId === 'history') window.appLogic.renderHistory();
+                        else if(viewId === 'customers') window.appLogic.renderCustomers();
+                        else if(viewId === 'inventory') window.appLogic.renderInventory();
+                        else if(viewId === 'expenses') window.appLogic.renderExpenses();
+                    }
+                }
+            }
+        });
+    });
+}
+// ---------------------------------------------
+
+// Version: 1.0.3 (Firebase Sync Enabled)
 window.appLogic = {
-    _version: '1.0.2',
+    _version: '1.0.3',
     cart: [],
     deliveryFee: 0,
     customer: { phone: '', name: '' },
@@ -134,9 +205,14 @@ window.appLogic = {
         if (!(await localforage.getItem('tax_records'))) await localforage.setItem('tax_records', []);
         if (!(await localforage.getItem('inventory'))) await localforage.setItem('inventory', []);
         
-        // Dynamic Services (Auto-refresh from DefaultServices for this specific update)
-        await localforage.setItem('services', DefaultServices);
+        // Dynamic Services (Initialize only if empty to preserve Firebase synced custom pricing)
+        if (!(await localforage.getItem('services'))) {
+            await localforage.setItem('services', DefaultServices);
+        }
         this.services = await localforage.getItem('services');
+
+        // Start listening to Firebase Realtime Database
+        initFirebaseSync();
 
         this.renderItems();
         this.updateCartUI();
