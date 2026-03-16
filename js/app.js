@@ -1,6 +1,12 @@
 // Single monolithic file containing data, logic, and UI (World-class structure)
 
 // Source of truth built explicitly from user CSV rules and images.
+const DefaultDeliveryOptions = [
+    { id: 'none', name: 'بدون توصيل', amount: 0 },
+    { id: 'normal', name: 'توصيل عادي', amount: 10 },
+    { id: 'special', name: 'توصيل خاص', amount: 5 }
+];
+
 const DefaultServices = [
     { id: 'thobe', cat: 'men', name: 'ثوب', icon: 'fa-user-tie', prices: { iron: 2, wash_iron: 5, wash: 3 }, expressFee: { iron: 2, wash_iron: 2, wash: 2 } },
     { id: 'thobe_cotton', cat: 'men', name: 'ثوب قطن', icon: 'fa-user-tie', prices: { iron: 3, wash_iron: 6, wash: 3 }, expressFee: { iron: 2, wash_iron: 2, wash: 2 } },
@@ -134,7 +140,7 @@ if (typeof firebase !== 'undefined' && !firebase.apps.length) {
     }
 }
 
-const collectionsToSync = ['customers', 'invoices', 'journal_entries', 'tax_records', 'inventory', 'services', 'expenses'];
+const collectionsToSync = ['customers', 'invoices', 'journal_entries', 'tax_records', 'inventory', 'services', 'expenses', 'delivery_options'];
 const originalSetItem = localforage.setItem;
 window.isDataInitialized = false; // THE MASTER LOCK: App starts in strict READ-ONLY mode
 window.__syncingFromFirebase = false;
@@ -216,6 +222,10 @@ async function initFirebaseSync() {
                     
                     if (window.appLogic) {
                         if (key === 'services') window.appLogic.services = sanitized;
+                        if (key === 'delivery_options') {
+                            window.appLogic.deliveryOptions = sanitized;
+                            window.appLogic.updateCartUI();
+                        }
                         window.appLogic.refreshActiveView();
                     }
                 }
@@ -239,6 +249,7 @@ window.appLogic = {
     currentCategory: 'all',
     editingInvoiceId: null,
     services: [],
+    deliveryOptions: [],
     async init() {
         console.log("[App] !!! STARTING CRITICAL INITIALIZATION !!!");
         console.log("[App] Environment:", window.location.protocol);
@@ -261,6 +272,7 @@ window.appLogic = {
 
         // 2. FETCH FINAL STATE: After Firebase has updated localforage, we pull it into memory.
         this.services = await localforage.getItem('services') || DefaultServices;
+        this.deliveryOptions = await localforage.getItem('delivery_options') || DefaultDeliveryOptions;
         
         console.log("[App] Initialization pulse complete. Data is now protected and loaded.");
         
@@ -514,6 +526,24 @@ window.appLogic = {
         document.getElementById('grand-total').innerText = finalTotal;
         const mobileTotal = document.getElementById('mobile-grand-total');
         if (mobileTotal) mobileTotal.innerText = finalTotal;
+
+        // Dynamic Delivery Buttons
+        this.renderDeliveryButtons();
+    },
+
+    renderDeliveryButtons() {
+        const container = document.querySelector('.delivery-buttons');
+        if (!container) return;
+        container.innerHTML = '';
+        this.deliveryOptions.forEach(opt => {
+            const isActive = this.deliveryFee === opt.amount;
+            container.innerHTML += `
+                <button class="btn-delivery ${isActive ? 'active' : ''}" 
+                        onclick="appLogic.setDelivery(${opt.amount}, this)">
+                    ${opt.name}${opt.amount > 0 ? ': ' + opt.amount + ' ر.س' : ''}
+                </button>
+            `;
+        });
     },
 
     // Customer
@@ -1293,6 +1323,7 @@ window.appLogic = {
 
         const container = document.getElementById('inventory-content');
         if (container) container.innerHTML = html;
+        this.renderDeliveryManager();
     },
 
     // Service Management Logic
@@ -1405,6 +1436,112 @@ window.appLogic = {
         this.renderInventory();
         this.renderItems(); 
         this.showToast('تم حذف الخدمة بنجاح');
+    },
+
+    renderDeliveryManager() {
+        const container = document.getElementById('delivery-manager-content');
+        if (!container) return;
+        
+        let html = `
+            <table class="inventory-table">
+                <thead>
+                    <tr>
+                        <th style="padding:12px; text-align:right;">اسم الخيار</th>
+                        <th style="padding:12px; text-align:right;">المبلغ (ر.س)</th>
+                        <th style="padding:12px; text-align:center;">إجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        this.deliveryOptions.forEach(opt => {
+            html += `
+                <tr style="border-bottom:1px solid var(--border);">
+                    <td style="padding:12px; font-weight:bold;">${opt.name}</td>
+                    <td style="padding:12px; direction:ltr; text-align:right;">${opt.amount.toFixed(2)} SAR</td>
+                    <td style="padding:12px; text-align:center;">
+                        <button class="btn-action-icon btn-action-edit" onclick="appLogic.openAddDeliveryModal('${opt.id}')"><i class="fa-solid fa-edit"></i></button>
+                        <button class="btn-action-icon btn-action-delete" onclick="appLogic.deleteDeliveryOption('${opt.id}')"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        if (this.deliveryOptions.length === 0) {
+            html += '<tr><td colspan="3" style="text-align:center; padding:20px;">لا يوجد خيارات توصيل حالياً.</td></tr>';
+        }
+        
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    },
+
+    openAddDeliveryModal(id = null) {
+        const idField = document.getElementById('delivery-id');
+        const nameField = document.getElementById('delivery-name');
+        const amountField = document.getElementById('delivery-amount');
+        const title = document.getElementById('delivery-modal-title');
+        
+        if (id) {
+            const opt = this.deliveryOptions.find(o => o.id === id);
+            idField.value = id;
+            nameField.value = opt.name;
+            amountField.value = opt.amount;
+            title.innerText = "تعديل خيار توصيل";
+        } else {
+            idField.value = "";
+            nameField.value = "";
+            amountField.value = "";
+            title.innerText = "إضافة خيار توصيل";
+        }
+        document.getElementById('delivery-modal').classList.remove('hidden');
+    },
+
+    closeDeliveryModal() {
+        document.getElementById('delivery-modal').classList.add('hidden');
+    },
+
+    async saveDeliveryOption() {
+        const id = document.getElementById('delivery-id').value;
+        const name = document.getElementById('delivery-name').value;
+        const amt = parseFloat(document.getElementById('delivery-amount').value);
+        
+        if (!name || isNaN(amt)) {
+            alert('يرجى كتابة الاسم والمبلغ');
+            return;
+        }
+
+        if (id) {
+            const idx = this.deliveryOptions.findIndex(o => o.id === id);
+            if (idx !== -1) {
+                this.deliveryOptions[idx] = { ...this.deliveryOptions[idx], name: name, amount: amt };
+            }
+        } else {
+            this.deliveryOptions.push({
+                id: 'del_' + Date.now(),
+                name: name,
+                amount: amt
+            });
+        }
+
+        await localforage.setItem('delivery_options', this.deliveryOptions);
+        await manualSyncToCloud('delivery_options', this.deliveryOptions);
+        
+        this.closeDeliveryModal();
+        this.renderInventory();
+        this.updateCartUI();
+        this.showToast('تم حفظ رسوم التوصيل');
+    },
+
+    async deleteDeliveryOption(id) {
+        if (!confirm('هل أنت متأكد من حذف هذا الخيار؟')) return;
+        this.deliveryOptions = this.deliveryOptions.filter(o => o.id !== id);
+        
+        await localforage.setItem('delivery_options', this.deliveryOptions);
+        await manualSyncToCloud('delivery_options', this.deliveryOptions);
+        
+        this.renderInventory();
+        this.updateCartUI();
+        this.showToast('تم حذف الخيار');
     },
 
     // Wafeq UI: Expenses

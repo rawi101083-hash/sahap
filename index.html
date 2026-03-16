@@ -89,9 +89,7 @@
                         <div class="delivery-options">
                             <h4>رسوم التوصيل:</h4>
                             <div class="delivery-buttons">
-                                <button class="btn-delivery active" onclick="appLogic.setDelivery(0, this)">بدون</button>
-                                <button class="btn-delivery" onclick="appLogic.setDelivery(10, this)">توصيل عادي: 10 ر.س</button>
-                                <button class="btn-delivery" onclick="appLogic.setDelivery(5, this)">توصيل خاص: 5 ر.س</button>
+                                <!-- Dynamic Delivery Buttons Injected Here -->
                             </div>
                         </div>
 
@@ -153,6 +151,15 @@
                         </div>
                     </div>
                     <div id="inventory-content"></div>
+
+                    <!-- Delivery Fee Management -->
+                    <div style="margin-top: 40px; padding: 24px; background: var(--bg-surface); border-radius: var(--radius-lg); border: 1px solid var(--border);">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                            <h2 style="font-size: 22px; color: var(--primary);"><i class="fa-solid fa-truck"></i> إدارة رسوم التوصيل</h2>
+                            <button class="btn btn-primary" onclick="appLogic.openAddDeliveryModal()"><i class="fa-solid fa-plus"></i> إضافة خيار توصيل</button>
+                        </div>
+                        <div id="delivery-manager-content"></div>
+                    </div>
                 </div>
             </div>
 
@@ -399,6 +406,30 @@
             </div>
         </div>
     </div>
+
+        <!-- Add Delivery Modal -->
+        <div class="modal-overlay hidden" id="delivery-modal">
+            <div class="modal" style="width: 400px;">
+                <div class="modal-header">
+                    <h3 id="delivery-modal-title">إضافة خيار توصيل</h3>
+                    <button class="close-modal" onclick="appLogic.closeDeliveryModal()"><i class="fa-solid fa-times"></i></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="delivery-id">
+                    <div class="selector-group">
+                        <label style="display:block; margin-bottom:10px; color:var(--text-muted);">اسم الخيار (مثل: توصيل VIP)</label>
+                        <input type="text" id="delivery-name" class="w-100" style="padding:14px; background:var(--bg-body); color:#fff; border:1px solid var(--border); border-radius:var(--radius-md); font-family:inherit;">
+                    </div>
+                    <div class="selector-group">
+                        <label style="display:block; margin-bottom:10px; color:var(--text-muted);">المبلغ (ر.س)</label>
+                        <input type="number" id="delivery-amount" class="w-100" style="padding:14px; background:var(--bg-body); color:#fff; border:1px solid var(--border); border-radius:var(--radius-md); font-family:inherit;">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary w-100" onclick="appLogic.saveDeliveryOption()">حفظ البيانات</button>
+                </div>
+            </div>
+        </div>
 
     <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
