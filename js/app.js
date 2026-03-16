@@ -91,6 +91,7 @@ const accountingEngine = {
         };
         journals.unshift(jEntry);
         await localforage.setItem('journal_entries', journals);
+        await manualSyncToCloud('journal_entries', journals);
 
         let taxRecords = await localforage.getItem('tax_records') || [];
         taxRecords.unshift({
@@ -102,10 +103,12 @@ const accountingEngine = {
             vatCollected: vat
         });
         await localforage.setItem('tax_records', taxRecords);
+        await manualSyncToCloud('tax_records', taxRecords);
 
         let inventory = await localforage.getItem('inventory') || [];
         // Future-proof: Logic to deduct raw materials if required
         await localforage.setItem('inventory', inventory);
+        await manualSyncToCloud('inventory', inventory);
 
         return invoice;
     }
@@ -133,58 +136,55 @@ if (typeof firebase !== 'undefined' && !firebase.apps.length) {
 
 const collectionsToSync = ['customers', 'invoices', 'journal_entries', 'tax_records', 'inventory', 'services', 'expenses'];
 const originalSetItem = localforage.setItem;
-window.__cloudChecked = {}; // Track each collection independently
+window.isDataInitialized = false; // THE MASTER LOCK: App starts in strict READ-ONLY mode
 window.__syncingFromFirebase = false;
 
-// Override localforage to seamlessly sync ALL saves to Firebase
+// 1. SIMPLE STORAGE: localforage now ONLY handles local database
 localforage.setItem = async function (key, value) {
-    const result = await originalSetItem.call(localforage, key, value);
-    
-    // THE GATEKEEPER: Only push to Firebase if:
-    // 1. It's a syncable collection
-    // 2. We aren't currently pulling data FROM Firebase (infinite loop protection)
-    // 3. We have ALREADY fetched the cloud version for this specific key (Initialization protection)
-    if (collectionsToSync.includes(key) && !window.__syncingFromFirebase && window.__cloudChecked[key]) {
-        if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "YOUR_API_KEY" && !!firebaseConfig.apiKey) {
-            try {
-                // EXTREME SANITIZATION: Clean data for Firebase
-                const safePayload = JSON.parse(JSON.stringify(value, (k, v) => (v === undefined ? null : v)));
-                console.log(`[Sync-Out] Sending ${key} to cloud...`, safePayload);
-                firebase.database().ref(key).set(safePayload)
-                    .then(() => console.log(`[Sync-Done] ${key} saved to cloud.`))
-                    .catch(err => console.error(`[Sync-Error] ${key} failed:`, err));
-            } catch (err) {
-                console.error("[Sync-Crash] Serialization Error:", err);
-            }
-        }
-    }
-    return result;
+    return await originalSetItem.call(localforage, key, value);
 };
 
-// Listen to Firebase Realtime Database for updates from other devices
+// 2. EXPLICIT SYNC: Manual helper to send data to Firebase
+async function manualSyncToCloud(key, value) {
+    if (!window.isDataInitialized) {
+        console.warn(`[Sync-Blocked] Cannot save ${key}. System is still initializing.`);
+        return;
+    }
+    
+    if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "YOUR_API_KEY" && !!firebaseConfig.apiKey) {
+        try {
+            console.log(`[Manual-Sync] Sending ${key} to cloud...`);
+            // Deep sanitize for Firebase (remove undefined)
+            const safePayload = JSON.parse(JSON.stringify(value, (k, v) => (v === undefined ? null : v)));
+            await firebase.database().ref(key).set(safePayload);
+            console.log(`[Manual-Sync] ${key} saved successfully.`);
+        } catch (err) {
+            console.error(`[Manual-Sync] Error saving ${key}:`, err);
+        }
+    }
+}
+
+// 3. RECOVERY LOGIC: Fetch-Only initialization
 async function initFirebaseSync() {
-    console.log("[Init] Connection Attempt...");
+    console.log("[Recovery] --- STARTING CLOUD FETCH ---");
     
     if (typeof firebase === 'undefined' || firebaseConfig.apiKey === "YOUR_API_KEY") {
-        console.warn("[Init] Firebase is disabled (Check config).");
-        collectionsToSync.forEach(k => window.__cloudChecked[k] = true); // Bypass for offline mode
+        console.warn("[Recovery] Firebase disabled. Using local database.");
+        window.isDataInitialized = true;
         return;
     }
 
-    console.log("Firebase connection established"); // Required Log
-    
-    const syncPromises = collectionsToSync.map(key => {
+    const fetchPromises = collectionsToSync.map(key => {
         return new Promise((resolve) => {
             const dbRef = firebase.database().ref(key);
-            console.log(`[Init] Fetching ${key}...`);
+            console.log(`[Recovery] Requesting ${key} from cloud...`);
             
-            // 1. FETCH BEFORE WRITE: Get cloud state first
+            // FETCH BEFORE WRITE: Fetch strictly once to populate the system
             dbRef.once('value', async (snapshot) => {
                 let cloudData = snapshot.val();
-                console.log("Data received from cloud"); // Required Log
                 
                 if (cloudData !== null) {
-                    console.log(`[Init] Using Cloud Version for ${key}`);
+                    console.log(`[Recovery] Data found for ${key}. Overwriting local cache.`);
                     if (typeof cloudData === 'object' && !Array.isArray(cloudData)) cloudData = Object.values(cloudData);
                     if (Array.isArray(cloudData)) {
                         cloudData = cloudData.filter(item => item !== null && typeof item === 'object');
@@ -193,28 +193,19 @@ async function initFirebaseSync() {
                     await originalSetItem.call(localforage, key, cloudData);
                     window.__syncingFromFirebase = false;
                 } else {
-                    console.log(`[Init] Cloud is empty for ${key}. Checking local cache...`);
-                    const localData = await localforage.getItem(key);
-                    if (localData && Array.isArray(localData) && localData.length > 0) {
-                        console.log(`[Init] Seeding cloud from local data for ${key}`);
-                        await dbRef.set(localData);
-                    }
+                    console.log(`[Recovery] No cloud data for ${key}. Local cache remains intact.`);
                 }
-                
-                // CRITICAL: ONLY UNLOCK SYNC AFTER FIRST SUCCESSFUL PULSE (FETCH BEFORE WRITE)
-                window.__cloudChecked[key] = true;
                 resolve();
             }, (err) => {
-                console.error(`[Init] ${key} fetch failed:`, err);
-                // DO NOT unlock sync on error to protect cloud from factory-reset wipe
+                console.error(`[Recovery] Critical fetch error for ${key}:`, err);
                 resolve(); 
             });
 
-            // 2. REAL-TIME LISTENERS (HEARTBEAT)
+            // REAL-TIME UPDATES: Listener only (No automatic writes)
             dbRef.on('value', async (snapshot) => {
+                if (!window.isDataInitialized) return; // Ignore updates during boot
                 const cloudData = snapshot.val();
-                if (cloudData !== null && window.__cloudChecked[key]) {
-                    console.log(`[Heartbeat] Change detected on another device for: ${key}`);
+                if (cloudData !== null) {
                     let sanitized = cloudData;
                     if (typeof sanitized === 'object' && !Array.isArray(sanitized)) sanitized = Object.values(sanitized);
                     if (Array.isArray(sanitized)) sanitized = sanitized.filter(item => item !== null);
@@ -223,33 +214,18 @@ async function initFirebaseSync() {
                     await originalSetItem.call(localforage, key, sanitized);
                     window.__syncingFromFirebase = false;
                     
-                    // Instant UI Refresh
                     if (window.appLogic) {
-                        if (key === 'services') {
-                            window.appLogic.services = sanitized;
-                            window.appLogic.filterItems(); 
-                        }
-                        const currentView = document.querySelector('.view-section.active');
-                        if (currentView) {
-                            const vId = currentView.id.replace('view-', '');
-                            if (vId === 'history' && key === 'invoices') window.appLogic.filterHistory();
-                            else if (vId === 'customers' && key === 'customers') window.appLogic.filterCustomers();
-                            else if (vId === 'inventory' && (key === 'inventory' || key === 'services')) window.appLogic.renderInventory();
-                            else if (vId === 'expenses' && key === 'expenses') window.appLogic.renderExpenses();
-                            else if (vId === 'reports') window.appLogic.renderReports();
-                        }
+                        if (key === 'services') window.appLogic.services = sanitized;
+                        window.appLogic.refreshActiveView();
                     }
                 }
             });
         });
     });
 
-    try {
-        await Promise.all(syncPromises);
-        console.log("[Init] --- DATA PROTECTION ENGINE ACTIVE ---");
-    } catch (err) {
-        console.error("[Init] Error establishing sync:", err);
-    }
+    await Promise.all(fetchPromises);
+    window.isDataInitialized = true; // UNLOCK System
+    console.log("[Recovery] --- SYSTEM READY (READ-WRITE ENABLED) ---");
 }
 // ---------------------------------------------
 
@@ -336,6 +312,17 @@ window.appLogic = {
         } catch (err) {
             console.error('Routing Error:', err);
         }
+    },
+    refreshActiveView() {
+        const currentView = document.querySelector('.view-section.active');
+        if (!currentView) return;
+        const vId = currentView.id.replace('view-', '');
+        console.log(`[UI] Refreshing Active View: ${vId}`);
+        if (vId === 'history') this.renderHistory();
+        else if (vId === 'customers') this.renderCustomers();
+        else if (vId === 'inventory') this.renderInventory();
+        else if (vId === 'reports') this.renderReports();
+        else if (vId === 'expenses') this.renderExpenses();
     },
 
     // Filters
@@ -616,6 +603,7 @@ window.appLogic = {
             let cData = { phone: this.customer.phone, name: this.customer.name || 'عميل نقدي', timestamp: Date.now() };
             if (cIdx >= 0) customers[cIdx] = cData; else customers.push(cData);
             await localforage.setItem('customers', customers);
+            await manualSyncToCloud('customers', customers);
         }
 
         // Pass to Wafeq Accounting Engine
@@ -634,6 +622,7 @@ window.appLogic = {
         }
 
         await localforage.setItem('invoices', invoices);
+        await manualSyncToCloud('invoices', invoices);
 
         this.currentInvoice = this.pendingInvoice;
         this.pendingInvoice = null;
@@ -1040,6 +1029,7 @@ window.appLogic = {
         let invs = await localforage.getItem('invoices') || [];
         invs = invs.filter(i => i.id !== id);
         await localforage.setItem('invoices', invs);
+        await manualSyncToCloud('invoices', invs);
         this.filterHistory();
     },
 
@@ -1160,6 +1150,7 @@ window.appLogic = {
             inv.push({ id: Date.now(), name, sku, qty, cost });
         }
         await localforage.setItem('inventory', inv);
+        await manualSyncToCloud('inventory', inv);
         this.closeInventoryModal();
         this.renderInventory();
         this.showToast('تم حفظ الصنف بنجاح');
@@ -1235,6 +1226,9 @@ window.appLogic = {
                     <td style="padding:12px; text-align:center;">
                         <button class="btn-edit-svc" onclick="appLogic.openEditServiceModal('${item.id}')">
                             <i class="fa-solid fa-edit"></i> تعديل
+                        </button>
+                        <button class="btn-delete-svc" onclick="appLogic.deleteService('${item.id}')" style="margin-right: 5px;">
+                            <i class="fa-solid fa-trash"></i> حذف
                         </button>
                     </td>
                 </tr>`;
@@ -1329,10 +1323,32 @@ window.appLogic = {
         }
 
         await localforage.setItem('services', this.services);
+        await manualSyncToCloud('services', this.services);
         this.closeServiceModal();
         this.renderInventory();
         this.renderItems(); // Refresh POS grid
         this.showToast('تم حفظ بيانات الخدمة بنجاح');
+    },
+
+    async deleteService(id) {
+        if (!confirm("هل أنت متأكد من حذف هذه الخدمة؟")) return;
+
+        const idx = this.services.findIndex(s => s.id === id);
+        if (idx === -1) return;
+
+        console.log(`[Admin] Deleting service: ${id}`);
+        this.services.splice(idx, 1);
+
+        // 1. Persist to local storage
+        await localforage.setItem('services', this.services);
+
+        // 2. Explicit manual sync to cloud (Senior Data Architect Rule)
+        await manualSyncToCloud('services', this.services);
+
+        // 3. UI Refresh
+        this.renderInventory();
+        this.renderItems(); 
+        this.showToast('تم حذف الخدمة بنجاح');
     },
 
     // Wafeq UI: Expenses
@@ -1349,6 +1365,7 @@ window.appLogic = {
         let exps = await localforage.getItem('expenses') || [];
         exps.push({ id: Date.now(), category: cat, amount: amount, desc: desc, date: date });
         await localforage.setItem('expenses', exps);
+        await manualSyncToCloud('expenses', exps);
 
         this.closeExpenseModal();
         this.renderExpenses();
