@@ -747,6 +747,28 @@ button:active {
     display: none;
 }
 
+/* Delivery Management */
+.delivery-manager-card {
+    margin-top: 40px; 
+    padding: 24px; 
+    background: var(--bg-surface); 
+    border-radius: var(--radius-lg); 
+    border: 1px solid var(--border);
+}
+
+.delivery-manager-header {
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    margin-bottom: 20px;
+}
+
+.delivery-manager-title {
+    font-size: 22px; 
+    color: var(--primary);
+    margin: 0;
+}
+
 @media print {
 
     body,
@@ -1015,6 +1037,23 @@ button:active {
    ========================================= */
 
 @media (max-width: 768px) {
+    .delivery-manager-header {
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+    }
+
+    .delivery-manager-header button {
+        width: 100%;
+        max-width: 300px;
+        margin: 0 auto;
+        padding: 12px;
+    }
+
+    .inventory-table th, .inventory-table td {
+        padding: 8px !important;
+        font-size: 14px;
+    }
 
     /* App Shell */
     #app {

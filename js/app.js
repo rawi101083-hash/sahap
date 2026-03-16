@@ -1055,12 +1055,49 @@ window.appLogic = {
     },
 
     async deleteInvoice(id) {
-        if (!confirm(`هل أنت متأكد من حذف الفاتورة ${id} نهائياً؟`)) return;
+        if (!confirm(`تحذير: هل أنت متأكد من حذف الفاتورة ${id}؟ سيتم حذف كافة السجلات المحاسبية والضريبية المرتبطة بها وتعديل الإيرادات فوراً.`)) return;
+        
+        console.log(`[Triple-Sync-Delete] Starting cascading delete for invoice: ${id}`);
+        const invIdStr = id.toString().trim();
+
+        // 1. Purge from Invoices
         let invs = await localforage.getItem('invoices') || [];
-        invs = invs.filter(i => i.id !== id);
+        invs = invs.filter(i => i && i.id && i.id.toString().trim() !== invIdStr);
         await localforage.setItem('invoices', invs);
         await manualSyncToCloud('invoices', invs);
-        this.filterHistory();
+
+        // 2. Purge from Tax Records (Revenue Dashboards)
+        let taxRecs = await localforage.getItem('tax_records') || [];
+        taxRecs = taxRecs.filter(r => r && r.ref_invoice && r.ref_invoice.toString().trim() !== invIdStr);
+        await localforage.setItem('tax_records', taxRecs);
+        await manualSyncToCloud('tax_records', taxRecs);
+
+        // 3. Purge from Journal Entries (Accounting Ledger)
+        let journals = await localforage.getItem('journal_entries') || [];
+        journals = journals.filter(j => j && j.ref_invoice && j.ref_invoice.toString().trim() !== invIdStr);
+        await localforage.setItem('journal_entries', journals);
+        await manualSyncToCloud('journal_entries', journals);
+
+        // 4. Force UI Recalculation (Aggressive Refresh)
+        console.log(`[Triple-Sync-Delete] Forcing UI recalculation for all modules...`);
+        
+        // PROACTIVE CLEANUP: If this was the last invoice, wipe collections to be sure
+        if (invs.length === 0) {
+            console.log('[Triple-Sync-Delete] Last invoice deleted. Purging all financial collections.');
+            await localforage.setItem('tax_records', []);
+            await manualSyncToCloud('tax_records', []);
+            await localforage.setItem('journal_entries', []);
+            await manualSyncToCloud('journal_entries', []);
+            // Also refresh customers to ensure ghost list cleanup
+            await localforage.setItem('customers', []);
+            await manualSyncToCloud('customers', []);
+        }
+
+        await this.renderHistory();   // Refresh Invoice List
+        await this.renderReports();   // Force recalculate Daily/Monthly Sales
+        await this.renderCustomers(); // Sync Customer histories
+        
+        this.showToast('تم حذف الفاتورة وتطهير السجلات المحاسبية بنجاح');
     },
 
     async editInvoice(id) {
@@ -1090,7 +1127,24 @@ window.appLogic = {
     async renderCustomers() {
         try {
             const custs = await localforage.getItem('customers') || [];
-            this.renderCustomersList(custs);
+            const invs = await localforage.getItem('invoices') || [];
+
+            // AGGRESSIVE SYNC: Map invoices to customers and calculate totals
+            const enriched = custs.map(c => {
+                if (!c || !c.phone) return null;
+                const customerInvoices = invs.filter(i => i && i.customer && i.customer.phone === c.phone);
+                const totalSpent = customerInvoices.reduce((sum, i) => sum + (i.grandTotal || 0), 0);
+                const orderCount = customerInvoices.length;
+                return { ...c, totalSpent, orderCount };
+            }).filter(c => c !== null && c.orderCount > 0);
+
+            // AUTO-CLEANUP: If we found ghost customers in the list (0 orders), update the DB
+            if (enriched.length !== custs.length) {
+                console.log(`[Auto-Cleanup] Removing ghost customers with 0 invoices.`);
+                await localforage.setItem('customers', enriched.map(({totalSpent, orderCount, ...c}) => c));
+            }
+
+            this.renderCustomersList(enriched);
         } catch (err) {
             console.error('Render Customers Error:', err);
         }
@@ -1116,7 +1170,15 @@ window.appLogic = {
     renderCustomersList(customersArray) {
         try {
             let html = '<table style="width:100%; border-collapse:collapse; margin-top:20px; background:var(--bg-surface); border-radius:12px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.5)">';
-            html += '<thead><tr style="background:#111; color:var(--primary)"><th style="padding:15px; text-align:right;">الجوال</th><th style="padding:15px; text-align:right;">الاسم</th><th style="padding:15px; text-align:right;">آخر تاريخ</th><th style="padding:15px; text-align:center;">إجراءات</th></tr></thead><tbody>';
+            html += `<thead>
+                <tr style="background:#111; color:var(--primary)">
+                    <th style="padding:15px; text-align:right;">رقم الجوال</th>
+                    <th style="padding:15px; text-align:right;">اسم العميل</th>
+                    <th style="padding:15px; text-align:right;">عدد الطلبات</th>
+                    <th style="padding:15px; text-align:right;">إجمالي المشتريات</th>
+                    <th style="padding:15px; text-align:center;">إجراءات</th>
+                </tr>
+            </thead><tbody>`;
             if (customersArray.length === 0) {
                 html += '<tr><td colspan="4" style="padding:20px; text-align:center;">لا توجد بيانات للعملاء حتى الآن.</td></tr>';
             } else {
@@ -1131,11 +1193,14 @@ window.appLogic = {
                     if (!c) return;
                     let n = c.name || 'غير معروف';
                     let p = c.phone || 'غير مسجل';
-                    let d = c.timestamp ? new Date(c.timestamp).toLocaleString('ar-SA') : '-';
+                    let count = c.orderCount || 0;
+                    let spent = c.totalSpent || 0;
+                    
                     html += `<tr style="border-bottom:1px solid var(--border);">
                         <td style="padding:15px; font-weight:bold; direction:ltr; text-align:right;">${p}</td>
                         <td style="padding:15px; font-weight:bold;">${n}</td>
-                        <td style="padding:15px;">${d}</td>
+                        <td style="padding:15px; font-weight:bold; color:var(--text-muted);">${count} طلب</td>
+                        <td style="padding:15px; font-weight:bold; color:var(--primary); direction:ltr; text-align:right;">${spent.toFixed(2)} SAR</td>
                         <td style="padding:15px; text-align:center;">
                             <button class="btn btn-sm" style="background:var(--primary); color:#000; padding:5px 12px; border-radius:4px; font-weight:bold;" onclick="appLogic.viewCustomerOrders('${p}')">
                                 <i class="fa-solid fa-list-ul"></i> عرض الفواتير
@@ -1612,8 +1677,35 @@ window.appLogic = {
 
     // Wafeq UI: Financial Reports
     async renderReports() {
-        const taxRecords = await localforage.getItem('tax_records') || [];
+        const invoices = await localforage.getItem('invoices') || [];
+        let taxRecords = await localforage.getItem('tax_records') || [];
         const exps = await localforage.getItem('expenses') || [];
+
+        // ZERO-STATE GUARD: If no invoices, force data to be empty
+        if (invoices.length === 0) {
+            taxRecords = [];
+            // If we have stale ghosts in DB, purge them now
+            const staleTax = await localforage.getItem('tax_records') || [];
+            const staleJournals = await localforage.getItem('journal_entries') || [];
+            if (staleTax.length > 0 || staleJournals.length > 0) {
+                console.log('[Zero-State-Guard] Purging ghost collections because invoices is empty.');
+                await localforage.setItem('tax_records', []);
+                await manualSyncToCloud('tax_records', []);
+                await localforage.setItem('journal_entries', []);
+                await manualSyncToCloud('journal_entries', []);
+            }
+        } else {
+            // SELF-HEALING: Filter tax_records that don't have a matching invoice anymore
+            const validInvoiceIds = new Set(invoices.filter(i => i && i.id).map(i => i.id.toString()));
+            const originalCount = taxRecords.length;
+            taxRecords = taxRecords.filter(r => r && r.ref_invoice && validInvoiceIds.has(r.ref_invoice.toString()));
+            
+            if (taxRecords.length !== originalCount) {
+                console.log(`[Self-Healing] Purged ${originalCount - taxRecords.length} orphan tax records.`);
+                await localforage.setItem('tax_records', taxRecords);
+                await manualSyncToCloud('tax_records', taxRecords);
+            }
+        }
 
         let totalGross = 0;
         let totalNet = 0;
