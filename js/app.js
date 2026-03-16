@@ -1132,9 +1132,43 @@ window.appLogic = {
     },
 
     // Wafeq UI: Inventory
-    openAddInventoryModal() { document.getElementById('add-inventory-modal').classList.remove('hidden'); },
+    openAddInventoryModal() { 
+        document.getElementById('inv-id').value = '';
+        document.getElementById('inv-name').value = '';
+        document.getElementById('inv-sku').value = '';
+        document.getElementById('inv-qty').value = 0;
+        document.getElementById('inv-cost').value = '0.00';
+        document.querySelector('#add-inventory-modal h3').innerHTML = '<i class="fa-solid fa-box-open"></i> إضافة صنف استهلاكي';
+        document.getElementById('add-inventory-modal').classList.remove('hidden'); 
+    },
     closeInventoryModal() { document.getElementById('add-inventory-modal').classList.add('hidden'); },
+    async editConsumable(id) {
+        let inv = await localforage.getItem('inventory') || [];
+        let item = inv.find(i => String(i.id) === String(id));
+        if (!item) return;
+
+        document.getElementById('inv-id').value = item.id;
+        document.getElementById('inv-name').value = item.name;
+        document.getElementById('inv-sku').value = item.sku;
+        document.getElementById('inv-qty').value = item.qty;
+        document.getElementById('inv-cost').value = item.cost;
+
+        document.querySelector('#add-inventory-modal h3').innerHTML = '<i class="fa-solid fa-edit"></i> تعديل صنف استهلاكي';
+        document.getElementById('add-inventory-modal').classList.remove('hidden');
+    },
+    async deleteConsumable(id) {
+        if (!confirm("هل أنت متأكد من حذف هذه المادة؟")) return;
+        let inv = await localforage.getItem('inventory') || [];
+        inv = inv.filter(i => String(i.id) !== String(id));
+        
+        await localforage.setItem('inventory', inv);
+        await manualSyncToCloud('inventory', inv);
+        
+        this.renderInventory();
+        this.showToast('تم حذف المادة بنجاح');
+    },
     async saveInventoryItem() {
+        let id = document.getElementById('inv-id').value;
         let name = document.getElementById('inv-name').value;
         let sku = document.getElementById('inv-sku').value;
         let qty = parseFloat(document.getElementById('inv-qty').value);
@@ -1142,15 +1176,28 @@ window.appLogic = {
         if (!name || !sku) { alert('يرجى تعبئة الحقول الأساسية!'); return; }
 
         let inv = await localforage.getItem('inventory') || [];
-        let itemIdx = inv.findIndex(i => i.sku === sku);
-        if (itemIdx >= 0) {
-            inv[itemIdx].qty += qty;
-            inv[itemIdx].cost = cost;
+        
+        if (id) {
+            // Edit Mode
+            let idx = inv.findIndex(i => String(i.id) === String(id));
+            if (idx >= 0) {
+                inv[idx] = { id, name, sku, qty, cost };
+            }
         } else {
-            inv.push({ id: Date.now(), name, sku, qty, cost });
+            // Add Mode (Original Logic with SKU collision check)
+            let itemIdx = inv.findIndex(i => i.sku === sku);
+            if (itemIdx >= 0) {
+                inv[itemIdx].qty += qty;
+                inv[itemIdx].cost = cost;
+                inv[itemIdx].name = name; // Sync name just in case
+            } else {
+                inv.push({ id: Date.now(), name, sku, qty, cost });
+            }
         }
+        
         await localforage.setItem('inventory', inv);
         await manualSyncToCloud('inventory', inv);
+
         this.closeInventoryModal();
         this.renderInventory();
         this.showToast('تم حفظ الصنف بنجاح');
@@ -1174,6 +1221,7 @@ window.appLogic = {
                         <th style="padding:10px;">التكلفة</th>
                         <th style="padding:10px;">الرصيد المتاح (Qty)</th>
                         <th style="padding:10px;">إجمالي القيمة</th>
+                        <th style="padding:10px; text-align:center;">إجراءات</th>
                     </tr>
                 </thead>
                 <tbody>`;
@@ -1185,6 +1233,14 @@ window.appLogic = {
                     <td style="padding:12px; direction:ltr;">${item.cost.toFixed(2)} SAR</td>
                     <td style="padding:12px; font-weight:bold; color:${item.qty < 5 ? '#e91e63' : '#4CAF50'}">${item.qty}</td>
                     <td style="padding:12px; font-weight:bold; direction:ltr;">${(item.qty * item.cost).toFixed(2)} SAR</td>
+                    <td style="padding:12px; text-align:center;">
+                        <button class="btn-edit-svc" onclick="appLogic.editConsumable('${item.id}')">
+                            <i class="fa-solid fa-edit"></i> تعديل
+                        </button>
+                        <button class="btn-delete-svc" onclick="appLogic.deleteConsumable('${item.id}')" style="margin-right: 5px;">
+                            <i class="fa-solid fa-trash"></i> حذف
+                        </button>
+                    </td>
                 </tr>`;
             });
             html += `</tbody></table>`;
