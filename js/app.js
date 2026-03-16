@@ -1531,6 +1531,65 @@ window.appLogic = {
             </div>
         </div>
 
+
+        <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px; margin-bottom: 30px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:15px; margin-bottom:20px;">
+                <div>
+                    <h3 style="margin-bottom:5px; color:var(--text-main); font-size: 18px;"><i class="fa-solid fa-calendar-days" style="color:var(--primary); margin-left:8px;"></i> مبيعات الأشهر (Monthly Sales Breakdown)</h3>
+                    <p style="color:var(--text-muted); font-size:13px;">تفصيل المبيعات الإيرادية مجمعة حسب الشهر والميلادي.</p>
+                </div>
+            </div>
+            
+            <div style="overflow-x: auto;">
+                <table style="width:100%; border-collapse:collapse; text-align:right;">
+                    <thead>
+                        <tr style="border-bottom:2px solid var(--border); color:var(--text-muted); font-size: 14px;">
+                            <th style="padding:12px;">الشهر / السنة (Period)</th>
+                            <th style="padding:12px;">إجمالي المبيعات (Total Revenue)</th>
+                            <th style="padding:12px; text-align:center;">الحالة (Status)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        // Monthly Grouping Logic
+        const monthsAr = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+        const monthlyMap = {};
+
+        taxRecords.forEach(r => {
+            const d = new Date(r.date);
+            const mIdx = d.getMonth();
+            const year = d.getFullYear();
+            const key = `${year}-${String(mIdx + 1).padStart(2, '0')}`; // Sortable key
+            const label = `${monthsAr[mIdx]} ${year}`;
+
+            if (!monthlyMap[key]) monthlyMap[key] = { label, total: 0, sortKey: key };
+            monthlyMap[key].total += (r.netTotal || 0);
+        });
+
+        const sortedMonths = Object.values(monthlyMap).sort((a, b) => b.sortKey.localeCompare(a.sortKey));
+
+        if (sortedMonths.length === 0) {
+            html += `<tr><td colspan="3" style="padding:20px; text-align:center; color:var(--text-muted);">لا توجد مبيعات مسجلة حتى الآن</td></tr>`;
+        } else {
+            sortedMonths.forEach(m => {
+                html += `
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                    <td style="padding:14px; font-weight:700; color:#fff;">${m.label}</td>
+                    <td style="padding:14px; font-weight:900; color:var(--primary); direction:ltr;">${m.total.toFixed(2)} SAR</td>
+                    <td style="padding:14px; text-align:center;">
+                        <span style="background:rgba(76, 175, 80, 0.15); color:#4CAF50; padding:4px 10px; border-radius:12px; font-size:11px; font-weight:bold;">محقق</span>
+                    </td>
+                </tr>`;
+            });
+        }
+
+        html += `
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px;">
             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:15px; margin-bottom:20px;">
                 <div>
