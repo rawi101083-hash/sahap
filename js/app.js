@@ -78,8 +78,9 @@ const zatcaEncoder = {
 const accountingEngine = {
     async postTransaction(invoice) {
         const total = invoice.grandTotal;
-        const subtotal = total / 1.15;
-        const vat = total - subtotal;
+        // FIXED: Stop VAT/Hidden tax deductions. 1:1 Revenue Math.
+        const subtotal = total; 
+        const vat = 0; 
 
         invoice.vatAmount = vat;
         invoice.subtotalNet = subtotal;
@@ -207,27 +208,34 @@ async function initFirebaseSync() {
                 resolve(); 
             });
 
-            // REAL-TIME UPDATES: Listener only (No automatic writes)
+            // REAL-TIME UPDATES: Listener handles additions, edits, AND deletions
             dbRef.on('value', async (snapshot) => {
                 if (!window.isDataInitialized) return; // Ignore updates during boot
-                const cloudData = snapshot.val();
+                
+                let cloudData = snapshot.val();
+                let sanitized = [];
+
+                // FIX: Handle removal/empty state (cloudData === null)
                 if (cloudData !== null) {
-                    let sanitized = cloudData;
-                    if (typeof sanitized === 'object' && !Array.isArray(sanitized)) sanitized = Object.values(sanitized);
-                    if (Array.isArray(sanitized)) sanitized = sanitized.filter(item => item !== null);
-                    
-                    window.__syncingFromFirebase = true;
-                    await originalSetItem.call(localforage, key, sanitized);
-                    window.__syncingFromFirebase = false;
-                    
-                    if (window.appLogic) {
-                        if (key === 'services') window.appLogic.services = sanitized;
-                        if (key === 'delivery_options') {
-                            window.appLogic.deliveryOptions = sanitized;
-                            window.appLogic.updateCartUI();
-                        }
-                        window.appLogic.refreshActiveView();
+                    if (typeof cloudData === 'object' && !Array.isArray(cloudData)) sanitized = Object.values(cloudData);
+                    else if (Array.isArray(cloudData)) sanitized = cloudData;
+                    sanitized = sanitized.filter(item => item !== null && typeof item === 'object');
+                }
+
+                console.log(`[Realtime-Sync] Update received for ${key}: ${sanitized.length} items.`);
+                
+                window.__syncingFromFirebase = true;
+                await originalSetItem.call(localforage, key, sanitized);
+                window.__syncingFromFirebase = false;
+                
+                if (window.appLogic) {
+                    if (key === 'services') window.appLogic.services = sanitized;
+                    if (key === 'delivery_options') {
+                        window.appLogic.deliveryOptions = sanitized;
+                        window.appLogic.updateCartUI();
                     }
+                    // CRITICAL: Force UI to reflect deletion/change immediately
+                    window.appLogic.refreshActiveView();
                 }
             });
         });
@@ -1721,22 +1729,24 @@ window.appLogic = {
         let salesToday = 0, salesWeek = 0, salesMonth = 0, salesYear = 0;
 
         taxRecords.forEach(r => {
-            totalGross += r.grossTotal || 0;
-            totalNet += r.netTotal || 0;
-            totalVat += r.vatCollected || 0;
+            // FIX: Gross Revenue = Exact sum of all invoice totals.
+            const amt = r.grossTotal || r.netTotal || 0;
+            totalGross += amt;
+            totalNet += amt; // Standardize net to gross per user instruction
+            totalVat += (r.vatCollected || 0);
 
             const rTime = new Date(r.date).getTime();
-            const rNet = r.netTotal || 0;
-            if (rTime >= today) salesToday += rNet;
-            if (rTime >= weekAgo) salesWeek += rNet;
-            if (rTime >= monthAgo) salesMonth += rNet;
-            if (rTime >= yearAgo) salesYear += rNet;
+            if (rTime >= today) salesToday += amt;
+            if (rTime >= weekAgo) salesWeek += amt;
+            if (rTime >= monthAgo) salesMonth += amt;
+            if (rTime >= yearAgo) salesYear += amt;
         });
 
         exps.forEach(e => {
             totalExpensesCost += e.amount || 0;
         });
 
+        // Profit = Gross Revenue - Total Expenses
         let netProfit = totalNet - totalExpensesCost;
 
         let html = `
