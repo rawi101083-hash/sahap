@@ -1808,16 +1808,14 @@ window.appLogic = {
         document.getElementById('expenses-content').innerHTML = html;
     },
 
-    // Wafeq UI: Financial Reports
     async renderReports() {
         const invoices = await localforage.getItem('invoices') || [];
-        let taxRecords = await localforage.getItem('tax_records') || [];
         const exps = await localforage.getItem('expenses') || [];
+        let taxRecords = await localforage.getItem('tax_records') || [];
 
         // ZERO-STATE GUARD: If no invoices, force data to be empty
         if (invoices.length === 0) {
             taxRecords = [];
-            // If we have stale ghosts in DB, purge them now
             const staleTax = await localforage.getItem('tax_records') || [];
             const staleJournals = await localforage.getItem('journal_entries') || [];
             if (staleTax.length > 0 || staleJournals.length > 0) {
@@ -1840,19 +1838,10 @@ window.appLogic = {
             }
         }
 
-        let totalGross = 0;
-        let totalNet = 0;
-        let totalVat = 0;
+        let totalRevenue = 0;
         let totalExpensesCost = 0;
         let totalPartnerCosts = 0;
-
-        // Calculate Partner Costs from Invoices
-        invoices.forEach(i => {
-            if (i && i.partnerLaundryCost) {
-                totalPartnerCosts += parseFloat(i.partnerLaundryCost) || 0;
-            }
-        });
-
+        
         const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
         const weekAgo = today - (7 * 24 * 60 * 60 * 1000);
@@ -1860,55 +1849,73 @@ window.appLogic = {
         const yearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()).getTime();
 
         let salesToday = 0, salesWeek = 0, salesMonth = 0, salesYear = 0;
+        const monthsAr = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+        const monthlyMap = {};
 
-        taxRecords.forEach(r => {
-            // FIX: Gross Revenue = Exact sum of all invoice totals.
-            const amt = r.grossTotal || r.netTotal || 0;
-            totalGross += amt;
-            totalNet += amt; // Standardize net to gross per user instruction
-            totalVat += (r.vatCollected || 0);
+        // Calculate Revenue, Partner Costs, and Time-based Analytics DIRECTLY from Invoices
+        invoices.forEach(i => {
+            if (!i) return;
+            const amt = parseFloat(i.grossTotal || i.total || 0);
+            totalRevenue += amt;
+            
+            if (i.partnerLaundryCost) {
+                totalPartnerCosts += parseFloat(i.partnerLaundryCost) || 0;
+            }
 
-            const rTime = new Date(r.date).getTime();
+            const rTime = new Date(i.date).getTime();
             if (rTime >= today) salesToday += amt;
             if (rTime >= weekAgo) salesWeek += amt;
             if (rTime >= monthAgo) salesMonth += amt;
             if (rTime >= yearAgo) salesYear += amt;
+
+            const d = new Date(i.date);
+            const mIdx = d.getMonth();
+            const year = d.getFullYear();
+            const key = `${year}-${String(mIdx + 1).padStart(2, '0')}`;
+            const label = `${monthsAr[mIdx]} ${year}`;
+
+            if (!monthlyMap[key]) monthlyMap[key] = { label, total: 0, sortKey: key };
+            monthlyMap[key].total += amt;
         });
 
+        // Calculate Operational Expenses
         exps.forEach(e => {
-            totalExpensesCost += e.amount || 0;
+            totalExpensesCost += parseFloat(e.amount) || 0;
         });
 
-        // FIXED PROFIT FORMULA: Net Profit = (Total Revenue) - (Partner Costs) - (Operational Expenses)
-        let netProfit = totalNet - totalPartnerCosts - totalExpensesCost;
+        // PROFIT FORMULA
+        let netProfit = totalRevenue - totalPartnerCosts - totalExpensesCost;
 
         let html = `
         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:20px; margin-bottom:30px;">
+            <!-- 1. Total Revenue -->
             <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:24px; text-align:center; box-shadow:0 4px 15px rgba(0,0,0,0.2);">
                 <i class="fa-solid fa-sack-dollar" style="font-size:32px; color:#4CAF50; margin-bottom:15px;"></i>
                 <h3 style="color:var(--text-muted); font-size:16px; margin-bottom:5px;">إجمالي الإيرادات (Total Revenue)</h3>
-                <div style="font-size:28px; font-weight:900; color:#fff; direction:ltr;">${totalNet.toFixed(2)} SAR</div>
+                <div style="font-size:28px; font-weight:900; color:#fff; direction:ltr;">${totalRevenue.toFixed(2)} SAR</div>
             </div>
 
+            <!-- 2. Partner Costs -->
             <div style="background:var(--bg-surface); border:1px solid #3f51b5; border-radius:var(--radius-md); padding:24px; text-align:center; box-shadow:0 4px 15px rgba(63, 81, 181, 0.2);">
                 <i class="fa-solid fa-truck-ramp-box" style="font-size:32px; color:#5c6bc0; margin-bottom:15px;"></i>
                 <h3 style="color:var(--text-muted); font-size:16px; margin-bottom:5px;">إجمالي حسابات المغاسل (Partner Costs)</h3>
                 <div style="font-size:28px; font-weight:900; color:#fff; direction:ltr;">${totalPartnerCosts.toFixed(2)} SAR</div>
             </div>
             
+            <!-- 3. Operational Expenses -->
             <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:24px; text-align:center; box-shadow:0 4px 15px rgba(0,0,0,0.2);">
                 <i class="fa-solid fa-arrow-right-from-bracket" style="font-size:32px; color:#e91e63; margin-bottom:15px;"></i>
                 <h3 style="color:var(--text-muted); font-size:16px; margin-bottom:5px;">المصروفات التشغيلية (Operational Expenses)</h3>
                 <div style="font-size:28px; font-weight:900; color:#e91e63; direction:ltr;">- ${totalExpensesCost.toFixed(2)} SAR</div>
             </div>
 
+            <!-- 4. Net Profit -->
             <div style="background:var(--bg-surface); border:1px solid var(--primary); border-radius:var(--radius-md); padding:24px; text-align:center; box-shadow:0 4px 15px rgba(253,184,19,0.2);">
                 <i class="fa-solid fa-chart-pie" style="font-size:32px; color:var(--primary); margin-bottom:15px;"></i>
                 <h3 style="color:var(--text-muted); font-size:16px; margin-bottom:5px;">صافي الربح (Net Profit)</h3>
                 <div style="font-size:28px; font-weight:900; color:${netProfit >= 0 ? '#4CAF50' : '#e91e63'}; direction:ltr;">${netProfit.toFixed(2)} SAR</div>
             </div>
         </div>
-
 
         <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px; margin-bottom: 30px;">
             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:15px; margin-bottom:20px;">
@@ -1929,21 +1936,6 @@ window.appLogic = {
                     </thead>
                     <tbody>
         `;
-
-        // Monthly Grouping Logic
-        const monthsAr = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
-        const monthlyMap = {};
-
-        taxRecords.forEach(r => {
-            const d = new Date(r.date);
-            const mIdx = d.getMonth();
-            const year = d.getFullYear();
-            const key = `${year}-${String(mIdx + 1).padStart(2, '0')}`; // Sortable key
-            const label = `${monthsAr[mIdx]} ${year}`;
-
-            if (!monthlyMap[key]) monthlyMap[key] = { label, total: 0, sortKey: key };
-            monthlyMap[key].total += (r.netTotal || 0);
-        });
 
         const sortedMonths = Object.values(monthlyMap).sort((a, b) => b.sortKey.localeCompare(a.sortKey));
 
