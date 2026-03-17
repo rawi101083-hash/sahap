@@ -1756,6 +1756,17 @@ window.appLogic = {
         document.getElementById('expense-date').value = '';
     },
 
+    async clearExpenses() {
+        if (!confirm('هل أنت متأكد من مسح جميع المصروفات التشغيلية نهائياً؟')) return;
+        
+        await localforage.setItem('expenses', []);
+        await manualSyncToCloud('expenses', []);
+        
+        this.renderExpenses();
+        this.renderReports();
+        this.showToast('تم تصفير جميع المصروفات التشغيلية');
+    },
+
     async renderExpenses() {
         let exps = await localforage.getItem('expenses') || [];
 
