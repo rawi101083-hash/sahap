@@ -1728,7 +1728,10 @@ window.appLogic = {
     },
 
     // Wafeq UI: Expenses
-    openAddExpenseModal() { document.getElementById('add-expense-modal').classList.remove('hidden'); },
+    openAddExpenseModal() { 
+        document.getElementById('add-expense-modal').classList.remove('hidden');
+        document.getElementById('expense-date').value = new Date().toISOString().split('T')[0];
+    },
     closeExpenseModal() { document.getElementById('add-expense-modal').classList.add('hidden'); },
     async saveExpense() {
         let cat = document.getElementById('exp-category').value;
