@@ -150,7 +150,13 @@
                             <button class="btn btn-success" onclick="appLogic.openAddServiceModal()"><i class="fa-solid fa-shirt"></i> إضافة خدمة جديدة</button>
                         </div>
                     </div>
-                    <div id="inventory-content"></div>
+                    <div id="inventory-content">
+                        <div style="text-align:center; padding:50px; color:var(--text-muted);">
+                            <i class="fa-solid fa-spinner fa-spin fa-3x" style="margin-bottom:20px; color:var(--primary);"></i>
+                            <h2 style="color:var(--text-main); margin-bottom:10px;">جاري تحضير قائمة الخدمات...</h2>
+                            <p>إذا استغرق هذا وقتاً طويلاً، يرجى تحديث الصفحة.</p>
+                        </div>
+                    </div>
 
                     <!-- Delivery Fee Management -->
                     <div class="delivery-manager-card">
@@ -439,6 +445,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-database-compat.js"></script>
 
-    <script src="js/app.js?v=2.0.0"></script>
+    <script src="js/app.js?v=4.0.1"></script>
 </body>
 </html>

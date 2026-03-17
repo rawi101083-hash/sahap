@@ -1,7 +1,6 @@
-// Single monolithic file containing data, logic, and UI (World-class structure)
-
-// Source of truth built explicitly from user CSV rules and images.
+// Sahab POS - Main Application Logic
 const DefaultDeliveryOptions = [
+
     { id: 'none', name: 'بدون توصيل', amount: 0 },
     { id: 'normal', name: 'توصيل عادي', amount: 10 },
     { id: 'special', name: 'توصيل خاص', amount: 5 }
@@ -279,8 +278,21 @@ window.appLogic = {
         await initFirebaseSync();
 
         // 2. FETCH FINAL STATE: After Firebase has updated localforage, we pull it into memory.
-        this.services = await localforage.getItem('services') || DefaultServices;
-        this.deliveryOptions = await localforage.getItem('delivery_options') || DefaultDeliveryOptions;
+        let savedServices = await localforage.getItem('services');
+        this.services = (savedServices && savedServices.length > 0) ? savedServices : DefaultServices;
+
+        let savedDelivery = await localforage.getItem('delivery_options');
+        this.deliveryOptions = (savedDelivery && savedDelivery.length > 0) ? savedDelivery : DefaultDeliveryOptions;
+
+        // Auto-Restore: If we had to use defaults, save them back to ensure they persist and sync
+        if (!savedServices || savedServices.length === 0) {
+            await localforage.setItem('services', DefaultServices);
+            await manualSyncToCloud('services', DefaultServices);
+        }
+        if (!savedDelivery || savedDelivery.length === 0) {
+            await localforage.setItem('delivery_options', DefaultDeliveryOptions);
+            await manualSyncToCloud('delivery_options', DefaultDeliveryOptions);
+        }
         
         console.log("[App] Initialization pulse complete. Data is now protected and loaded.");
         
@@ -1360,96 +1372,134 @@ window.appLogic = {
     },
 
     async renderInventory() {
-        let trackedInv = await localforage.getItem('inventory') || [];
+        const container = document.getElementById('inventory-content');
+        if (!container) return;
+        
+        // Immediate Feedback
+        container.innerHTML = '<div style="text-align:center; padding:20px; color:var(--primary);"><i class="fa-solid fa-spinner fa-spin"></i> جاري تحميل البيانات...</div>';
 
-        let html = `
-        <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px; margin-bottom:20px;">
-            <h3 style="margin-bottom:15px; border-bottom:1px solid var(--border); padding-bottom:10px;">المواد الاستهلاكية (Consumables)</h3>
-            ${trackedInv.length === 0 ? '<p style="color:var(--text-muted); text-align:center;">لا توجد مواد استهلاكية مضافة حالياً. أضف الجِير، الأكياس، الشماعات ليتم خصمها آلياً يدوياً.</p>' : ''}
-        `;
+        try {
+            console.log('[UI] Starting renderInventory...');
+            
+            // Load tracked inventory (consumables)
+            let trackedInv = [];
+            try {
+                trackedInv = await localforage.getItem('inventory');
+                if (!Array.isArray(trackedInv)) trackedInv = [];
+            } catch (e) {
+                console.error('[UI] Error loading consumables:', e);
+            }
 
-        if (trackedInv.length > 0) {
-            html += `<table style="width:100%; border-collapse:collapse; text-align:right; margin-bottom:20px;">
-                <thead>
-                    <tr style="border-bottom:2px solid var(--border); color:var(--text-muted);">
-                        <th style="padding:10px;">SKU</th>
-                        <th style="padding:10px;">الاسم</th>
-                        <th style="padding:10px;">التكلفة</th>
-                        <th style="padding:10px;">الرصيد المتاح (Qty)</th>
-                        <th style="padding:10px;">إجمالي القيمة</th>
-                        <th style="padding:10px; text-align:center;">إجراءات</th>
-                    </tr>
-                </thead>
-                <tbody>`;
-            trackedInv.forEach(item => {
-                html += `
-                <tr style="border-bottom:1px solid var(--border);">
-                    <td style="padding:12px; font-family:monospace; color:var(--primary);">${item.sku}</td>
-                    <td style="padding:12px; font-weight:bold;">${item.name}</td>
-                    <td style="padding:12px; direction:ltr;">${item.cost.toFixed(2)} SAR</td>
-                    <td style="padding:12px; font-weight:bold; color:${item.qty < 5 ? '#e91e63' : '#4CAF50'}">${item.qty}</td>
-                    <td style="padding:12px; font-weight:bold; direction:ltr;">${(item.qty * item.cost).toFixed(2)} SAR</td>
-                    <td style="padding:12px; text-align:center;">
-                        <button class="btn-edit-svc" onclick="appLogic.editConsumable('${item.id}')">
-                            <i class="fa-solid fa-edit"></i> تعديل
-                        </button>
-                        <button class="btn-delete-svc" onclick="appLogic.deleteConsumable('${item.id}')" style="margin-right: 5px;">
-                            <i class="fa-solid fa-trash"></i> حذف
-                        </button>
-                    </td>
-                </tr>`;
-            });
-            html += `</tbody></table>`;
-        }
-        html += `</div>`;
+            let html = '';
 
-        // Laundry Services Section
-        html += `
-        <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px;">
-            <h3 style="margin-bottom:15px; border-bottom:1px solid var(--border); padding-bottom:10px;">خدمات المغسلة وأسعارها (Laundry Services)</h3>
-            <div style="overflow-x: auto;">
-                <table class="inventory-table">
+            // Consumables Section
+            html += `
+            <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px; margin-bottom:20px;">
+                <h3 style="margin-bottom:15px; border-bottom:1px solid var(--border); padding-bottom:10px;">المواد الاستهلاكية (Consumables)</h3>
+                ${trackedInv.length === 0 ? '<p style="color:var(--text-muted); text-align:center;">لا توجد مواد استهلاكية مضافة حالياً. أضف الجِير، الأكياس، الشماعات ليتم خصمها آلياً يدوياً.</p>' : ''}
+            `;
+
+            if (trackedInv.length > 0) {
+                html += `<table style="width:100%; border-collapse:collapse; text-align:right; margin-bottom:20px;">
                     <thead>
-                        <tr>
-                            <th>الأيقونة</th>
-                            <th>اسم الخدمة</th>
-                            <th>الفئة</th>
-                            <th>كوي</th>
-                            <th>غسيل+كوي</th>
-                            <th>غسيل</th>
-                            <th>رسم السريع</th>
-                            <th style="text-align:center;">إجراءات</th>
+                        <tr style="border-bottom:2px solid var(--border); color:var(--text-muted);">
+                            <th style="padding:10px;">SKU</th>
+                            <th style="padding:10px;">الاسم</th>
+                            <th style="padding:10px;">التكلفة</th>
+                            <th style="padding:10px;">الرصيد المتاح (Qty)</th>
+                            <th style="padding:10px;">إجمالي القيمة</th>
+                            <th style="padding:10px; text-align:center;">إجراءات</th>
                         </tr>
                     </thead>
-                    <tbody>
-            `;
-        this.services.forEach(item => {
-            html += `
-                <tr style="border-bottom:1px solid var(--border);">
-                    <td style="padding:12px;"><i class="fa-solid ${item.icon}" style="font-size:20px; color:var(--primary);"></i></td>
-                    <td style="padding:12px; font-weight:bold;">${item.name}</td>
-                    <td style="padding:12px;">${item.cat === 'men' ? 'رجالي' : (item.cat === 'women' ? 'نسائي' : 'أخرى')}</td>
-                    <td style="padding:12px; color:var(--primary); font-weight:bold;">${parseFloat(item.prices.iron).toFixed(2)}</td>
-                    <td style="padding:12px; color:var(--primary); font-weight:bold;">${parseFloat(item.prices.wash_iron).toFixed(2)}</td>
-                    <td style="padding:12px; color:var(--primary); font-weight:bold;">${parseFloat(item.prices.wash).toFixed(2)}</td>
-                    <td style="padding:12px; color:#4CAF50; font-weight:bold;">
-                        ${typeof item.expressFee === 'object' ? 'متغير' : `+${parseFloat(item.expressFee).toFixed(2)}`}
-                    </td>
-                    <td style="padding:12px; text-align:center;">
-                        <button class="btn-edit-svc" onclick="appLogic.openEditServiceModal('${item.id}')">
-                            <i class="fa-solid fa-edit"></i> تعديل
-                        </button>
-                        <button class="btn-delete-svc" onclick="appLogic.deleteService('${item.id}')" style="margin-right: 5px;">
-                            <i class="fa-solid fa-trash"></i> حذف
-                        </button>
-                    </td>
-                </tr>`;
-        });
-        html += `</tbody></table></div></div>`;
+                    <tbody>`;
+                trackedInv.forEach(item => {
+                    if (!item) return;
+                    html += `
+                    <tr style="border-bottom:1px solid var(--border);">
+                        <td style="padding:12px; font-family:monospace; color:var(--primary);">${item.sku || 'N/A'}</td>
+                        <td style="padding:12px; font-weight:bold;">${item.name || 'Unlabeled'}</td>
+                        <td style="padding:12px; direction:ltr;">${(parseFloat(item.cost) || 0).toFixed(2)} SAR</td>
+                        <td style="padding:12px; font-weight:bold; color:${(item.qty || 0) < 5 ? '#e91e63' : '#4CAF50'}">${item.qty || 0}</td>
+                        <td style="padding:12px; font-weight:bold; direction:ltr;">${((item.qty || 0) * (item.cost || 0)).toFixed(2)} SAR</td>
+                        <td style="padding:12px; text-align:center;">
+                            <button class="btn-edit-svc" onclick="appLogic.editConsumable('${item.id}')">
+                                <i class="fa-solid fa-edit"></i> تعديل
+                            </button>
+                            <button class="btn-delete-svc" onclick="appLogic.deleteConsumable('${item.id}')" style="margin-right: 5px;">
+                                <i class="fa-solid fa-trash"></i> حذف
+                            </button>
+                        </td>
+                    </tr>`;
+                });
+                html += `</tbody></table>`;
+            }
+            html += `</div>`;
 
-        const container = document.getElementById('inventory-content');
-        if (container) container.innerHTML = html;
-        this.renderDeliveryManager();
+            // Laundry Services Section
+            html += `
+            <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px;">
+                <h3 style="margin-bottom:15px; border-bottom:1px solid var(--border); padding-bottom:10px;">خدمات المغسلة وأسعارها (Laundry Services)</h3>
+                <div style="overflow-x: auto;">
+                    <table class="inventory-table">
+                        <thead>
+                            <tr>
+                                <th>الأيقونة</th>
+                                <th>اسم الخدمة</th>
+                                <th>الفئة</th>
+                                <th>كوي</th>
+                                <th>غسيل+كوي</th>
+                                <th>غسيل</th>
+                                <th>رسم السريع</th>
+                                <th style="text-align:center;">إجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+            
+            const services = window.appLogic.services || [];
+            if (Array.isArray(services)) {
+                services.forEach(item => {
+                    if (!item) return;
+                    const p = item.prices || {};
+                    const iron = parseFloat(p.iron) || 0;
+                    const washIron = parseFloat(p.wash_iron) || 0;
+                    const wash = parseFloat(p.wash) || 0;
+                    
+                    let expLbl = '0.00';
+                    if (item.expressFee) {
+                        if (typeof item.expressFee === 'object') expLbl = 'متغير';
+                        else expLbl = `+${parseFloat(item.expressFee).toFixed(2)}`;
+                    }
+
+                    html += `
+                        <tr style="border-bottom:1px solid var(--border);">
+                            <td style="padding:12px;"><i class="fa-solid ${item.icon || 'fa-shirt'}" style="font-size:20px; color:var(--primary);"></i></td>
+                            <td style="padding:12px; font-weight:bold;">${item.name || 'N/A'}</td>
+                            <td style="padding:12px;">${item.cat === 'men' ? 'رجالي' : (item.cat === 'women' ? 'نسائي' : 'أخرى')}</td>
+                            <td style="padding:12px; color:var(--primary); font-weight:bold;">${iron.toFixed(2)}</td>
+                            <td style="padding:12px; color:var(--primary); font-weight:bold;">${washIron.toFixed(2)}</td>
+                            <td style="padding:12px; color:var(--primary); font-weight:bold;">${wash.toFixed(2)}</td>
+                            <td style="padding:12px; color:#4CAF50; font-weight:bold;">${expLbl}</td>
+                            <td style="padding:12px; text-align:center;">
+                                <button class="btn-edit-svc" onclick="appLogic.openEditServiceModal('${item.id}')">
+                                <i class="fa-solid fa-edit"></i> تعديل
+                                </button>
+                                <button class="btn-delete-svc" onclick="appLogic.deleteService('${item.id}')" style="margin-right: 5px;">
+                                <i class="fa-solid fa-trash"></i> حذف
+                                </button>
+                            </td>
+                        </tr>`;
+                });
+            }
+            html += `</tbody></table></div></div>`;
+
+            container.innerHTML = html;
+            window.appLogic.renderDeliveryManager();
+            console.log('[UI] renderInventory completed successfully.');
+        } catch (err) {
+            console.error('[UI] Critical failure in renderInventory:', err);
+            container.innerHTML = `<div style="color:red; padding:20px;">خطأ في تحميل الجدول: ${err.message}</div>`;
+        }
     },
 
     // Service Management Logic
@@ -1565,40 +1615,47 @@ window.appLogic = {
     },
 
     renderDeliveryManager() {
-        const container = document.getElementById('delivery-manager-content');
-        if (!container) return;
-        
-        let html = `
-            <table class="inventory-table">
-                <thead>
-                    <tr>
-                        <th style="padding:12px; text-align:right;">اسم الخيار</th>
-                        <th style="padding:12px; text-align:right;">المبلغ (ر.س)</th>
-                        <th style="padding:12px; text-align:center;">إجراءات</th>
-                    </tr>
-                </thead>
-                <tbody>
-        `;
-        
-        this.deliveryOptions.forEach(opt => {
-            html += `
-                <tr style="border-bottom:1px solid var(--border);">
-                    <td style="padding:12px; font-weight:bold;">${opt.name}</td>
-                    <td style="padding:12px; direction:ltr; text-align:right;">${opt.amount.toFixed(2)} SAR</td>
-                    <td style="padding:12px; text-align:center;">
-                        <button class="btn-action-icon btn-action-edit" onclick="appLogic.openAddDeliveryModal('${opt.id}')"><i class="fa-solid fa-edit"></i></button>
-                        <button class="btn-action-icon btn-action-delete" onclick="appLogic.deleteDeliveryOption('${opt.id}')"><i class="fa-solid fa-trash"></i></button>
-                    </td>
-                </tr>
+        try {
+            const container = document.getElementById('delivery-manager-content');
+            if (!container) return;
+            
+            let html = `
+                <table class="inventory-table">
+                    <thead>
+                        <tr>
+                            <th style="padding:12px; text-align:right;">اسم الخيار</th>
+                            <th style="padding:12px; text-align:right;">المبلغ (ر.س)</th>
+                            <th style="padding:12px; text-align:center;">إجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
             `;
-        });
-        
-        if (this.deliveryOptions.length === 0) {
-            html += '<tr><td colspan="3" style="text-align:center; padding:20px;">لا يوجد خيارات توصيل حالياً.</td></tr>';
+            
+            const deliveryArray = Array.isArray(this.deliveryOptions) ? this.deliveryOptions : [];
+            deliveryArray.forEach(opt => {
+                if (!opt) return;
+                const amt = parseFloat(opt.amount) || 0;
+                html += `
+                    <tr style="border-bottom:1px solid var(--border);">
+                        <td style="padding:12px; font-weight:bold;">${opt.name || 'Unknown'}</td>
+                        <td style="padding:12px; direction:ltr; text-align:right;">${amt.toFixed(2)} SAR</td>
+                        <td style="padding:12px; text-align:center;">
+                            <button class="btn-action-icon btn-action-edit" onclick="appLogic.openAddDeliveryModal('${opt.id}')"><i class="fa-solid fa-edit"></i></button>
+                            <button class="btn-action-icon btn-action-delete" onclick="appLogic.deleteDeliveryOption('${opt.id}')"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            if (deliveryArray.length === 0) {
+                html += '<tr><td colspan="3" style="text-align:center; padding:20px;">لا يوجد خيارات توصيل حالياً.</td></tr>';
+            }
+            
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        } catch (err) {
+            console.error('[UI] Crash in renderDeliveryManager:', err);
         }
-        
-        html += '</tbody></table>';
-        container.innerHTML = html;
     },
 
     openAddDeliveryModal(id = null) {
@@ -1807,33 +1864,33 @@ window.appLogic = {
             totalExpensesCost += e.amount || 0;
         });
 
-        // Profit = Gross Revenue - Total Expenses
-        let netProfit = totalNet - totalExpensesCost;
+        // FIXED PROFIT FORMULA: Net Profit = (Total Revenue) - (Partner Costs) - (Operational Expenses)
+        let netProfit = totalNet - totalPartnerCosts - totalExpensesCost;
 
         let html = `
         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:20px; margin-bottom:30px;">
             <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:24px; text-align:center; box-shadow:0 4px 15px rgba(0,0,0,0.2);">
                 <i class="fa-solid fa-sack-dollar" style="font-size:32px; color:#4CAF50; margin-bottom:15px;"></i>
-                <h3 style="color:var(--text-muted); font-size:16px; margin-bottom:5px;">إجمالي المبيعات الإيرادية (Revenue)</h3>
+                <h3 style="color:var(--text-muted); font-size:16px; margin-bottom:5px;">إجمالي الإيرادات (Total Revenue)</h3>
                 <div style="font-size:28px; font-weight:900; color:#fff; direction:ltr;">${totalNet.toFixed(2)} SAR</div>
-            </div>
-            
-            <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:24px; text-align:center; box-shadow:0 4px 15px rgba(0,0,0,0.2);">
-                <i class="fa-solid fa-arrow-right-from-bracket" style="font-size:32px; color:#e91e63; margin-bottom:15px;"></i>
-                <h3 style="color:var(--text-muted); font-size:16px; margin-bottom:5px;">مصروفات تشغيلية (Expenses)</h3>
-                <div style="font-size:28px; font-weight:900; color:#e91e63; direction:ltr;">- ${totalExpensesCost.toFixed(2)} SAR</div>
-            </div>
-
-            <div style="background:var(--bg-surface); border:1px solid var(--primary); border-radius:var(--radius-md); padding:24px; text-align:center; box-shadow:0 4px 15px rgba(253,184,19,0.2);">
-                <i class="fa-solid fa-chart-pie" style="font-size:32px; color:var(--primary); margin-bottom:15px;"></i>
-                <h3 style="color:var(--text-muted); font-size:16px; margin-bottom:5px;">صافي الربح / الخسارة (P&L)</h3>
-                <div style="font-size:28px; font-weight:900; color:${netProfit >= 0 ? '#4CAF50' : '#e91e63'}; direction:ltr;">${netProfit.toFixed(2)} SAR</div>
             </div>
 
             <div style="background:var(--bg-surface); border:1px solid #3f51b5; border-radius:var(--radius-md); padding:24px; text-align:center; box-shadow:0 4px 15px rgba(63, 81, 181, 0.2);">
                 <i class="fa-solid fa-truck-ramp-box" style="font-size:32px; color:#5c6bc0; margin-bottom:15px;"></i>
                 <h3 style="color:var(--text-muted); font-size:16px; margin-bottom:5px;">إجمالي حسابات المغاسل (Partner Costs)</h3>
                 <div style="font-size:28px; font-weight:900; color:#fff; direction:ltr;">${totalPartnerCosts.toFixed(2)} SAR</div>
+            </div>
+            
+            <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:24px; text-align:center; box-shadow:0 4px 15px rgba(0,0,0,0.2);">
+                <i class="fa-solid fa-arrow-right-from-bracket" style="font-size:32px; color:#e91e63; margin-bottom:15px;"></i>
+                <h3 style="color:var(--text-muted); font-size:16px; margin-bottom:5px;">المصروفات التشغيلية (Operational Expenses)</h3>
+                <div style="font-size:28px; font-weight:900; color:#e91e63; direction:ltr;">- ${totalExpensesCost.toFixed(2)} SAR</div>
+            </div>
+
+            <div style="background:var(--bg-surface); border:1px solid var(--primary); border-radius:var(--radius-md); padding:24px; text-align:center; box-shadow:0 4px 15px rgba(253,184,19,0.2);">
+                <i class="fa-solid fa-chart-pie" style="font-size:32px; color:var(--primary); margin-bottom:15px;"></i>
+                <h3 style="color:var(--text-muted); font-size:16px; margin-bottom:5px;">صافي الربح (Net Profit)</h3>
+                <div style="font-size:28px; font-weight:900; color:${netProfit >= 0 ? '#4CAF50' : '#e91e63'}; direction:ltr;">${netProfit.toFixed(2)} SAR</div>
             </div>
         </div>
 
