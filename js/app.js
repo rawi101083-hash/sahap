@@ -611,13 +611,17 @@ window.appLogic = {
 
         let invoiceData = {
             id: newInvId, timestamp: Date.now(), customer: { phone: cPhone, name: cName },
-            items: [...this.cart], deliveryFee: this.deliveryFee, grandTotal: grT,
+            items: [...this.cart], 
+            deliveryFee: parseFloat(this.deliveryFee) || 0, 
+            total: parseFloat(grT) || 0, // AUTHORITATIVE REVENUE FIELD
+            grandTotal: parseFloat(grT) || 0, 
+            laundryCost: 0, // AUTHORITATIVE PARTNER COST FIELD
             status: 'completed',
             paymentMethod: 'cash'
         };
 
         // No VAT Logic (Tax free invoice as requested)
-        invoiceData.subtotalNet = invoiceData.grandTotal;
+        invoiceData.subtotalNet = invoiceData.total;
         invoiceData.vatAmount = 0;
 
         this.pendingInvoice = invoiceData;
@@ -1048,12 +1052,12 @@ window.appLogic = {
                                     <input type="text" id="partner-name-${i.id}" value="${i.partnerLaundryName || ''}" style="width:100%; background:#000; color:#fff; border:1px solid var(--border); padding:8px; border-radius:4px;">
                                 </div>
                                 <div>
-                                    <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px;">الحي</label>
-                                    <input type="text" id="partner-hood-${i.id}" value="${i.partnerLaundryNeighborhood || ''}" style="width:100%; background:#000; color:#fff; border:1px solid var(--border); padding:8px; border-radius:4px;">
+                                    <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px;">حساب المغاسل (ر.س)</label>
+                                    <input type="number" id="partner-cost-${i.id}" value="${i.laundryCost || i.partnerLaundryCost || 0}" style="width:100%; background:#000; color:#fff; border:1px solid var(--border); padding:8px; border-radius:4px;">
                                 </div>
                                 <div>
-                                    <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px;">حساب المغسلة (ر.س)</label>
-                                    <input type="number" id="partner-cost-${i.id}" value="${i.partnerLaundryCost || 0}" style="width:100%; background:#000; color:#fff; border:1px solid var(--border); padding:8px; border-radius:4px;">
+                                    <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px;">الحي</label>
+                                    <input type="text" id="partner-hood-${i.id}" value="${i.partnerLaundryNeighborhood || ''}" style="width:100%; background:#000; color:#fff; border:1px solid var(--border); padding:8px; border-radius:4px;">
                                 </div>
                                 <div>
                                     <button class="btn btn-primary" style="width:100%; padding:9px;" onclick="appLogic.savePartnerInfo('${i.id}')">حفظ التفاصيل</button>
@@ -1092,7 +1096,8 @@ window.appLogic = {
 
         invs[idx].partnerLaundryName = name;
         invs[idx].partnerLaundryNeighborhood = hood;
-        invs[idx].partnerLaundryCost = cost;
+        invs[idx].laundryCost = cost;
+        invs[idx].partnerLaundryCost = cost; // Mirror for safety/back-compat
 
         await localforage.setItem('invoices', invs);
         await manualSyncToCloud('invoices', invs);
@@ -1855,20 +1860,21 @@ window.appLogic = {
         // Calculate Revenue, Partner Costs, and Time-based Analytics DIRECTLY from Invoices
         invoices.forEach(i => {
             if (!i) return;
-            const amt = parseFloat(i.grossTotal || i.total || 0);
+            // REVENUE: Sum of every invoice.total
+            const amt = parseFloat(i.total || i.grandTotal || 0);
             totalRevenue += amt;
             
-            if (i.partnerLaundryCost) {
-                totalPartnerCosts += parseFloat(i.partnerLaundryCost) || 0;
-            }
+            // PARTNER COSTS: Sum of every invoice.laundryCost
+            const pCost = parseFloat(i.laundryCost || i.partnerLaundryCost || 0);
+            totalPartnerCosts += pCost;
 
-            const rTime = new Date(i.date).getTime();
+            const rTime = new Date(i.date || i.timestamp).getTime();
             if (rTime >= today) salesToday += amt;
             if (rTime >= weekAgo) salesWeek += amt;
             if (rTime >= monthAgo) salesMonth += amt;
             if (rTime >= yearAgo) salesYear += amt;
 
-            const d = new Date(i.date);
+            const d = new Date(i.date || i.timestamp);
             const mIdx = d.getMonth();
             const year = d.getFullYear();
             const key = `${year}-${String(mIdx + 1).padStart(2, '0')}`;
