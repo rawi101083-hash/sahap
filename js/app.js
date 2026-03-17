@@ -1734,7 +1734,7 @@ window.appLogic = {
         let cat = document.getElementById('exp-category').value;
         let amount = parseFloat(document.getElementById('exp-amount').value);
         let desc = document.getElementById('exp-desc').value;
-        let date = document.getElementById('exp-date').value;
+        let date = document.getElementById('expense-date').value;
 
         if (!amount || !desc || !date) { alert('يرجى تعبئة كافة الحقول لحفظ التقييد المحاسبي!'); return; }
 
@@ -1750,6 +1750,7 @@ window.appLogic = {
         // Reset fields
         document.getElementById('exp-amount').value = 0;
         document.getElementById('exp-desc').value = '';
+        document.getElementById('expense-date').value = '';
     },
 
     async renderExpenses() {
