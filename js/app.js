@@ -1022,9 +1022,31 @@ window.appLogic = {
                         <td style="padding:15px; font-weight:bold; color:var(--primary)">${total.toFixed(2)} ر.س</td>
                         <td style="padding:15px;">${dateStr}</td>
                         <td style="padding:15px; text-align:center;">
+                            <button class="btn-action-icon btn-action-info" onclick="appLogic.togglePartnerInfo('${i.id}')" title="تفاصيل المغسلة الشريكة"><i class="fa-solid fa-truck-ramp-box"></i></button>
                             <button class="btn-action-icon btn-action-print" onclick="appLogic.reprintInvoice('${i.id}')" title="معاينة وإعادة طباعة"><i class="fa-solid fa-print"></i></button>
                             <button class="btn-action-icon btn-action-edit" onclick="appLogic.editInvoice('${i.id}')" title="تعديل"><i class="fa-solid fa-edit"></i></button>
                             <button class="btn-action-icon btn-action-delete" onclick="appLogic.deleteInvoice('${i.id}')" title="حذف"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    </tr>
+                    <tr id="partner-info-${i.id}" class="hidden" style="background:rgba(253,184,19,0.03); border-bottom:2px solid var(--primary);">
+                        <td colspan="5" style="padding:20px;">
+                            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:15px; align-items:end;">
+                                <div>
+                                    <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px;">اسم المغسلة</label>
+                                    <input type="text" id="partner-name-${i.id}" value="${i.partnerLaundryName || ''}" style="width:100%; background:#000; color:#fff; border:1px solid var(--border); padding:8px; border-radius:4px;">
+                                </div>
+                                <div>
+                                    <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px;">الحي</label>
+                                    <input type="text" id="partner-hood-${i.id}" value="${i.partnerLaundryNeighborhood || ''}" style="width:100%; background:#000; color:#fff; border:1px solid var(--border); padding:8px; border-radius:4px;">
+                                </div>
+                                <div>
+                                    <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px;">حساب المغسلة (ر.س)</label>
+                                    <input type="number" id="partner-cost-${i.id}" value="${i.partnerLaundryCost || 0}" style="width:100%; background:#000; color:#fff; border:1px solid var(--border); padding:8px; border-radius:4px;">
+                                </div>
+                                <div>
+                                    <button class="btn btn-primary" style="width:100%; padding:9px;" onclick="appLogic.savePartnerInfo('${i.id}')">حفظ التفاصيل</button>
+                                </div>
+                            </div>
                         </td>
                     </tr>`;
                 });
@@ -1037,6 +1059,37 @@ window.appLogic = {
             const container = document.getElementById('history-content');
             if (container) container.innerHTML = `<p style="color:red; text-align:center; padding:20px;">خطأ في تحميل سجل الفواتير: ${err.message}</p>`;
         }
+    },
+
+    togglePartnerInfo(id) {
+        const el = document.getElementById(`partner-info-${id}`);
+        if (el) el.classList.toggle('hidden');
+    },
+
+    async savePartnerInfo(id) {
+        const name = document.getElementById(`partner-name-${id}`).value;
+        const hood = document.getElementById(`partner-hood-${id}`).value;
+        const cost = parseFloat(document.getElementById(`partner-cost-${id}`).value) || 0;
+
+        let invs = await localforage.getItem('invoices') || [];
+        const idx = invs.findIndex(i => i.id === id);
+        if (idx === -1) {
+            console.error(`Invoice ${id} not found for partner update.`);
+            return;
+        }
+
+        invs[idx].partnerLaundryName = name;
+        invs[idx].partnerLaundryNeighborhood = hood;
+        invs[idx].partnerLaundryCost = cost;
+
+        await localforage.setItem('invoices', invs);
+        await manualSyncToCloud('invoices', invs);
+        
+        this.showToast('تم حفظ بيانات المغسلة الشريكة بنجاح');
+        
+        // Refresh UI to keep it consistent
+        this.renderHistory();
+        this.renderReports();
     },
 
     async reprintInvoice(id) {
@@ -1719,6 +1772,14 @@ window.appLogic = {
         let totalNet = 0;
         let totalVat = 0;
         let totalExpensesCost = 0;
+        let totalPartnerCosts = 0;
+
+        // Calculate Partner Costs from Invoices
+        invoices.forEach(i => {
+            if (i && i.partnerLaundryCost) {
+                totalPartnerCosts += parseFloat(i.partnerLaundryCost) || 0;
+            }
+        });
 
         const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -1767,6 +1828,12 @@ window.appLogic = {
                 <i class="fa-solid fa-chart-pie" style="font-size:32px; color:var(--primary); margin-bottom:15px;"></i>
                 <h3 style="color:var(--text-muted); font-size:16px; margin-bottom:5px;">صافي الربح / الخسارة (P&L)</h3>
                 <div style="font-size:28px; font-weight:900; color:${netProfit >= 0 ? '#4CAF50' : '#e91e63'}; direction:ltr;">${netProfit.toFixed(2)} SAR</div>
+            </div>
+
+            <div style="background:var(--bg-surface); border:1px solid #3f51b5; border-radius:var(--radius-md); padding:24px; text-align:center; box-shadow:0 4px 15px rgba(63, 81, 181, 0.2);">
+                <i class="fa-solid fa-truck-ramp-box" style="font-size:32px; color:#5c6bc0; margin-bottom:15px;"></i>
+                <h3 style="color:var(--text-muted); font-size:16px; margin-bottom:5px;">إجمالي حسابات المغاسل (Partner Costs)</h3>
+                <div style="font-size:28px; font-weight:900; color:#fff; direction:ltr;">${totalPartnerCosts.toFixed(2)} SAR</div>
             </div>
         </div>
 
