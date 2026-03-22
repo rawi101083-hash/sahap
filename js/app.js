@@ -716,7 +716,7 @@ window.appLogic = {
         const subtotal = data.items.reduce((acc, item) => acc + (item.unitPrice * item.qty), 0);
         const vatRate = 0; // Tax Removed
         const vatAmount = 0;
-        const grandTotal = subtotal;
+        const grandTotal = subtotal + (data.deliveryFee || 0);
 
         // Professional Items Table
         let itemsHtml = '';
@@ -737,6 +737,20 @@ window.appLogic = {
                 <td style="padding: 12px; text-align: center; border-left: 1px solid #edf2f7; color: #a0aec0;">${i + 1}</td>
             </tr>`;
         });
+
+        if (data.deliveryFee > 0) {
+            itemsHtml += `
+            <tr style="border-bottom: 1px solid #edf2f7;">
+                <td style="padding: 12px; text-align: center; border-right: 1px solid #edf2f7; font-weight: bold;">${data.deliveryFee.toFixed(2)}</td>
+                <td style="padding: 12px; text-align: center; border-right: 1px solid #edf2f7;">${data.deliveryFee.toFixed(2)}</td>
+                <td style="padding: 12px; text-align: center; border-right: 1px solid #edf2f7;">1</td>
+                <td style="padding: 12px; text-align: right; line-height: 1.5;">
+                    <strong style="display: block; color: #1a202c;">رسوم التوصيل</strong>
+                    <span style="font-size: 11px; color: #718096;">Delivery Fee</span>
+                </td>
+                <td style="padding: 12px; text-align: center; border-left: 1px solid #edf2f7; color: #a0aec0;">${data.items.length + 1}</td>
+            </tr>`;
+        }
 
         const container = document.createElement('div');
         container.style.position = 'absolute';
@@ -927,6 +941,16 @@ window.appLogic = {
                 <td style="font-weight:bold;">${(item.unitPrice * item.qty).toFixed(2)}</td>
             </tr>`;
         });
+
+        if (data.deliveryFee > 0) {
+            itemsHtml += `
+            <tr>
+                <td style="text-align:center;">1</td>
+                <td>رسوم التوصيل<br><span style="font-size:10px;color:#444">Delivery Fee</span></td>
+                <td>${data.deliveryFee.toFixed(2)}</td>
+                <td style="font-weight:bold;">${data.deliveryFee.toFixed(2)}</td>
+            </tr>`;
+        }
 
         return `
         <div class="thermal-receipt" style="margin:0 auto;">
