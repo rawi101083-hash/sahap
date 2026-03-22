@@ -1102,7 +1102,7 @@ button:active {
     /* POS Section */
     .items-section {
         padding: 16px;
-        padding-bottom: 60vh; /* Ensure last item is fully scrollable above cart */
+        padding-bottom: 80px; /* Just enough to clear the 64px handle */
     }
 
     .items-header {
@@ -1156,13 +1156,13 @@ button:active {
         box-shadow: 0 -5px 25px rgba(0, 0, 0, 0.6);
         height: auto;
         min-height: auto;
-        max-height: 55vh; /* Strict max height */
+        max-height: 85vh; /* Allow large open area */
         display: flex;
         flex-direction: column;
         transform: translateY(calc(100% - 64px));
         /* Peek height */
-        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        overflow-y: auto; /* Allow entire cart to scroll internally */
+        transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        overflow: hidden; /* Prevent ANY upward bleeding when collapsed */
     }
 
     .cart-section.cart-open {
@@ -1184,6 +1184,7 @@ button:active {
         /* Peek height */
         position: relative;
         flex-shrink: 0;
+        z-index: 5;
         box-shadow: 0 4px 15px rgba(253, 184, 19, 0.3);
     }
 
@@ -1201,17 +1202,21 @@ button:active {
     .cart-header {
         padding: 16px;
         padding-top: 24px;
+        flex-shrink: 0; /* Prevent crushing */
     }
 
     .cart-items {
         padding: 16px;
-        max-height: none;
-        overflow-y: visible;
+        flex: 1 1 auto; /* Allow it to shrink/grow */
+        min-height: 0; /* Crucial for scrolling inside flex */
+        overflow-y: auto; /* Contains the scroll internally */
+        max-height: none; 
     }
 
     .cart-footer {
         padding: 16px;
-        padding-bottom: 24px;
+        padding-bottom: env(safe-area-inset-bottom, 20px);
+        flex-shrink: 0; /* Prevent crushing */
     }
 
     .delivery-buttons {

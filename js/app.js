@@ -248,6 +248,26 @@ async function initFirebaseSync() {
 
 // Version: 1.0.3 (Firebase Sync Enabled)
 window.appLogic = {
+    toggleMobileCart() {
+        const cartSection = document.getElementById('cart-section');
+        const icon = document.getElementById('mobile-cart-icon');
+        if (!cartSection) return;
+
+        cartSection.classList.toggle('cart-open');
+        
+        if (cartSection.classList.contains('cart-open')) {
+            if (icon) {
+                icon.classList.remove('fa-chevron-up');
+                icon.classList.add('fa-chevron-down');
+            }
+        } else {
+            if (icon) {
+                icon.classList.remove('fa-chevron-down');
+                icon.classList.add('fa-chevron-up');
+            }
+        }
+    },
+    
     _version: '1.0.3',
     cart: [],
     deliveryFee: 0,
