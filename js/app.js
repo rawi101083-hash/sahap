@@ -345,11 +345,17 @@ window.appLogic = {
         try {
             const invs = await localforage.getItem('invoices') || [];
             const laundries = new Set();
+            const hoods = new Set();
+            
             invs.forEach(i => {
                 if (i && i.partnerLaundryName && i.partnerLaundryName.trim() !== '') {
                     laundries.add(i.partnerLaundryName.trim());
                 }
+                if (i && i.partnerLaundryNeighborhood && i.partnerLaundryNeighborhood.trim() !== '') {
+                    hoods.add(i.partnerLaundryNeighborhood.trim());
+                }
             });
+            
             const datalist = document.getElementById('saved-laundries');
             if (datalist) {
                 datalist.innerHTML = '';
@@ -357,7 +363,15 @@ window.appLogic = {
                     datalist.innerHTML += `<option value="${name}">`;
                 });
             }
-        } catch(e) { console.error('Error updating datalist', e); }
+
+            const hoodDatalist = document.getElementById('saved-neighborhoods');
+            if (hoodDatalist) {
+                hoodDatalist.innerHTML = '';
+                Array.from(hoods).sort().forEach(hood => {
+                    hoodDatalist.innerHTML += `<option value="${hood}">`;
+                });
+            }
+        } catch(e) { console.error('Error updating datalists', e); }
     },
 
     // UI Routing
@@ -681,8 +695,18 @@ window.appLogic = {
 
         let pName = document.getElementById('pos-laundry-name') ? document.getElementById('pos-laundry-name').value.trim() : '';
         let pHood = document.getElementById('pos-laundry-hood') ? document.getElementById('pos-laundry-hood').value.trim() : '';
-        let pCost = parseFloat(document.getElementById('pos-laundry-cost') ? document.getElementById('pos-laundry-cost').value : 0) || 0;
+        let pCostElem = document.getElementById('pos-laundry-cost');
+        let pCostStr = pCostElem ? pCostElem.value.trim() : '';
+        let pCost = parseFloat(pCostStr) || 0;
         let pPaid = document.getElementById('pos-laundry-paid') ? document.getElementById('pos-laundry-paid').value === 'true' : false;
+
+        // Strict Mandatory Validation
+        if (pName || pHood || pCostStr !== '') {
+            if (!pName || !pHood || pCostStr === '') {
+                alert('الرجاء إكمال كافة بيانات المغسلة (الاسم، الحي، والتكلفة) للمتابعة');
+                return;
+            }
+        }
 
         let invoiceData = {
             id: newInvId, timestamp: Date.now(), customer: { phone: cPhone, name: cName },
@@ -1158,7 +1182,7 @@ window.appLogic = {
                             <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:15px; align-items:end;">
                                 <div>
                                     <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px;">اسم المغسلة</label>
-                                    <input type="text" id="partner-name-${i.id}" value="${i.partnerLaundryName || ''}" style="width:100%; background:#000; color:#fff; border:1px solid var(--border); padding:8px; border-radius:4px;">
+                                    <input type="text" id="partner-name-${i.id}" value="${i.partnerLaundryName || ''}" list="saved-laundries" style="width:100%; background:#000; color:#fff; border:1px solid var(--border); padding:8px; border-radius:4px;">
                                 </div>
                                 <div>
                                     <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px;">حساب المغاسل (ر.س)</label>
@@ -1166,7 +1190,7 @@ window.appLogic = {
                                 </div>
                                 <div>
                                     <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px;">الحي</label>
-                                    <input type="text" id="partner-hood-${i.id}" value="${i.partnerLaundryNeighborhood || ''}" style="width:100%; background:#000; color:#fff; border:1px solid var(--border); padding:8px; border-radius:4px;">
+                                    <input type="text" id="partner-hood-${i.id}" value="${i.partnerLaundryNeighborhood || ''}" list="saved-neighborhoods" style="width:100%; background:#000; color:#fff; border:1px solid var(--border); padding:8px; border-radius:4px;">
                                 </div>
                                 <div>
                                     <button class="btn btn-primary" style="width:100%; padding:9px;" onclick="appLogic.savePartnerInfo('${i.id}')">حفظ التفاصيل</button>
@@ -1206,9 +1230,18 @@ window.appLogic = {
     },
 
     async savePartnerInfo(id) {
-        const name = document.getElementById(`partner-name-${id}`).value;
-        const hood = document.getElementById(`partner-hood-${id}`).value;
-        const cost = parseFloat(document.getElementById(`partner-cost-${id}`).value) || 0;
+        const name = document.getElementById(`partner-name-${id}`).value.trim();
+        const hood = document.getElementById(`partner-hood-${id}`).value.trim();
+        const costStr = document.getElementById(`partner-cost-${id}`).value.trim();
+        const cost = parseFloat(costStr) || 0;
+
+        // Strict Mandatory Validation
+        if (name || hood || costStr !== '') {
+            if (!name || !hood || costStr === '') {
+                alert('الرجاء إكمال كافة بيانات المغسلة (الاسم، الحي، والتكلفة) للمتابعة');
+                return;
+            }
+        }
 
         let invs = await localforage.getItem('invoices') || [];
         const idx = invs.findIndex(i => i.id === id);
