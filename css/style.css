@@ -1102,6 +1102,7 @@ button:active {
     /* POS Section */
     .items-section {
         padding: 16px;
+        padding-bottom: 60vh; /* Ensure last item is fully scrollable above cart */
     }
 
     .items-header {
@@ -1155,12 +1156,13 @@ button:active {
         box-shadow: 0 -5px 25px rgba(0, 0, 0, 0.6);
         height: auto;
         min-height: auto;
-        max-height: 85vh;
+        max-height: 55vh; /* Strict max height */
         display: flex;
         flex-direction: column;
         transform: translateY(calc(100% - 64px));
         /* Peek height */
         transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        overflow-y: auto; /* Allow entire cart to scroll internally */
     }
 
     .cart-section.cart-open {
@@ -1203,14 +1205,13 @@ button:active {
 
     .cart-items {
         padding: 16px;
-        max-height: 40vh;
-        /* Adjust based on viewport */
-        overflow-y: auto;
+        max-height: none;
+        overflow-y: visible;
     }
 
     .cart-footer {
         padding: 16px;
-        padding-bottom: 150px; /* Fix Mobile UI Overlap */
+        padding-bottom: 24px;
     }
 
     .delivery-buttons {
