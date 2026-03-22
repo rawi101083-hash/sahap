@@ -296,8 +296,28 @@ window.appLogic = {
         
         console.log("[App] Initialization pulse complete. Data is now protected and loaded.");
         
+        await this.updateLaundryDatalist();
         this.renderItems();
         this.updateCartUI();
+    },
+
+    async updateLaundryDatalist() {
+        try {
+            const invs = await localforage.getItem('invoices') || [];
+            const laundries = new Set();
+            invs.forEach(i => {
+                if (i && i.partnerLaundryName && i.partnerLaundryName.trim() !== '') {
+                    laundries.add(i.partnerLaundryName.trim());
+                }
+            });
+            const datalist = document.getElementById('saved-laundries');
+            if (datalist) {
+                datalist.innerHTML = '';
+                Array.from(laundries).sort().forEach(name => {
+                    datalist.innerHTML += `<option value="${name}">`;
+                });
+            }
+        } catch(e) { console.error('Error updating datalist', e); }
     },
 
     // UI Routing
@@ -617,13 +637,20 @@ window.appLogic = {
         let subT = this.cart.reduce((s, i) => s + (i.unitPrice * i.qty), 0);
         let grT = subT + this.deliveryFee;
 
+        let pName = document.getElementById('pos-laundry-name') ? document.getElementById('pos-laundry-name').value.trim() : '';
+        let pCost = parseFloat(document.getElementById('pos-laundry-cost') ? document.getElementById('pos-laundry-cost').value : 0) || 0;
+        let pPaid = document.getElementById('pos-laundry-paid') ? document.getElementById('pos-laundry-paid').value === 'true' : false;
+
         let invoiceData = {
             id: newInvId, timestamp: Date.now(), customer: { phone: cPhone, name: cName },
             items: [...this.cart], 
             deliveryFee: parseFloat(this.deliveryFee) || 0, 
             total: parseFloat(grT) || 0, // AUTHORITATIVE REVENUE FIELD
             grandTotal: parseFloat(grT) || 0, 
-            laundryCost: 0, // AUTHORITATIVE PARTNER COST FIELD
+            laundryCost: pCost, // AUTHORITATIVE PARTNER COST FIELD
+            partnerLaundryCost: pCost,
+            partnerLaundryName: pName,
+            laundryPaid: pPaid,
             status: 'completed',
             paymentMethod: 'cash'
         };
@@ -699,7 +726,12 @@ window.appLogic = {
         this.customer = { phone: '', name: '' };
         document.getElementById('customer-phone').value = '';
         document.getElementById('customer-name').value = '';
+        if (document.getElementById('pos-laundry-name')) document.getElementById('pos-laundry-name').value = '';
+        if (document.getElementById('pos-laundry-cost')) document.getElementById('pos-laundry-cost').value = '';
+        if (document.getElementById('pos-laundry-paid')) document.getElementById('pos-laundry-paid').value = 'false';
         this.updateCartUI();
+
+        await this.updateLaundryDatalist();
 
         // Auto Download PDF
         await this.downloadDigitalPDF(null);
@@ -1063,11 +1095,12 @@ window.appLogic = {
                     let cellPhone = (customerPhone !== '0000000000') ? `<br><small style="color:var(--text-muted); direction:ltr; display:inline-block">${customerPhone}</small>` : '';
                     let total = i.grandTotal || 0;
                     let dateStr = i.timestamp ? new Date(i.timestamp).toLocaleString('ar-SA') : '-';
+                    let partnerBadge = i.partnerLaundryName ? `<br><span onclick="appLogic.toggleLaundryPaid('${i.id}')" style="cursor:pointer; display:inline-block; margin-top:5px; font-size:11px; padding:3px 8px; border-radius:12px; background:${i.laundryPaid ? '#4CAF50' : '#f44336'}; color:#fff;"><i class="fa-solid ${i.laundryPaid ? 'fa-check' : 'fa-times'}"></i> مغسلة: ${i.partnerLaundryName} (${i.laundryPaid ? 'مدفوع' : 'غير مدفوع'})</span>` : '';
 
                     html += `<tr style="border-bottom:1px solid var(--border);">
                         <td style="padding:15px; font-weight:bold;">${i.id || 'N/A'}</td>
                         <td style="padding:15px;">${customerName}${cellPhone}</td>
-                        <td style="padding:15px; font-weight:bold; color:var(--primary)">${total.toFixed(2)} ر.س</td>
+                        <td style="padding:15px; font-weight:bold; color:var(--primary)">${total.toFixed(2)} ر.س ${partnerBadge}</td>
                         <td style="padding:15px;">${dateStr}</td>
                         <td style="padding:15px; text-align:center;">
                             <button class="btn-action-icon btn-action-info" onclick="appLogic.togglePartnerInfo('${i.id}')" title="تفاصيل المغسلة الشريكة"><i class="fa-solid fa-truck-ramp-box"></i></button>
@@ -1112,6 +1145,20 @@ window.appLogic = {
     togglePartnerInfo(id) {
         const el = document.getElementById(`partner-info-${id}`);
         if (el) el.classList.toggle('hidden');
+    },
+
+    async toggleLaundryPaid(id) {
+        let invs = await localforage.getItem('invoices') || [];
+        const idx = invs.findIndex(i => i.id === id);
+        if (idx === -1) return;
+        
+        invs[idx].laundryPaid = !invs[idx].laundryPaid;
+        await localforage.setItem('invoices', invs);
+        await manualSyncToCloud('invoices', invs);
+        
+        this.renderHistory();
+        this.renderReports();
+        this.showToast('تم تحديث حالة دفع المغسلة الشريكة');
     },
 
     async savePartnerInfo(id) {
@@ -2027,6 +2074,101 @@ window.appLogic = {
         </div>
         `;
         document.getElementById('reports-content').innerHTML = html;
+        this.renderLaundryAccounts();
+    },
+
+    async renderLaundryAccounts() {
+        try {
+            const invoices = await localforage.getItem('invoices') || [];
+            const laundryMap = {};
+
+            invoices.forEach(i => {
+                if (!i || !i.partnerLaundryName || i.partnerLaundryName.trim() === '') return;
+                const name = i.partnerLaundryName.trim();
+                const cost = parseFloat(i.laundryCost || i.partnerLaundryCost || 0);
+                if (cost <= 0) return;
+
+                if (!laundryMap[name]) {
+                    laundryMap[name] = { dues: 0, paid: 0 };
+                }
+
+                if (i.laundryPaid) {
+                    laundryMap[name].paid += cost;
+                } else {
+                    laundryMap[name].dues += cost;
+                }
+            });
+
+            const container = document.getElementById('laundry-accounts-content');
+            if (!container) return; // Silent if not on reports page
+
+            const names = Object.keys(laundryMap).sort();
+            if (names.length === 0) {
+                container.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:20px;">لا توجد حسابات مسجلة للمغاسل الشريكة</p>';
+                return;
+            }
+
+            let html = `
+            <div style="overflow-x: auto;">
+                <table style="width:100%; border-collapse:collapse; background:var(--bg-body); border-radius:8px; overflow:hidden;">
+                    <thead>
+                        <tr style="background:#111; color:var(--primary); font-size:13px;">
+                            <th style="padding:12px; text-align:right;">اسم المغسلة</th>
+                            <th style="padding:12px; text-align:right;">المستحقات (ذمة)</th>
+                            <th style="padding:12px; text-align:right;">المدفوعات السابقة</th>
+                            <th style="padding:12px; text-align:center;">إجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            names.forEach(name => {
+                const data = laundryMap[name];
+                const safeName = name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+                html += `
+                <tr style="border-bottom:1px solid var(--border);">
+                    <td style="padding:15px; font-weight:bold;">${name}</td>
+                    <td style="padding:15px; font-weight:bold; color:${data.dues > 0 ? '#f44336' : '#fff'}; direction:ltr; text-align:right;">${data.dues.toFixed(2)} SAR</td>
+                    <td style="padding:15px; font-weight:bold; color:#4CAF50; direction:ltr; text-align:right;">${data.paid.toFixed(2)} SAR</td>
+                    <td style="padding:15px; text-align:center;">
+                        ${data.dues > 0 ? `<button class="btn" style="background:var(--primary); color:#000; padding:6px 12px; font-weight:bold; border:none; border-radius:4px; font-size:12px; cursor:pointer;" onclick="appLogic.settleAllLaundryDues('${safeName}')"><i class="fa-solid fa-money-check-dollar"></i> تسديد المستحقات</button>` : '<span style="color:#aaa; font-size:12px;">مُسددة بالكامل</span>'}
+                    </td>
+                </tr>
+                `;
+            });
+
+            html += `</tbody></table></div>`;
+            container.innerHTML = html;
+
+        } catch (err) {
+            console.error('Error rendering laundry accounts:', err);
+        }
+    },
+
+    async settleAllLaundryDues(name) {
+        if (!confirm(`هل أنت متأكد من تسديد جميع المستحقات للمغسلة '${name}'؟\n(سيتم تحويل حالة جميع الفواتير لهذه المغسلة إلى 'مدفوعة نقداً')`)) return;
+
+        try {
+            let invs = await localforage.getItem('invoices') || [];
+            let updated = false;
+
+            invs.forEach(i => {
+                if (i && i.partnerLaundryName && i.partnerLaundryName.trim() === name && !i.laundryPaid && parseFloat(i.laundryCost || i.partnerLaundryCost || 0) > 0) {
+                    i.laundryPaid = true;
+                    updated = true;
+                }
+            });
+
+            if (updated) {
+                await localforage.setItem('invoices', invs);
+                await manualSyncToCloud('invoices', invs);
+                this.renderLaundryAccounts(); // Refresh the table
+                this.renderHistory();         // Refresh history view badges globally
+                this.showToast(`تم تسديد جميع مستحقات المغسلة '${name}'`);
+            }
+        } catch (err) {
+            console.error('Error settling laundry dues:', err);
+        }
     }
 };
 

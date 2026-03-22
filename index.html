@@ -103,6 +103,20 @@
                             </div>
                         </div>
                         
+                        <!-- Laundry Partner B2B Tracker -->
+                        <div class="laundry-partner-select" style="margin-top: 15px; margin-bottom: 15px; padding-top: 15px; border-top: 1px dashed var(--border);">
+                            <h4 style="margin-bottom: 10px; font-size: 13px; color: var(--primary);">بيانات المغسلة الشريكة (اختياري)</h4>
+                            <input type="text" placeholder="اسم المغسلة..." id="pos-laundry-name" list="saved-laundries" class="w-100" style="padding:10px; background:var(--bg-body); color:#fff; border:1px solid var(--border); border-radius:var(--radius-sm); margin-bottom: 10px; font-family:inherit;">
+                            <datalist id="saved-laundries"></datalist>
+                            <div style="display: flex; gap: 10px;">
+                                <input type="number" placeholder="تكلفة المغسلة (ر.س)" id="pos-laundry-cost" style="flex: 1; padding:10px; background:var(--bg-body); color:#fff; border:1px solid var(--border); border-radius:var(--radius-sm); font-family:inherit;" dir="ltr">
+                                <select id="pos-laundry-paid" style="flex: 1; padding:10px; background:var(--bg-body); color:#fff; border:1px solid var(--border); border-radius:var(--radius-sm); font-family:inherit;">
+                                    <option value="false">غير مدفوع (ذمة)</option>
+                                    <option value="true">مدفوع نقداً</option>
+                                </select>
+                            </div>
+                        </div>
+
                         <div class="cart-actions">
                             <button class="btn btn-danger" onclick="appLogic.clearCart()" style="flex:0.3;"><i class="fa-solid fa-trash"></i></button>
                             <button class="btn btn-primary" onclick="appLogic.previewCheckout()" style="flex:1;"><i class="fa-solid fa-file-invoice"></i> إنشاء فاتورة</button>
@@ -188,6 +202,14 @@
                         <h2>القوائم المالية وإقرارات الزكاة</h2>
                     </div>
                     <div id="reports-content"></div>
+                    
+                    <!-- Laundry Accounts Section -->
+                    <div id="laundry-accounts-section" style="margin-top: 40px; background: var(--bg-surface); padding: 20px; border-radius: var(--radius-md); border: 1px solid var(--border);">
+                        <h3 style="margin-bottom: 15px; border-bottom: 1px solid var(--border); padding-bottom: 10px; color: var(--primary);"><i class="fa-solid fa-handshake"></i> حسابات المغاسل المتعاونة</h3>
+                        <div id="laundry-accounts-content">
+                            <!-- Populated dynamically from app.js -->
+                        </div>
+                    </div>
                 </div>
             </div>
         </main>
