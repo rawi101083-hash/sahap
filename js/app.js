@@ -267,6 +267,26 @@ window.appLogic = {
             }
         }
     },
+
+    toggleGoldenDrawer() {
+        const footer = document.getElementById('cart-footer');
+        const icon = document.getElementById('golden-trigger-icon');
+        if (!footer) return;
+
+        footer.classList.toggle('drawer-open');
+        
+        if (footer.classList.contains('drawer-open')) {
+            if (icon) {
+                icon.classList.remove('fa-chevron-up');
+                icon.classList.add('fa-chevron-down');
+            }
+        } else {
+            if (icon) {
+                icon.classList.remove('fa-chevron-down');
+                icon.classList.add('fa-chevron-up');
+            }
+        }
+    },
     
     _version: '1.0.3',
     cart: [],
@@ -586,6 +606,8 @@ window.appLogic = {
         document.getElementById('grand-total').innerText = finalTotal;
         const mobileTotal = document.getElementById('mobile-grand-total');
         if (mobileTotal) mobileTotal.innerText = finalTotal;
+        const goldenTotal = document.getElementById('golden-trigger-total');
+        if (goldenTotal) goldenTotal.innerText = finalTotal;
 
         // Dynamic Delivery Buttons
         this.renderDeliveryButtons();

@@ -85,7 +85,13 @@
                         <div class="empty-cart-msg">السلة فارغة، يرجى اختيار أصناف.</div>
                     </div>
                     
-                    <div class="cart-footer">
+                    <div class="cart-footer" id="cart-footer">
+                        <!-- BIG GOLDEN TRIGGER FOR MOBILE DRAWER -->
+                        <div class="golden-trigger no-print" onclick="appLogic.toggleGoldenDrawer()">
+                            <span class="trigger-text">تكملة البيانات <i class="fa-solid fa-chevron-up" id="golden-trigger-icon"></i></span>
+                            <span class="trigger-total" id="golden-trigger-total">0.00 ر.س</span>
+                        </div>
+
                         <div class="delivery-options">
                             <h4>رسوم التوصيل:</h4>
                             <div class="delivery-buttons">

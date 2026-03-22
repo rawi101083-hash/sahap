@@ -752,6 +752,11 @@ button:active {
     display: none;
 }
 
+/* Global golden trigger hidden by default */
+.golden-trigger {
+    display: none;
+}
+
 /* Delivery Management */
 .delivery-manager-card {
     margin-top: 40px; 
@@ -1142,81 +1147,77 @@ button:active {
         font-size: 13px;
     }
 
-    /* Cart Section - Swipeable Bottom Sheet */
+    /* Cart Section on Mobile sits in normal flow below items grid */
     .cart-section {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        background: var(--bg-surface);
-        z-index: 1000;
-        border-top: 1px solid var(--border);
-        border-right: none;
-        border-radius: 20px 20px 0 0;
-        box-shadow: 0 -5px 25px rgba(0, 0, 0, 0.6);
+        position: static;
+        display: block;
+        max-height: none;
         height: auto;
-        min-height: auto;
-        max-height: 85vh; /* Allow large open area */
-        display: flex;
-        flex-direction: column;
-        transform: translateY(calc(100% - 64px));
-        /* Peek height */
-        transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        overflow: hidden; /* Prevent ANY upward bleeding when collapsed */
-    }
-
-    .cart-section.cart-open {
-        transform: translateY(0);
+        transform: none !important;
+        overflow: visible;
+        border-radius: 0;
+        box-shadow: none;
+        border: none;
+        padding-bottom: 80px; /* buffer for the closed drawer */
     }
 
     .cart-mobile-handle {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 0 20px;
-        background: linear-gradient(135deg, var(--primary-light), var(--primary-dark));
-        color: #000;
-        font-weight: 800;
-        font-size: 16px;
-        border-radius: 20px 20px 0 0;
-        cursor: pointer;
-        height: 64px;
-        /* Peek height */
-        position: relative;
-        flex-shrink: 0;
-        z-index: 5;
-        box-shadow: 0 4px 15px rgba(253, 184, 19, 0.3);
-    }
-
-    .cart-mobile-handle .handle-bar {
-        position: absolute;
-        top: 8px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 40px;
-        height: 4px;
-        background: rgba(0, 0, 0, 0.4);
-        border-radius: 4px;
+        display: none !important;
     }
 
     .cart-header {
         padding: 16px;
         padding-top: 24px;
-        flex-shrink: 0; /* Prevent crushing */
     }
 
     .cart-items {
         padding: 16px;
-        flex: 1 1 auto; /* Allow it to shrink/grow */
-        min-height: 0; /* Crucial for scrolling inside flex */
-        overflow-y: auto; /* Contains the scroll internally */
-        max-height: none; 
+        max-height: none;
+        overflow-y: visible;
     }
 
+    /* THE GOLDEN DRAWER IS THE FOOTER */
     .cart-footer {
-        padding: 16px;
-        padding-bottom: env(safe-area-inset-bottom, 20px);
-        flex-shrink: 0; /* Prevent crushing */
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 1000;
+        background: var(--bg-surface);
+        border-top: 2px solid var(--primary);
+        box-shadow: 0 -5px 25px rgba(0, 0, 0, 0.6);
+        border-radius: 20px 20px 0 0;
+        padding: 20px;
+        padding-top: 0; 
+        max-height: 85vh;
+        overflow-y: auto;
+        
+        transform: translateY(calc(100% - 64px));
+        transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .cart-footer.drawer-open {
+        transform: translateY(0);
+    }
+
+    /* THE GOLDEN TRIGGER */
+    .golden-trigger {
+        display: flex !important; /* Force visible on mobile */
+        justify-content: space-between;
+        align-items: center;
+        height: 64px;
+        background: linear-gradient(135deg, #fdb813, #f57f17);
+        color: #000;
+        font-weight: 800;
+        font-size: 16px;
+        border-radius: 20px 20px 0 0;
+        margin: 0 -20px 20px -20px; 
+        padding: 0 20px;
+        cursor: pointer;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        box-shadow: 0 4px 15px rgba(253, 184, 19, 0.3);
     }
 
     .delivery-buttons {
