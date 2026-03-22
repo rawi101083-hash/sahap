@@ -638,6 +638,7 @@ window.appLogic = {
         let grT = subT + this.deliveryFee;
 
         let pName = document.getElementById('pos-laundry-name') ? document.getElementById('pos-laundry-name').value.trim() : '';
+        let pHood = document.getElementById('pos-laundry-hood') ? document.getElementById('pos-laundry-hood').value.trim() : '';
         let pCost = parseFloat(document.getElementById('pos-laundry-cost') ? document.getElementById('pos-laundry-cost').value : 0) || 0;
         let pPaid = document.getElementById('pos-laundry-paid') ? document.getElementById('pos-laundry-paid').value === 'true' : false;
 
@@ -650,6 +651,7 @@ window.appLogic = {
             laundryCost: pCost, // AUTHORITATIVE PARTNER COST FIELD
             partnerLaundryCost: pCost,
             partnerLaundryName: pName,
+            partnerLaundryNeighborhood: pHood,
             laundryPaid: pPaid,
             status: 'completed',
             paymentMethod: 'cash'
@@ -1186,6 +1188,7 @@ window.appLogic = {
         // Refresh UI to keep it consistent
         this.renderHistory();
         this.renderReports();
+        this.renderLaundryAccounts(); // Ensure explicit recalculation
     },
 
     async reprintInvoice(id) {
@@ -1272,6 +1275,11 @@ window.appLogic = {
 
         document.getElementById('customer-phone').value = this.customer.phone === '0000000000' ? '' : this.customer.phone;
         document.getElementById('customer-name').value = this.customer.name === 'عميل نقدي' ? '' : this.customer.name;
+
+        if (document.getElementById('pos-laundry-name')) document.getElementById('pos-laundry-name').value = invoiceData.partnerLaundryName || '';
+        if (document.getElementById('pos-laundry-hood')) document.getElementById('pos-laundry-hood').value = invoiceData.partnerLaundryNeighborhood || '';
+        if (document.getElementById('pos-laundry-cost')) document.getElementById('pos-laundry-cost').value = invoiceData.laundryCost || invoiceData.partnerLaundryCost || '';
+        if (document.getElementById('pos-laundry-paid')) document.getElementById('pos-laundry-paid').value = invoiceData.laundryPaid ? 'true' : 'false';
 
         // UI updates
         this.updateCartUI();
@@ -2085,25 +2093,27 @@ window.appLogic = {
             invoices.forEach(i => {
                 if (!i || !i.partnerLaundryName || i.partnerLaundryName.trim() === '') return;
                 const name = i.partnerLaundryName.trim();
+                const hood = (i.partnerLaundryNeighborhood || '').trim();
+                const compKey = `${name}|${hood}`;
                 const cost = parseFloat(i.laundryCost || i.partnerLaundryCost || 0);
                 if (cost <= 0) return;
 
-                if (!laundryMap[name]) {
-                    laundryMap[name] = { dues: 0, paid: 0 };
+                if (!laundryMap[compKey]) {
+                    laundryMap[compKey] = { name, hood, dues: 0, paid: 0 };
                 }
 
                 if (i.laundryPaid) {
-                    laundryMap[name].paid += cost;
+                    laundryMap[compKey].paid += cost;
                 } else {
-                    laundryMap[name].dues += cost;
+                    laundryMap[compKey].dues += cost;
                 }
             });
 
             const container = document.getElementById('laundry-accounts-content');
             if (!container) return; // Silent if not on reports page
 
-            const names = Object.keys(laundryMap).sort();
-            if (names.length === 0) {
+            const keys = Object.keys(laundryMap).sort();
+            if (keys.length === 0) {
                 container.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:20px;">لا توجد حسابات مسجلة للمغاسل الشريكة</p>';
                 return;
             }
@@ -2113,7 +2123,7 @@ window.appLogic = {
                 <table style="width:100%; border-collapse:collapse; background:var(--bg-body); border-radius:8px; overflow:hidden;">
                     <thead>
                         <tr style="background:#111; color:var(--primary); font-size:13px;">
-                            <th style="padding:12px; text-align:right;">اسم المغسلة</th>
+                            <th style="padding:12px; text-align:right;">المغسلة (الحي)</th>
                             <th style="padding:12px; text-align:right;">المستحقات (ذمة)</th>
                             <th style="padding:12px; text-align:right;">المدفوعات السابقة</th>
                             <th style="padding:12px; text-align:center;">إجراءات</th>
@@ -2122,16 +2132,17 @@ window.appLogic = {
                     <tbody>
             `;
 
-            names.forEach(name => {
-                const data = laundryMap[name];
-                const safeName = name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+            keys.forEach(key => {
+                const data = laundryMap[key];
+                const displayName = data.hood ? `${data.name} <small style="color:#888;">(${data.hood})</small>` : data.name;
+                const safeKey = key.replace(/'/g, "\\'").replace(/"/g, "&quot;");
                 html += `
                 <tr style="border-bottom:1px solid var(--border);">
-                    <td style="padding:15px; font-weight:bold;">${name}</td>
+                    <td style="padding:15px; font-weight:bold;">${displayName}</td>
                     <td style="padding:15px; font-weight:bold; color:${data.dues > 0 ? '#f44336' : '#fff'}; direction:ltr; text-align:right;">${data.dues.toFixed(2)} SAR</td>
                     <td style="padding:15px; font-weight:bold; color:#4CAF50; direction:ltr; text-align:right;">${data.paid.toFixed(2)} SAR</td>
                     <td style="padding:15px; text-align:center;">
-                        ${data.dues > 0 ? `<button class="btn" style="background:var(--primary); color:#000; padding:6px 12px; font-weight:bold; border:none; border-radius:4px; font-size:12px; cursor:pointer;" onclick="appLogic.settleAllLaundryDues('${safeName}')"><i class="fa-solid fa-money-check-dollar"></i> تسديد المستحقات</button>` : '<span style="color:#aaa; font-size:12px;">مُسددة بالكامل</span>'}
+                        ${data.dues > 0 ? `<button class="btn" style="background:var(--primary); color:#000; padding:6px 12px; font-weight:bold; border:none; border-radius:4px; font-size:12px; cursor:pointer;" onclick="appLogic.settleAllLaundryDues('${safeKey}')"><i class="fa-solid fa-money-check-dollar"></i> تسديد المستحقات</button>` : '<span style="color:#aaa; font-size:12px;">مُسددة بالكامل</span>'}
                     </td>
                 </tr>
                 `;
@@ -2145,15 +2156,21 @@ window.appLogic = {
         }
     },
 
-    async settleAllLaundryDues(name) {
-        if (!confirm(`هل أنت متأكد من تسديد جميع المستحقات للمغسلة '${name}'؟\n(سيتم تحويل حالة جميع الفواتير لهذه المغسلة إلى 'مدفوعة نقداً')`)) return;
+    async settleAllLaundryDues(compKey) {
+        let [targetName, targetHood = ''] = compKey.split('|');
+        let displayName = targetHood ? `${targetName} (${targetHood})` : targetName;
+        
+        if (!confirm(`هل أنت متأكد من تسديد جميع المستحقات للمغسلة '${displayName}'؟\n(سيتم تحويل حالة جميع الفواتير لهذه المغسلة إلى 'مدفوعة نقداً')`)) return;
 
         try {
             let invs = await localforage.getItem('invoices') || [];
             let updated = false;
 
             invs.forEach(i => {
-                if (i && i.partnerLaundryName && i.partnerLaundryName.trim() === name && !i.laundryPaid && parseFloat(i.laundryCost || i.partnerLaundryCost || 0) > 0) {
+                let pName = i.partnerLaundryName ? i.partnerLaundryName.trim() : '';
+                let pHood = i.partnerLaundryNeighborhood ? i.partnerLaundryNeighborhood.trim() : '';
+                
+                if (pName === targetName && pHood === targetHood && !i.laundryPaid && parseFloat(i.laundryCost || i.partnerLaundryCost || 0) > 0) {
                     i.laundryPaid = true;
                     updated = true;
                 }
@@ -2164,7 +2181,7 @@ window.appLogic = {
                 await manualSyncToCloud('invoices', invs);
                 this.renderLaundryAccounts(); // Refresh the table
                 this.renderHistory();         // Refresh history view badges globally
-                this.showToast(`تم تسديد جميع مستحقات المغسلة '${name}'`);
+                this.showToast(`تم تسديد جميع مستحقات المغسلة '${displayName}'`);
             }
         } catch (err) {
             console.error('Error settling laundry dues:', err);

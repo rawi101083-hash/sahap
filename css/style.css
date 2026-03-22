@@ -1210,6 +1210,7 @@ button:active {
 
     .cart-footer {
         padding: 16px;
+        padding-bottom: 150px; /* Fix Mobile UI Overlap */
     }
 
     .delivery-buttons {
