@@ -66,11 +66,10 @@
 
                 <!-- Left side (Cart / Order Summary) -->
                 <section class="cart-section" id="cart-section">
-                    <!-- Mobile Toggle Handle -->
-                    <div class="cart-mobile-handle no-print" onclick="appLogic.toggleMobileCart()">
-                        <div class="handle-bar"></div>
-                        <span id="mobile-cart-title">تفاصيل الطلب (<span id="mobile-grand-total">0.00 ر.س</span>)</span>
-                        <i class="fa-solid fa-chevron-up" id="mobile-cart-icon"></i>
+                    <!-- Mobile Toggle Handle (THE GOLDEN TRIGGER) -->
+                    <div class="cart-mobile-handle no-print golden-bar" onclick="appLogic.toggleMobileCart()">
+                        <span class="trigger-text">تكملة البيانات <i class="fa-solid fa-chevron-up" id="mobile-cart-icon"></i></span>
+                        <span class="trigger-total" id="mobile-grand-total">0.00 ر.س</span>
                     </div>
 
                     <div class="cart-header">
@@ -86,12 +85,6 @@
                     </div>
                     
                     <div class="cart-footer" id="cart-footer">
-                        <!-- BIG GOLDEN TRIGGER FOR MOBILE DRAWER -->
-                        <div class="golden-trigger no-print" onclick="appLogic.toggleGoldenDrawer()">
-                            <span class="trigger-text">تكملة البيانات <i class="fa-solid fa-chevron-up" id="golden-trigger-icon"></i></span>
-                            <span class="trigger-total" id="golden-trigger-total">0.00 ر.س</span>
-                        </div>
-
                         <div class="delivery-options">
                             <h4>رسوم التوصيل:</h4>
                             <div class="delivery-buttons">
@@ -115,7 +108,8 @@
                             <input type="text" placeholder="اسم المغسلة..." id="pos-laundry-name" list="saved-laundries" class="w-100" style="padding:10px; background:var(--bg-body); color:#fff; border:1px solid var(--border); border-radius:var(--radius-sm); margin-bottom: 10px; font-family:inherit;">
                             <datalist id="saved-laundries"></datalist>
                             <div style="display: flex; gap: 10px;">
-                                <input type="text" placeholder="الحي (مثال: الشاطئ)" id="pos-laundry-hood" style="flex: 1; padding:10px; background:var(--bg-body); color:#fff; border:1px solid var(--border); border-radius:var(--radius-sm); font-family:inherit;">
+                                <input type="text" placeholder="الحي (مثال: الشاطئ)" id="pos-laundry-hood" list="saved-neighborhoods" style="flex: 1; padding:10px; background:var(--bg-body); color:#fff; border:1px solid var(--border); border-radius:var(--radius-sm); font-family:inherit;">
+                                <datalist id="saved-neighborhoods"></datalist>
                                 <input type="number" placeholder="تكلفة المغسلة (ر.س)" id="pos-laundry-cost" style="flex: 1; padding:10px; background:var(--bg-body); color:#fff; border:1px solid var(--border); border-radius:var(--radius-sm); font-family:inherit;" dir="ltr">
                             </div>
                             <div style="display: flex; gap: 10px; margin-top: 10px;">

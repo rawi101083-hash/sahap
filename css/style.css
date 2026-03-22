@@ -1147,77 +1147,78 @@ button:active {
         font-size: 13px;
     }
 
-    /* Cart Section on Mobile sits in normal flow below items grid */
+    /* Cart Section - STRICT SLIDE-UP DRAWER */
     .cart-section {
-        position: static;
-        display: block;
-        max-height: none;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: var(--bg-surface);
+        z-index: 1000;
+        border-top: 2px solid var(--primary);
+        border-right: none;
+        border-radius: 20px 20px 0 0;
+        box-shadow: 0 -5px 25px rgba(0, 0, 0, 0.6);
         height: auto;
-        transform: none !important;
-        overflow: visible;
-        border-radius: 0;
-        box-shadow: none;
-        border: none;
-        padding-bottom: 80px; /* buffer for the closed drawer */
+        min-height: auto;
+        max-height: 85vh; /* Standard drawer height */
+        display: flex;
+        flex-direction: column;
+        
+        /* STRICTLY COLLAPSED BY DEFAULT */
+        transform: translateY(calc(100% - 64px));
+        transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        overflow: hidden; /* CRITICAL: Hides everything underneath the Golden Bar when collapsed */
     }
 
+    /* DRAWER EXPANDS ON CLICK */
+    .cart-section.cart-open {
+        transform: translateY(0);
+    }
+
+    /* THE GOLDEN BAR IS THE TOP OF THE DRAWER */
     .cart-mobile-handle {
-        display: none !important;
+        display: flex !important;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0 20px;
+        background: linear-gradient(135deg, #fdb813, #f57f17); /* Golden Bar */
+        color: #000;
+        font-weight: 800;
+        font-size: 16px;
+        border-radius: 20px 20px 0 0;
+        cursor: pointer;
+        height: 64px;
+        position: relative;
+        flex-shrink: 0;
+        z-index: 5;
+        box-shadow: 0 4px 15px rgba(253, 184, 19, 0.3);
     }
 
     .cart-header {
         padding: 16px;
         padding-top: 24px;
+        flex-shrink: 0;
     }
 
+    /* Internal Drawer Scrolling */
     .cart-items {
         padding: 16px;
-        max-height: none;
-        overflow-y: visible;
-    }
-
-    /* THE GOLDEN DRAWER IS THE FOOTER */
-    .cart-footer {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        z-index: 1000;
-        background: var(--bg-surface);
-        border-top: 2px solid var(--primary);
-        box-shadow: 0 -5px 25px rgba(0, 0, 0, 0.6);
-        border-radius: 20px 20px 0 0;
-        padding: 20px;
-        padding-top: 0; 
-        max-height: 85vh;
+        flex: 1 1 auto;
+        min-height: 0;
         overflow-y: auto;
-        
-        transform: translateY(calc(100% - 64px));
-        transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    
-    .cart-footer.drawer-open {
-        transform: translateY(0);
+        max-height: none;
     }
 
-    /* THE GOLDEN TRIGGER */
-    .golden-trigger {
-        display: flex !important; /* Force visible on mobile */
-        justify-content: space-between;
-        align-items: center;
-        height: 64px;
-        background: linear-gradient(135deg, #fdb813, #f57f17);
-        color: #000;
-        font-weight: 800;
-        font-size: 16px;
-        border-radius: 20px 20px 0 0;
-        margin: 0 -20px 20px -20px; 
-        padding: 0 20px;
-        cursor: pointer;
-        position: sticky;
-        top: 0;
-        z-index: 10;
-        box-shadow: 0 4px 15px rgba(253, 184, 19, 0.3);
+    .cart-footer {
+        padding: 16px;
+        padding-bottom: env(safe-area-inset-bottom, 20px);
+        flex-shrink: 0;
+        position: static;
+        max-height: none;
+        border-radius: 0;
+        box-shadow: none;
+        border-top: 1px dashed var(--border);
     }
 
     .delivery-buttons {
