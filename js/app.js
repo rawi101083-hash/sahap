@@ -587,6 +587,14 @@ window.appLogic = {
         console.log('Button Clicked: previewCheckout - Start processing checkout preview');
         if (this.cart.length === 0) return alert('السلة فارغة!');
 
+        const custNameInput = document.getElementById('customer-name') ? document.getElementById('customer-name').value.trim() : (this.customer.name || '').trim();
+        const custPhoneInput = document.getElementById('customer-phone') ? document.getElementById('customer-phone').value.trim() : (this.customer.phone || '').trim();
+
+        if (!custNameInput || !custPhoneInput) {
+            alert('الرجاء إدخال اسم العميل ورقم الجوال لإصدار الفاتورة');
+            return;
+        }
+
         let cName = this.customer.name || 'عميل نقدي';
         let cPhone = this.customer.phone || '0000000000';
 
