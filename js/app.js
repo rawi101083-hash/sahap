@@ -248,6 +248,20 @@ async function initFirebaseSync() {
 
 // Version: 1.0.3 (Firebase Sync Enabled)
 window.appLogic = {
+    toggleLaundryFields() {
+        const container = document.getElementById('laundry-fields-container');
+        const btn = document.getElementById('laundry-toggle-btn');
+        if (!container || !btn) return;
+
+        container.classList.toggle('expanded');
+        
+        if (container.classList.contains('expanded')) {
+            btn.innerHTML = 'إخفاء بيانات المغسلة ⬆️';
+        } else {
+            btn.innerHTML = 'إضافة مغسلة شريكة ⬇️';
+        }
+    },
+
     toggleMobileCart() {
         const cartSection = document.getElementById('cart-section');
         const icon = document.getElementById('mobile-cart-icon');

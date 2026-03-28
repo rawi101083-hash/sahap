@@ -1042,6 +1042,11 @@ button:active {
     box-shadow: 0 4px 8px rgba(229, 57, 53, 0.3);
 }
 
+/* Laundry Accordion Desktop Defaults */
+.mobile-only-toggle { display: none !important; }
+.desktop-only-heading { display: block; }
+.laundry-fields-wrapper { display: block; }
+
 /* =========================================
    RESPONSIVE DESIGN (Mobile & Tablet)
    ========================================= */
@@ -1255,6 +1260,21 @@ button:active {
         background: rgba(253, 184, 19, 0.05);
         border-radius: 8px;
         position: static !important;
+    }
+
+    /* Laundry Accordion Mobile Behavior */
+    .mobile-only-toggle { display: block !important; }
+    .desktop-only-heading { display: none !important; }
+    .laundry-fields-wrapper { display: none; margin-top: 10px; }
+    
+    @keyframes fadeInAccordion {
+        from { opacity: 0; transform: translateY(-5px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .laundry-fields-wrapper.expanded { 
+        display: block; 
+        animation: fadeInAccordion 0.2s ease-in; 
     }
 
     /* 5. Cart Items array naturally flows next */
