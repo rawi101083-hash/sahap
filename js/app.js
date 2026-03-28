@@ -124,11 +124,12 @@ const accountingEngine = {
 const firebaseConfig = {
     apiKey: "AIzaSyBTE1YodqeIKjG-RBCe8pHbnRM7EQNSemU",
     authDomain: "sahab-3089b.firebaseapp.com",
-    databaseURL: "https://sahab-3089b-default-rtdb.firebaseio.com/",
+    databaseURL: "https://sahab-3089b-default-rtdb.firebaseio.com",
     projectId: "sahab-3089b",
     storageBucket: "sahab-3089b.firebasestorage.app",
     messagingSenderId: "236842364975",
-    appId: "1:236842364975:web:1ECD34c708e7a9096596da"
+    appId: "1:236842364975:web:1ecd34c708e7a9096596da",
+    measurementId: "G-H5J0L3JN0J"
 };
 
 // Initialize Firebase only if not already initialized
@@ -150,7 +151,7 @@ localforage.setItem = async function (key, value) {
     return await originalSetItem.call(localforage, key, value);
 };
 
-// 2. EXPLICIT SYNC: Manual helper to send data to Firebase
+// 2. EXPLICIT SYNC: Manual helper to send data to Firebase (UID-scoped)
 async function manualSyncToCloud(key, value) {
     if (!window.isDataInitialized) {
         console.warn(`[Sync-Blocked] Cannot save ${key}. System is still initializing.`);
@@ -160,9 +161,8 @@ async function manualSyncToCloud(key, value) {
     if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "YOUR_API_KEY" && !!firebaseConfig.apiKey) {
         try {
             console.log(`[Manual-Sync] Sending ${key} to cloud...`);
-            // Deep sanitize for Firebase (remove undefined)
             const safePayload = JSON.parse(JSON.stringify(value, (k, v) => (v === undefined ? null : v)));
-            await firebase.database().ref(key).set(safePayload);
+            await firebase.database().ref(getDbPath(key)).set(safePayload);
             console.log(`[Manual-Sync] ${key} saved successfully.`);
         } catch (err) {
             console.error(`[Manual-Sync] Error saving ${key}:`, err);
@@ -170,7 +170,15 @@ async function manualSyncToCloud(key, value) {
     }
 }
 
-// 3. RECOVERY LOGIC: Fetch-Only initialization
+// UID-scoped DB path helper
+window.currentUID = null;
+window.tenantSettings = { name: 'مغسلة جديدة', phone: '', taxNumber: '' };
+function getDbPath(key) {
+    if (window.currentUID) return `users/${window.currentUID}/${key}`;
+    return key; // fallback
+}
+
+// 3. RECOVERY LOGIC: Fetch-Only initialization (UID-scoped)
 async function initFirebaseSync() {
     console.log("[Recovery] --- STARTING CLOUD FETCH ---");
     
@@ -182,10 +190,9 @@ async function initFirebaseSync() {
 
     const fetchPromises = collectionsToSync.map(key => {
         return new Promise((resolve) => {
-            const dbRef = firebase.database().ref(key);
+            const dbRef = firebase.database().ref(getDbPath(key));
             console.log(`[Recovery] Requesting ${key} from cloud...`);
             
-            // FETCH BEFORE WRITE: Fetch strictly once to populate the system
             dbRef.once('value', async (snapshot) => {
                 let cloudData = snapshot.val();
                 
@@ -207,14 +214,12 @@ async function initFirebaseSync() {
                 resolve(); 
             });
 
-            // REAL-TIME UPDATES: Listener handles additions, edits, AND deletions
             dbRef.on('value', async (snapshot) => {
-                if (!window.isDataInitialized) return; // Ignore updates during boot
+                if (!window.isDataInitialized) return;
                 
                 let cloudData = snapshot.val();
                 let sanitized = [];
 
-                // FIX: Handle removal/empty state (cloudData === null)
                 if (cloudData !== null) {
                     if (typeof cloudData === 'object' && !Array.isArray(cloudData)) sanitized = Object.values(cloudData);
                     else if (Array.isArray(cloudData)) sanitized = cloudData;
@@ -233,7 +238,6 @@ async function initFirebaseSync() {
                         window.appLogic.deliveryOptions = sanitized;
                         window.appLogic.updateCartUI();
                     }
-                    // CRITICAL: Force UI to reflect deletion/change immediately
                     window.appLogic.refreshActiveView();
                 }
             });
@@ -241,7 +245,7 @@ async function initFirebaseSync() {
     });
 
     await Promise.all(fetchPromises);
-    window.isDataInitialized = true; // UNLOCK System
+    window.isDataInitialized = true;
     console.log("[Recovery] --- SYSTEM READY (READ-WRITE ENABLED) ---");
 }
 // ---------------------------------------------
@@ -887,7 +891,7 @@ window.appLogic = {
             <!-- ERP Header Section -->
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; box-sizing: border-box;">
                 <div style="text-align: right;">
-                    <h2 style="margin: 0; color: #1a202c; font-size: 28px; font-weight: 800;">غسلة سحاب</h2>
+                    <h2 style="margin: 0; color: #1a202c; font-size: 28px; font-weight: 800;">${window.tenantSettings?.name || 'مغسلة جديدة'}</h2>
                     <p style="margin: 4px 0; color: #718096; font-size: 14px;">Sahab Laundry</p>
                 </div>
                 <div style="text-align: center; flex: 1; display:flex; justify-content:center; align-items:center;">
@@ -965,7 +969,7 @@ window.appLogic = {
 
             <!-- Footer Note -->
             <div style="margin-top: 60px; border-top: 1px solid #edf2f7; padding-top: 20px; text-align: center; box-sizing: border-box;">
-                <p style="font-size: 12px; color: #a0aec0; margin: 0;">شكراً لتعاملكم مع غسلة سحاب - نسعد بخدمتكم دائماً</p>
+                <p style="font-size: 12px; color: #a0aec0; margin: 0;">شكراً لتعاملكم مع ${window.tenantSettings?.name || 'مغسلة جديدة'} - نسعد بخدمتكم دائماً</p>
                 <div style="font-size: 10px; color: #cbd5e0; margin: 4px 0; display: flex; justify-content: center; gap: 5px; align-items: center;">
                     <span>المملكة العربية السعودية</span>
                     <span>|</span>
@@ -978,7 +982,8 @@ window.appLogic = {
         document.body.appendChild(container);
 
         // Standard ZATCA QR (Updated with zero tax)
-        const zatcaQRBase64 = zatcaEncoder.generateZATCA_QR("غسلة سحاب", "000000000000000", data.timestamp, data.grandTotal, 0);
+        const bizName = window.tenantSettings?.name || 'مغسلة جديدة';
+        const zatcaQRBase64 = zatcaEncoder.generateZATCA_QR(bizName, window.tenantSettings?.taxNumber || "000000000000000", data.timestamp, data.grandTotal, 0);
         new QRCode(container.querySelector('#pdf-qr-container'), {
             text: zatcaQRBase64,
             width: 140, height: 140,
@@ -1078,7 +1083,7 @@ window.appLogic = {
         <div class="thermal-receipt" style="margin:0 auto;">
             <div class="thermal-header">
                 <img src="logo.png" alt="Logo" onerror="this.style.display='none'">
-                <h1>غسلة سحاب</h1>
+                <h1>${window.tenantSettings?.name || 'مغسلة جديدة'}</h1>
                 <p>للغسيل والكوي | Sahab Laundry</p>
             </div>
             
@@ -1172,6 +1177,7 @@ window.appLogic = {
                 
                 displayInvoices.forEach(i => {
                     if (!i) return;
+                    const isCancelled = i.isCancelled === true;
                     let customerName = (i.customer && i.customer.name) ? i.customer.name : 'عميل نقدي';
                     let customerPhone = (i.customer && i.customer.phone) ? i.customer.phone : '0000000000';
                     let cellPhone = (customerPhone !== '0000000000') ? `<br><small style="color:var(--text-muted); direction:ltr; display:inline-block">${customerPhone}</small>` : '';
@@ -1179,19 +1185,30 @@ window.appLogic = {
                     let dateStr = i.timestamp ? new Date(i.timestamp).toLocaleString('ar-SA') : '-';
                     let partnerBadge = i.partnerLaundryName ? `<br><span onclick="appLogic.toggleLaundryPaid('${i.id}')" style="cursor:pointer; display:inline-block; margin-top:5px; font-size:11px; padding:3px 8px; border-radius:12px; background:${i.laundryPaid ? '#4CAF50' : '#f44336'}; color:#fff;"><i class="fa-solid ${i.laundryPaid ? 'fa-check' : 'fa-times'}"></i> مغسلة: ${i.partnerLaundryName} (${i.laundryPaid ? 'مدفوع' : 'غير مدفوع'})</span>` : '';
 
-                    html += `<tr style="border-bottom:1px solid var(--border);">
+                    // Cancelled invoice visuals
+                    const rowStyle = isCancelled
+                        ? 'border-bottom:1px solid var(--border); opacity:0.55; background:rgba(255,70,70,0.06);'
+                        : 'border-bottom:1px solid var(--border);';
+                    const totalDisplay = isCancelled
+                        ? `<span style="text-decoration:line-through; color:#f44336">${total.toFixed(2)} ر.س</span> <span style="display:inline-block; background:#c62828; color:#fff; font-size:11px; font-weight:900; padding:2px 8px; border-radius:12px; margin-right:6px;">ملغاة</span>`
+                        : `${total.toFixed(2)} ر.س ${partnerBadge}`;
+                    const cancelBtn = isCancelled
+                        ? '' // Already cancelled — hide button
+                        : `<button class="btn-action-icon btn-action-delete" onclick="appLogic.cancelInvoice('${i.id}')" title="إلغاء الفاتورة"><i class="fa-solid fa-ban"></i></button>`;
+
+                    html += `<tr style="${rowStyle}">
                         <td style="padding:15px; font-weight:bold;">${i.id || 'N/A'}</td>
                         <td style="padding:15px;">${customerName}${cellPhone}</td>
-                        <td style="padding:15px; font-weight:bold; color:var(--primary)">${total.toFixed(2)} ر.س ${partnerBadge}</td>
+                        <td style="padding:15px; font-weight:bold; color:${isCancelled ? '#f44336' : 'var(--primary)'}">${totalDisplay}</td>
                         <td style="padding:15px;">${dateStr}</td>
                         <td style="padding:15px; text-align:center;">
-                            <button class="btn-action-icon btn-action-info" onclick="appLogic.togglePartnerInfo('${i.id}')" title="تفاصيل المغسلة الشريكة"><i class="fa-solid fa-truck-ramp-box"></i></button>
+                            ${isCancelled ? '' : `<button class="btn-action-icon btn-action-info" onclick="appLogic.togglePartnerInfo('${i.id}')" title="تفاصيل المغسلة الشريكة"><i class="fa-solid fa-truck-ramp-box"></i></button>`}
                             <button class="btn-action-icon btn-action-print" onclick="appLogic.reprintInvoice('${i.id}')" title="معاينة وإعادة طباعة"><i class="fa-solid fa-print"></i></button>
-                            <button class="btn-action-icon btn-action-edit" onclick="appLogic.editInvoice('${i.id}')" title="تعديل"><i class="fa-solid fa-edit"></i></button>
-                            <button class="btn-action-icon btn-action-delete" onclick="appLogic.deleteInvoice('${i.id}')" title="حذف"><i class="fa-solid fa-trash"></i></button>
+                            ${isCancelled ? '' : `<button class="btn-action-icon btn-action-edit" onclick="appLogic.editInvoice('${i.id}')" title="تعديل"><i class="fa-solid fa-edit"></i></button>`}
+                            ${cancelBtn}
                         </td>
                     </tr>
-                    <tr id="partner-info-${i.id}" class="hidden" style="background:rgba(253,184,19,0.03); border-bottom:2px solid var(--primary);">
+                    ${isCancelled ? '' : `<tr id="partner-info-${i.id}" class="hidden" style="background:rgba(253,184,19,0.03); border-bottom:2px solid var(--primary);">
                         <td colspan="5" style="padding:20px;">
                             <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:15px; align-items:end;">
                                 <div>
@@ -1211,8 +1228,9 @@ window.appLogic = {
                                 </div>
                             </div>
                         </td>
-                    </tr>`;
+                    </tr>`}`;
                 });
+
             }
             html += '</tbody></table>';
             const container = document.getElementById('history-content');
@@ -1303,50 +1321,24 @@ window.appLogic = {
         document.getElementById('invoice-preview-modal').classList.remove('hidden');
     },
 
-    async deleteInvoice(id) {
-        if (!confirm(`تحذير: هل أنت متأكد من حذف الفاتورة ${id}؟ سيتم حذف كافة السجلات المحاسبية والضريبية المرتبطة بها وتعديل الإيرادات فوراً.`)) return;
-        
-        console.log(`[Triple-Sync-Delete] Starting cascading delete for invoice: ${id}`);
-        const invIdStr = id.toString().trim();
+    async cancelInvoice(id) {
+        if (!confirm(`هل أنت متأكد من إلغاء هذه الفاتورة كمرتجع؟\nالفاتورة: ${id}\nسيتم تسجيلها كملغاة ولن تُحذف من السجلات.`)) return;
 
-        // 1. Purge from Invoices
         let invs = await localforage.getItem('invoices') || [];
-        invs = invs.filter(i => i && i.id && i.id.toString().trim() !== invIdStr);
+        const idx = invs.findIndex(i => i && i.id === id);
+        if (idx === -1) return;
+
+        invs[idx].isCancelled = true;
+        invs[idx].cancelledAt = Date.now();
+        invs[idx].status = 'cancelled';
+
         await localforage.setItem('invoices', invs);
         await manualSyncToCloud('invoices', invs);
 
-        // 2. Purge from Tax Records (Revenue Dashboards)
-        let taxRecs = await localforage.getItem('tax_records') || [];
-        taxRecs = taxRecs.filter(r => r && r.ref_invoice && r.ref_invoice.toString().trim() !== invIdStr);
-        await localforage.setItem('tax_records', taxRecs);
-        await manualSyncToCloud('tax_records', taxRecs);
+        await this.renderHistory();
+        await this.renderReports();
 
-        // 3. Purge from Journal Entries (Accounting Ledger)
-        let journals = await localforage.getItem('journal_entries') || [];
-        journals = journals.filter(j => j && j.ref_invoice && j.ref_invoice.toString().trim() !== invIdStr);
-        await localforage.setItem('journal_entries', journals);
-        await manualSyncToCloud('journal_entries', journals);
-
-        // 4. Force UI Recalculation (Aggressive Refresh)
-        console.log(`[Triple-Sync-Delete] Forcing UI recalculation for all modules...`);
-        
-        // PROACTIVE CLEANUP: If this was the last invoice, wipe collections to be sure
-        if (invs.length === 0) {
-            console.log('[Triple-Sync-Delete] Last invoice deleted. Purging all financial collections.');
-            await localforage.setItem('tax_records', []);
-            await manualSyncToCloud('tax_records', []);
-            await localforage.setItem('journal_entries', []);
-            await manualSyncToCloud('journal_entries', []);
-            // Also refresh customers to ensure ghost list cleanup
-            await localforage.setItem('customers', []);
-            await manualSyncToCloud('customers', []);
-        }
-
-        await this.renderHistory();   // Refresh Invoice List
-        await this.renderReports();   // Force recalculate Daily/Monthly Sales
-        await this.renderCustomers(); // Sync Customer histories
-        
-        this.showToast('تم حذف الفاتورة وتطهير السجلات المحاسبية بنجاح');
+        this.showToast(`تم إلغاء الفاتورة ${id} وتسجيلها كمرتجع ✓`);
     },
 
     async editInvoice(id) {
@@ -1383,10 +1375,10 @@ window.appLogic = {
             const custs = await localforage.getItem('customers') || [];
             const invs = await localforage.getItem('invoices') || [];
 
-            // AGGRESSIVE SYNC: Map invoices to customers and calculate totals
+            // AGGRESSIVE SYNC: Map invoices to customers, exclude cancelled invoices
             const enriched = custs.map(c => {
                 if (!c || !c.phone) return null;
-                const customerInvoices = invs.filter(i => i && i.customer && i.customer.phone === c.phone);
+                const customerInvoices = invs.filter(i => i && i.customer && i.customer.phone === c.phone && !i.isCancelled);
                 const totalSpent = customerInvoices.reduce((sum, i) => sum + (i.grandTotal || 0), 0);
                 const orderCount = customerInvoices.length;
                 return { ...c, totalSpent, orderCount };
@@ -2034,8 +2026,9 @@ window.appLogic = {
         const monthlyMap = {};
 
         // Calculate Revenue, Partner Costs, and Time-based Analytics DIRECTLY from Invoices
+        // ACCOUNTING RULE: Cancelled invoices (isCancelled === true) are EXCLUDED from all totals
         invoices.forEach(i => {
-            if (!i) return;
+            if (!i || i.isCancelled === true) return; // Skip cancelled invoices
             // REVENUE: Sum of every invoice.total
             const amt = parseFloat(i.total || i.grandTotal || 0);
             totalRevenue += amt;
@@ -2249,7 +2242,7 @@ window.appLogic = {
         let [targetName, targetHood = ''] = compKey.split('|');
         let displayName = targetHood ? `${targetName} (${targetHood})` : targetName;
         
-        if (!confirm(`هل أنت متأكد من تسديد جميع المستحقات للمغسلة '${displayName}'؟\n(سيتم تحويل حالة جميع الفواتير لهذه المغسلة إلى 'مدفوعة نقداً')`)) return;
+        if (!confirm(`هل أنت متأكد من تسديد جميع المستحقات للمغسلة '${displayName}'?\n(سيتم تحويل حالة جميع الفواتير لهذه المغسلة إلى 'مدفوعة نقداً')`)) return;
 
         try {
             let invs = await localforage.getItem('invoices') || [];
@@ -2268,14 +2261,159 @@ window.appLogic = {
             if (updated) {
                 await localforage.setItem('invoices', invs);
                 await manualSyncToCloud('invoices', invs);
-                this.renderLaundryAccounts(); // Refresh the table
-                this.renderHistory();         // Refresh history view badges globally
+                this.renderLaundryAccounts();
+                this.renderHistory();
                 this.showToast(`تم تسديد جميع مستحقات المغسلة '${displayName}'`);
             }
         } catch (err) {
             console.error('Error settling laundry dues:', err);
         }
+    },
+
+    // =====================================================
+    // AUTH & TENANT SETTINGS
+    // =====================================================
+
+    async loginWithPIN() {
+        const pin = document.getElementById('pin-input').value.trim();
+        const errEl = document.getElementById('login-error');
+        const btn = document.getElementById('login-btn');
+        errEl.classList.add('hidden');
+
+        if (!pin) {
+            errEl.classList.remove('hidden');
+            return;
+        }
+
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري التحقق...';
+        btn.disabled = true;
+
+        const email = `${pin}@sahab.pos`;
+        try {
+            await firebase.auth().signInWithEmailAndPassword(email, pin);
+            // Auth observer handles the rest
+        } catch (err) {
+            console.error('[Auth] Login failed:', err.code);
+            errEl.classList.remove('hidden');
+            btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> دخول';
+            btn.disabled = false;
+        }
+    },
+
+    async logoutUser() {
+        this.closeSettingsModal();
+        await firebase.auth().signOut();
+        window.currentUID = null;
+        window.isDataInitialized = false;
+        location.reload();
+    },
+
+    openSettingsModal() {
+        const s = window.tenantSettings;
+        document.getElementById('setting-name').value  = s.name  || '';
+        document.getElementById('setting-phone').value = s.phone || '';
+        document.getElementById('setting-tax').value   = s.taxNumber || '';
+        document.getElementById('settings-modal').classList.remove('hidden');
+    },
+
+    closeSettingsModal() {
+        document.getElementById('settings-modal').classList.add('hidden');
+    },
+
+    async saveTenantSettings() {
+        const name  = document.getElementById('setting-name').value.trim()  || 'مغسلة جديدة';
+        const phone = document.getElementById('setting-phone').value.trim();
+        const tax   = document.getElementById('setting-tax').value.trim();
+
+        window.tenantSettings = { name, phone, taxNumber: tax };
+
+        // Persist locally
+        localStorage.setItem('tenant_settings', JSON.stringify(window.tenantSettings));
+
+        // Persist to Firebase under user node
+        if (window.currentUID && typeof firebase !== 'undefined') {
+            try {
+                await firebase.database().ref(`users/${window.currentUID}/settings`).set(window.tenantSettings);
+            } catch (e) {
+                console.warn('[Settings] Firebase save failed, using local only:', e);
+            }
+        }
+
+        this.applyBranding();
+        this.closeSettingsModal();
+        this.showToast('تم حفظ إعدادات المغسلة بنجاح ✓');
+    },
+
+    async loadTenantSettings(uid) {
+        let settings = null;
+
+        // 1. Try Firebase first
+        if (uid && typeof firebase !== 'undefined') {
+            try {
+                const snap = await firebase.database().ref(`users/${uid}/settings`).once('value');
+                if (snap.val()) settings = snap.val();
+            } catch (e) {
+                console.warn('[Settings] Firebase read failed:', e);
+            }
+        }
+
+        // 2. Fallback to localStorage
+        if (!settings) {
+            try { settings = JSON.parse(localStorage.getItem('tenant_settings')); } catch (e) {}
+        }
+
+        window.tenantSettings = settings || { name: 'مغسلة جديدة', phone: '', taxNumber: '' };
+        this.applyBranding();
+    },
+
+    applyBranding() {
+        const name = window.tenantSettings?.name || 'مغسلة جديدة';
+        const h1 = document.getElementById('header-brand-name');
+        if (h1) h1.textContent = name;
+        const loginH2 = document.getElementById('login-brand-name');
+        if (loginH2) loginH2.textContent = name;
+        document.title = `${name} - نظام إدارة المبيعات`;
     }
 };
 
-document.addEventListener('DOMContentLoaded', () => appLogic.init());
+// =====================================================
+// FIREBASE AUTH STATE OBSERVER — controls app startup
+// =====================================================
+document.addEventListener('DOMContentLoaded', () => {
+    const loginOverlay = document.getElementById('login-overlay');
+    const appEl = document.getElementById('app');
+
+    // Show login, hide app by default
+    if (loginOverlay) loginOverlay.classList.remove('hidden');
+    if (appEl) appEl.style.display = 'none';
+
+    if (typeof firebase === 'undefined') {
+        // No Firebase — run in local mode directly
+        if (loginOverlay) loginOverlay.classList.add('hidden');
+        if (appEl) appEl.style.display = '';
+        appLogic.init();
+        return;
+    }
+
+    firebase.auth().onAuthStateChanged(async (user) => {
+        if (user) {
+            // ✅ LOGGED IN
+            window.currentUID = user.uid;
+            if (loginOverlay) loginOverlay.classList.add('hidden');
+            if (appEl) appEl.style.display = '';
+
+            // Load tenant settings & apply branding BEFORE init
+            await appLogic.loadTenantSettings(user.uid);
+
+            // Now boot the app
+            await appLogic.init();
+        } else {
+            // ❌ NOT LOGGED IN — show login screen
+            window.currentUID = null;
+            if (loginOverlay) loginOverlay.classList.remove('hidden');
+            if (appEl) appEl.style.display = 'none';
+            const pinInput = document.getElementById('pin-input');
+            if (pinInput) pinInput.focus();
+        }
+    });
+});

@@ -17,13 +17,33 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+    <!-- ===== LOGIN OVERLAY ===== -->
+    <div id="login-overlay">
+        <div class="login-card">
+            <div class="login-logo">
+                <img src="logo.png" alt="Logo" onerror="this.style.display='none'">
+                <h2 id="login-brand-name">مغسلة جديدة</h2>
+                <p>نظام نقاط البيع</p>
+            </div>
+            <div class="login-body">
+                <label>الرمز السري (PIN)</label>
+                <input type="password" id="pin-input" placeholder="••••••" maxlength="20"
+                    onkeydown="if(event.key==='Enter') appLogic.loginWithPIN()">
+                <p id="login-error" class="login-error hidden">رمز سري خاطئ، يرجى المحاولة مجدداً</p>
+                <button id="login-btn" class="btn btn-primary w-100" onclick="appLogic.loginWithPIN()">
+                    <i class="fa-solid fa-right-to-bracket"></i> دخول
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div id="app">
         <!-- Header -->
         <header class="main-header no-print">
             <div class="logo-area">
                 <img src="logo.png" alt="غسلة سحاب" class="logo-icon" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' fill=\'%23FDB813\' viewBox=\'0 0 24 24\'><path d=\'M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM12 18H6c-2.21 0-4-1.79-4-4 0-2.05 1.53-3.76 3.56-3.97l1.07-.11.5-.95C8.08 7.14 9.94 6 12 6c2.62 0 4.88 1.86 5.39 4.43l.3 1.5 1.53.11c1.56.1 2.78 1.41 2.78 2.96 0 1.65-1.35 3-3 3h-2z\'/></svg>'">
                 <div class="brand-text">
-                    <h1>غسلة سحاب</h1>
+                    <h1 id="header-brand-name">مغسلة جديدة</h1>
                     <p>نظام نقاط البيع</p>
                 </div>
             </div>
@@ -34,6 +54,7 @@
                 <button class="nav-btn" onclick="appLogic.switchView('inventory')"><i class="fa-solid fa-boxes-stacked"></i> المخزون</button>
                 <button class="nav-btn" onclick="appLogic.switchView('expenses')"><i class="fa-solid fa-money-bill-transfer"></i> المصروفات</button>
                 <button class="nav-btn" onclick="appLogic.switchView('reports')"><i class="fa-solid fa-chart-line"></i> القوائم المالية</button>
+                <button class="nav-btn" id="settings-nav-btn" onclick="appLogic.openSettingsModal()"><i class="fa-solid fa-gear"></i> الإعدادات</button>
             </nav>
         </header>
 
@@ -445,14 +466,45 @@
             </div>
         </div>
 
+    <!-- ===== TENANT SETTINGS MODAL ===== -->
+    <div class="modal-overlay hidden" id="settings-modal">
+        <div class="modal" style="width: 480px;">
+            <div class="modal-header" style="background: linear-gradient(135deg, #1a1a1a, #2a2a2a); border-bottom: 2px solid var(--primary);">
+                <h3 style="color: var(--primary);"><i class="fa-solid fa-gear"></i> إعدادات المغسلة</h3>
+                <button class="close-modal" onclick="appLogic.closeSettingsModal()"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div class="modal-body" style="padding: 24px;">
+                <div class="selector-group">
+                    <label style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:13px; font-weight:700;">اسم النشاط التجاري</label>
+                    <input type="text" id="setting-name" placeholder="مثال: مغسلة الفيصل" style="width:100%; padding:12px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm); font-family:inherit; font-size:15px;">
+                </div>
+                <div class="selector-group">
+                    <label style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:13px; font-weight:700;">رقم الجوال</label>
+                    <input type="text" id="setting-phone" placeholder="05xxxxxxxx" dir="ltr" style="width:100%; padding:12px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm); font-family:inherit; font-size:15px;">
+                </div>
+                <div class="selector-group">
+                    <label style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:13px; font-weight:700;">الرقم الضريبي (اختياري)</label>
+                    <input type="text" id="setting-tax" placeholder="300xxxxxxxxx" dir="ltr" style="width:100%; padding:12px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm); font-family:inherit; font-size:15px;">
+                </div>
+                <button class="btn btn-primary w-100" onclick="appLogic.saveTenantSettings()" style="margin-top:8px; font-size:16px;">
+                    <i class="fa-solid fa-floppy-disk"></i> حفظ الإعدادات
+                </button>
+                <button class="btn w-100" onclick="appLogic.logoutUser()" style="margin-top:10px; background:rgba(255,69,58,0.1); color:var(--danger); border:1px solid rgba(255,69,58,0.3);">
+                    <i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    
-    <!-- Firebase SDK (Cross-Device Sync) -->
+
+    <!-- Firebase SDK (Cross-Device Sync + Auth) -->
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-database-compat.js"></script>
 
-    <script src="js/app.js?v=4.0.1"></script>
+    <script src="js/app.js?v=5.0.0"></script>
 </body>
 </html>
