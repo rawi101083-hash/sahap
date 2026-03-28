@@ -258,7 +258,7 @@ window.appLogic = {
         if (container.classList.contains('expanded')) {
             btn.innerHTML = 'إخفاء بيانات المغسلة ⬆️';
         } else {
-            btn.innerHTML = 'إضافة مغسلة شريكة ⬇️';
+            btn.innerHTML = 'إضافة مغسلة شريكة (اختياري) ⬇️';
         }
     },
 
