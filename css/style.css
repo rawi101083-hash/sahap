@@ -1174,12 +1174,22 @@ button:active {
     /* DRAWER EXPANDS ON CLICK */
     .cart-section.cart-open {
         transform: translateY(0);
-        overflow-y: auto; /* allow inner scrolling when open securely */
+        overflow-y: hidden; /* Prevent full drawer from scrolling, let cart-items scroll */
     }
     
     /* FLATTEN footer to strictly order its contents */
     .cart-footer {
-        display: contents;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        position: static;
+        order: 6; /* Put after cart-items */
+        margin: 0;
+        padding: 0 16px;
+        padding-bottom: env(safe-area-inset-bottom, 20px);
+        background: transparent;
+        border: none;
+        height: auto;
     }
 
     /* 1. TOP HEADER (The Handle) */
@@ -1238,12 +1248,13 @@ button:active {
     
     /* 4. LAUNDRY PARTNER DATA (Third) */
     .laundry-partner-select {
-        order: 4;
-        margin: 0 16px 15px 16px !important; /* override inline styles */
+        order: unset;
+        margin: 0 !important; /* Managed by footer gap */
         padding: 15px !important;
         border: 1px dashed var(--primary) !important;
         background: rgba(253, 184, 19, 0.05);
         border-radius: 8px;
+        position: static !important;
     }
 
     /* 5. Cart Items array naturally flows next */
@@ -1252,18 +1263,19 @@ button:active {
         padding: 16px;
         flex: 1 1 auto;
         min-height: 0;
-        overflow-y: visible; /* Scroll handled by .cart-section wrapper */
+        overflow-y: auto; /* Allow internal scrolling */
         max-height: none;
     }
     
-    .delivery-options { order: 6; margin: 0 16px 15px 16px; }
-    .totals { order: 7; margin: 0 16px 15px 16px; }
+    .delivery-options { order: unset; margin: 0; position: static; }
+    .totals { order: unset; margin: 0; position: static; }
 
     /* 6. ACTION BUTTON (Bottom) */
     .cart-actions {
-        order: 8;
-        margin: 0 16px 16px 16px;
-        padding-bottom: env(safe-area-inset-bottom, 20px);
+        order: unset;
+        margin: 0;
+        padding-bottom: 0; /* padding handled by cart-footer */
+        position: static;
     }
 
     .delivery-buttons {
