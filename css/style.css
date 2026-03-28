@@ -1042,11 +1042,6 @@ button:active {
     box-shadow: 0 4px 8px rgba(229, 57, 53, 0.3);
 }
 
-/* Laundry Accordion Desktop Defaults */
-.mobile-only-toggle { display: none !important; }
-.desktop-only-heading { display: block; }
-.laundry-fields-wrapper { display: block; }
-
 /* =========================================
    RESPONSIVE DESIGN (Mobile & Tablet)
    ========================================= */
@@ -1152,54 +1147,36 @@ button:active {
         font-size: 13px;
     }
 
-    /* Cart Section - STRICT SLIDE-UP DRAWER */
+    /* ── MOBILE DRAWER ─────────────────────────────────────── */
     .cart-section {
         position: fixed;
         bottom: 0;
         left: 0;
         right: 0;
-        background: var(--bg-surface);
         z-index: 1000;
+        background: var(--bg-surface);
         border-top: 2px solid var(--primary);
         border-right: none;
         border-radius: 20px 20px 0 0;
         box-shadow: 0 -5px 25px rgba(0, 0, 0, 0.6);
-        height: auto;
-        min-height: auto;
-        max-height: 85vh; /* Standard drawer height */
+        /* Strict flex column so children behave */
         display: flex;
         flex-direction: column;
-        
-        /* STRICTLY COLLAPSED BY DEFAULT */
+        max-height: 85vh;
+        /* Collapsed: only the golden handle shows */
         transform: translateY(calc(100% - 64px));
         transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        overflow: hidden; /* CRITICAL: Hides everything underneath the Golden Bar when collapsed */
+        overflow: hidden;
     }
 
-    /* DRAWER EXPANDS ON CLICK */
+    /* Expanded state */
     .cart-section.cart-open {
         transform: translateY(0);
-        overflow-y: hidden; /* Prevent full drawer from scrolling, let cart-items scroll */
-    }
-    
-    /* FLATTEN footer to strictly order its contents */
-    .cart-footer {
-        display: flex;
-        flex-direction: column;
-        gap: 15px;
-        position: static;
-        order: 6; /* Put after cart-items */
-        margin: 0;
-        padding: 0 16px;
-        padding-bottom: env(safe-area-inset-bottom, 20px);
-        background: transparent;
-        border: none;
-        height: auto;
+        overflow: hidden; /* let children scroll, not the drawer itself */
     }
 
-    /* 1. TOP HEADER (The Handle) */
+    /* ── GOLDEN HANDLE (flex-shrink: 0 — never squishes) */
     .cart-mobile-handle {
-        order: 1;
         display: flex !important;
         justify-content: space-between;
         align-items: center;
@@ -1211,92 +1188,45 @@ button:active {
         border-radius: 20px 20px 0 0;
         cursor: pointer;
         height: 64px;
-        flex-shrink: 0;
-        position: sticky;
-        top: 0;
+        flex-shrink: 0; /* NEVER shrinks */
         z-index: 10;
         box-shadow: 0 4px 15px rgba(253, 184, 19, 0.3);
     }
-    
-    .cart-mobile-handle .handle-bar {
-        position: absolute;
-        top: 8px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 40px;
-        height: 4px;
-        background: rgba(0, 0, 0, 0.4);
-        border-radius: 4px;
-    }
 
-    /* 2. CUSTOMER DATA */
+    /* ── CUSTOMER HEADER (flex-shrink: 0) */
     .cart-header {
-        order: 2;
-        padding: 16px;
-        padding-top: 24px;
+        padding: 16px 16px 0;
         flex-shrink: 0;
+        border-bottom: none;
     }
 
-    /* 3. THE GOLDEN BAR (Second below phone) */
-    .mobile-golden-bar {
-        order: 3;
-        display: block !important;
-        background: linear-gradient(135deg, #fdb813, #f57f17);
-        color: #000;
-        font-weight: bold;
-        text-align: center;
-        padding: 12px;
-        border-radius: 8px;
-        margin: 0 16px 15px 16px;
-        font-size: 15px;
-    }
-    
-    /* 4. LAUNDRY PARTNER DATA (Third) */
-    .laundry-partner-select {
-        order: unset;
-        margin: 0 !important; /* Managed by footer gap */
-        padding: 15px !important;
-        border: 1px dashed var(--primary) !important;
-        background: rgba(253, 184, 19, 0.05);
-        border-radius: 8px;
-        position: static !important;
-    }
-
-    /* Laundry Accordion Mobile Behavior */
-    .mobile-only-toggle { display: block !important; }
-    .desktop-only-heading { display: none !important; }
-    .laundry-fields-wrapper { display: none; margin-top: 10px; }
-    
-    @keyframes fadeInAccordion {
-        from { opacity: 0; transform: translateY(-5px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-    
-    .laundry-fields-wrapper.expanded { 
-        display: block; 
-        animation: fadeInAccordion 0.2s ease-in; 
-    }
-
-    /* 5. Cart Items array naturally flows next */
+    /* ── CART ITEMS (THE MIDDLE — takes ALL remaining space) */
     .cart-items {
-        order: 5;
+        flex: 1 1 auto;   /* grow to fill, shrink if needed */
+        min-height: 0;    /* CRITICAL: allows flex child to shrink below content size */
+        overflow-y: auto; /* scroll internally */
         padding: 16px;
-        flex: 1 1 auto;
-        min-height: 0;
-        overflow-y: auto; /* Allow internal scrolling */
-        max-height: none;
+        z-index: 10;
+        margin-bottom: 0;
     }
-    
-    .delivery-options { order: unset; margin: 0; position: static; }
-    .totals { order: unset; margin: 0; position: static; }
 
-    /* 6. ACTION BUTTON (Bottom) */
-    .cart-actions {
-        order: unset;
-        margin: 0;
-        padding-bottom: 0; /* padding handled by cart-footer */
-        position: static;
+    /* ── CART FOOTER (THE BOTTOM — never overlaps middle) */
+    .cart-footer {
+        flex-shrink: 0;        /* NEVER grows into cart items */
+        position: relative;    /* NO absolute/fixed */
+        z-index: 20;
+        background-color: #1a1a1a;
+        padding: 16px 16px;
+        padding-bottom: max(16px, env(safe-area-inset-bottom));
+        border-top: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
     }
+
+    .delivery-options { margin: 0; }
+    .totals { margin: 0; border-bottom: none; padding-bottom: 0; }
+    .cart-actions { margin: 0; }
 
     .delivery-buttons {
         flex-wrap: wrap;
