@@ -90,7 +90,7 @@
                 <p style="color: var(--text-muted); font-size: 14px; margin-top: 5px;">Tenant Management & Kill Switch Controls</p>
             </div>
             <div>
-                <button onclick="location.reload()" style="background: transparent; color: var(--text-muted); border: 1px solid var(--border); padding: 10px 20px; border-radius: 8px; cursor: pointer;">
+                <button onclick="masterApp.logout()" style="background: transparent; color: var(--text-muted); border: 1px solid var(--border); padding: 10px 20px; border-radius: 8px; cursor: pointer;">
                     <i class="fa-solid fa-power-off"></i> Disconnect
                 </button>
             </div>
@@ -116,16 +116,19 @@
 
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <h2 style="font-size: 20px; color: #fff;">Registered Nodes (Laundries)</h2>
-            <button onclick="masterApp.fetchData()" style="background: var(--primary); color: #000; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer;"><i class="fa-solid fa-rotate"></i> Refresh Network Data</button>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="masterApp.openStoreModal()" style="background: var(--success); color: #fff; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer;"><i class="fa-solid fa-plus-circle"></i> Create New Store</button>
+                <button onclick="masterApp.fetchData()" style="background: var(--primary); color: #000; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer;"><i class="fa-solid fa-rotate"></i> Refresh Network Data</button>
+            </div>
         </div>
 
         <table>
             <thead>
                 <tr>
-                    <th>Node ID (UID)</th>
+                    <th>Registration Date</th>
                     <th>Business Name</th>
                     <th>Phone</th>
-                    <th>Registration Date</th>
+                    <th>Assigned PIN</th>
                     <th>System Status</th>
                     <th style="text-align: center;">Controls</th>
                 </tr>
@@ -136,6 +139,33 @@
         </table>
         <div id="loading-spinner" style="text-align: center; padding: 40px; color: var(--primary); font-size: 24px; display: none;">
             <i class="fa-solid fa-circle-notch fa-spin"></i>
+        </div>
+    </div>
+
+    <!-- ===== CREATE STORE MODAL ===== -->
+    <div id="store-modal" class="hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; height:100vh; background:rgba(0,0,0,0.9); z-index:9000; display:flex; justify-content:center; align-items:center;">
+        <div class="login-box" style="width: 500px; text-align: right; background: #1a1a1a;">
+            <h2 style="color:var(--primary); margin-bottom:20px; font-size:20px; text-align:center;"><i class="fa-solid fa-plus-circle"></i> إضافة مغسلة جديدة للمنصة</h2>
+            
+            <div style="margin-bottom:15px;">
+                <label style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:13px;">اسم المغسلة الجديد</label>
+                <input type="text" id="new-store-name" placeholder="مثال: مغسلة نياف الحديثة" style="width:100%; padding:12px; background:#000; border:1px solid var(--border); color:#fff; border-radius:8px; font-family:inherit; text-align:right; letter-spacing:0;">
+            </div>
+
+            <div style="margin-bottom:15px;">
+                <label style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:13px;">رقم الجوال</label>
+                <input type="tel" id="new-store-phone" placeholder="05xxxxxxxx" style="width:100%; padding:12px; background:#000; border:1px solid var(--border); color:#fff; border-radius:8px; font-family:inherit; text-align:right; letter-spacing:0;">
+            </div>
+
+            <div style="margin-bottom:25px;">
+                <label style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:13px;">الرمز السري (6 أرقام)</label>
+                <input type="text" id="new-store-pin" maxlength="6" placeholder="مثلاً: 123456" style="width:100%; padding:12px; background:#000; border:1px solid var(--border); color:var(--primary); border-radius:8px; font-weight:bold; font-size:24px; text-align:center; letter-spacing:5px;">
+            </div>
+
+            <div style="display:flex; gap:10px;">
+                <button class="btn-gold" onclick="masterApp.saveStore()" style="flex:2;"><i class="fa-solid fa-check"></i> حفظ وإنشاء الحساب</button>
+                <button onclick="masterApp.closeStoreModal()" style="flex:1; background:transparent; border:1px solid var(--border); color:var(--text-muted); border-radius:8px; cursor:pointer;">إلغاء</button>
+            </div>
         </div>
     </div>
 
@@ -163,63 +193,86 @@
         const db = firebase.database();
 
         const masterApp = {
+            init() {
+                // AUTO-RESUME: If already authorized by Smart Gate
+                const isAuth = localStorage.getItem('radix_master_authorized');
+                if (isAuth === 'true') {
+                    console.log("[Master-Auth] Session detected. Resuming...");
+                    this.showDashboard();
+                }
+            },
+
             login() {
                 const pin = document.getElementById('master-pin').value;
                 if (pin === MASTER_PASSWORD) {
-                    document.getElementById('login-screen').classList.add('hidden');
-                    document.getElementById('dashboard').classList.remove('hidden');
-                    
-                    // We must trick Firebase into letting us read if rules are tight.
-                    // But usually admin needs auth. Since we don't know the exact Firebase Auth rules, 
-                    // we'll attempt an anonymous login or just fetch immediately.
-                    // If the Realtime DB is secure, this might require proper Firebase Auth Admin credentials.
-                    // We will attempt read directly first.
-                    this.fetchData();
+                    localStorage.setItem('radix_master_authorized', 'true');
+                    this.showDashboard();
                 } else {
                     document.getElementById('login-error').style.display = 'block';
                     document.getElementById('master-pin').value = '';
                 }
             },
 
+            showDashboard() {
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('dashboard').classList.remove('hidden');
+                this.fetchData();
+            },
+
+            logout() {
+                localStorage.removeItem('radix_master_authorized');
+                location.reload();
+            },
+
             async fetchData() {
-                document.getElementById('tenants-table-body').innerHTML = '';
+                const tbody = document.getElementById('tenants-table-body');
+                tbody.innerHTML = '';
                 document.getElementById('loading-spinner').style.display = 'block';
 
                 try {
-                    const snap = await db.ref('users').once('value');
-                    const users = snap.val() || {};
-                    this.renderTable(users);
+                    // We now use 'admin/stores' as the Master Registry of licenses
+                    const storesSnap = await db.ref('admin/stores').once('value');
+                    const stores = storesSnap.val() || {};
+                    
+                    // We also fetch 'users' to get deeper account details if they exist
+                    const usersSnap = await db.ref('users').once('value');
+                    const users = usersSnap.val() || {};
+
+                    this.renderTable(stores, users);
                 } catch (e) {
                     console.error("Firebase read error:", e);
-                    alert("Error reaching Firebase. Make sure database rules allow read access, or you are signed into an authorized admin account.");
+                    alert("Error reaching Firebase. Check permissions.");
                     document.getElementById('loading-spinner').style.display = 'none';
                 }
             },
 
-            renderTable(usersData) {
+            renderTable(storesData, usersData) {
                 const tbody = document.getElementById('tenants-table-body');
                 tbody.innerHTML = '';
                 let total = 0, active = 0, expired = 0;
 
-                Object.keys(usersData).forEach(uid => {
+                Object.keys(storesData).forEach(pin => {
                     total++;
-                    const user = usersData[uid];
-                    const settings = user.settings || {};
-                    const account = user.accountDetails || {};
-                    
-                    const name = settings.name || '<span style="color:#666">Unnamed Node</span>';
-                    const phone = settings.phone || '--';
-                    const status = settings.status || 'active'; // Default active
+                    const store = storesData[pin];
+                    const uid = store.uid;
+                    const status = store.status || 'active';
                     
                     if (status === 'expired') expired++;
                     else active++;
 
-                    // Format Date
-                    let dateStr = 'Unknown';
-                    if (account.firstUsedDate) {
+                    // Enrich with real user data if available
+                    const realUser = usersData[uid] || {};
+                    const account = realUser.accountDetails || {};
+                    
+                    const name = store.name || account.name || 'Unnamed';
+                    const phone = store.phone || account.phone || '--';
+                    const createdAt = store.timestamp || account.firstUsedDate || null;
+
+                    let dateStr = 'لم يسجل دخول بعد';
+                    if (createdAt) {
                         try {
-                            const d = new Date(account.firstUsedDate);
-                            dateStr = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                            const d = new Date(createdAt);
+                            dateStr = d.toLocaleDateString('en-GB');
                         } catch(e){}
                     }
 
@@ -229,16 +282,16 @@
                         : '<span class="status-badge status-active"><i class="fa-solid fa-check"></i> Active</span>';
 
                     const actionBtn = isExpired
-                        ? `<button class="btn-action btn-activate" onclick="masterApp.toggleStatus('${uid}', 'active')"><i class="fa-solid fa-play"></i> Reactivate Node</button>`
-                        : `<button class="btn-action btn-suspend" onclick="masterApp.toggleStatus('${uid}', 'expired')"><i class="fa-solid fa-power-off"></i> Suspend Node</button>`;
+                        ? `<button class="btn-action btn-activate" onclick="masterApp.toggleStatus('${uid}', 'active', '${pin}')"><i class="fa-solid fa-play"></i> Reactivate</button>`
+                        : `<button class="btn-action btn-suspend" onclick="masterApp.toggleStatus('${uid}', 'expired', '${pin}')"><i class="fa-solid fa-power-off"></i> Suspend</button>`;
 
                     const tr = document.createElement('tr');
                     tr.style.opacity = isExpired ? '0.6' : '1';
                     tr.innerHTML = `
-                        <td style="font-family: monospace; color:#6b7280; font-size:12px;" dir="ltr">${uid.substring(0,8)}...</td>
+                        <td dir="ltr" style="font-size:12px; color:#888;">${dateStr}</td>
                         <td style="font-weight:bold; color:#fff;">${name}</td>
                         <td dir="ltr" style="font-family: monospace;">${phone}</td>
-                        <td dir="ltr" style="font-size:12px; color:#888;">${dateStr}</td>
+                        <td style="font-family: monospace; color:var(--primary); font-weight:bold; letter-spacing:1px;">${pin}</td>
                         <td>${badge}</td>
                         <td style="text-align: center;">${actionBtn}</td>
                     `;
@@ -251,7 +304,65 @@
                 document.getElementById('loading-spinner').style.display = 'none';
             },
 
-            async toggleStatus(uid, newStatus) {
+            // --- CREATE STORE LOGIC ---
+            openStoreModal() {
+                document.getElementById('store-modal').classList.remove('hidden');
+            },
+            closeStoreModal() {
+                document.getElementById('store-modal').classList.add('hidden');
+                document.getElementById('new-store-name').value = '';
+                document.getElementById('new-store-phone').value = '';
+                document.getElementById('new-store-pin').value = '';
+            },
+            async saveStore() {
+                const name = document.getElementById('new-store-name').value.trim();
+                const phone = document.getElementById('new-store-phone').value.trim();
+                const pin = document.getElementById('new-store-pin').value.trim();
+
+                if (!name || !phone || pin.length !== 6) {
+                    alert("يرجى إكمال البيانات وضمان أن الرمز 6 أرقام.");
+                    return;
+                }
+
+                try {
+                    // Check if PIN already exists
+                    const check = await db.ref(`admin/stores/${pin}`).once('value');
+                    if (check.exists()) {
+                        alert("عذراً، هذا الرمز مستخدم مسبقاً لمغسلة أخرى.");
+                        return;
+                    }
+
+                    // Atomic Multi-Path Update
+                    const newID = db.ref('users').push().key;
+                    const timestamp = Date.now();
+                    
+                    const updates = {};
+                    // 1. Pincodes registry for login
+                    updates[`pincodes/${pin}`] = newID;
+                    // 2. Admin registry for metadata
+                    updates[`admin/stores/${pin}`] = {
+                        uid: newID, name, phone, status: 'active', timestamp
+                    };
+                    // 3. User activation node
+                    updates[`users/${newID}/accountDetails`] = {
+                        name, phone, isActivated: true, firstUsedDate: timestamp
+                    };
+                    // 4. User settings record
+                    updates[`users/${newID}/settings`] = {
+                        name, phone, status: 'active', pin: pin
+                    };
+
+                    await db.ref().update(updates);
+                    alert("تم إنشاء المغسلة بنجاح!");
+                    this.closeStoreModal();
+                    this.fetchData();
+                } catch (e) {
+                    console.error("Create store failed:", e);
+                    alert("فشل إنشاء الحساب.");
+                }
+            },
+
+            async toggleStatus(uid, newStatus, pin) {
                 const confirmMsg = newStatus === 'expired' 
                     ? "WARNING: This will instantly lock out the tenant and block their POS. Proceed?"
                     : "This will restore full access to the tenant. Proceed?";
@@ -259,7 +370,18 @@
                 if (!confirm(confirmMsg)) return;
 
                 try {
-                    await db.ref(`users/${uid}/settings/status`).set(newStatus);
+                    const updates = {};
+                    if (uid && uid !== 'undefined') {
+                        updates[`users/${uid}/accountDetails/isActivated`] = (newStatus !== 'expired');
+                        updates[`users/${uid}/settings/status`] = newStatus;
+                    }
+                    if (pin) {
+                        updates[`admin/stores/${pin}/status`] = newStatus;
+                    }
+
+                    await db.ref().update(updates);
+                    console.log(`[Master-Sync] Successfully synchronized status for PIN: ${pin}`);
+                    
                     this.fetchData(); // Refresh UI
                 } catch (e) {
                     console.error("Failed to update status:", e);
@@ -267,6 +389,9 @@
                 }
             }
         };
+
+        // Initialize
+        masterApp.init();
 
         // Listen for Enter key on login
         document.getElementById('master-pin').addEventListener('keypress', function(e) {

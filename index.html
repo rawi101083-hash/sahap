@@ -46,10 +46,11 @@
             </div>
             <div class="login-body">
                 <label>الرمز السري (PIN)</label>
-                <input type="password" id="pin-input" placeholder="••••••" maxlength="20"
+                <input type="text" id="pin-input" placeholder="••••••" maxlength="6" inputmode="numeric" 
+                    oninput="this.value = this.value.replace(/[^0-9]/g, ''); appLogic.validatePinInput(this)"
                     onkeydown="if(event.key==='Enter') appLogic.loginWithPIN()">
-                <p id="login-error" class="login-error hidden">رمز سري خاطئ، يرجى المحاولة مجدداً</p>
-                <button id="login-btn" class="btn btn-primary w-100" onclick="appLogic.loginWithPIN()">
+                <p id="login-error" class="login-error hidden" style="line-height: 1.5; min-height: 40px; margin-top: 10px;"></p>
+                <button id="login-btn" class="btn btn-primary w-100" onclick="appLogic.loginWithPIN()" disabled style="opacity: 0.5; cursor: not-allowed;">
                     <i class="fa-solid fa-right-to-bracket"></i> دخول
                 </button>
             </div>
@@ -74,6 +75,7 @@
                 <button class="nav-btn" onclick="appLogic.switchView('expenses')"><i class="fa-solid fa-money-bill-transfer"></i> المصروفات</button>
                 <button class="nav-btn" onclick="appLogic.switchView('reports')"><i class="fa-solid fa-chart-line"></i> القوائم المالية</button>
                 <button class="nav-btn" id="settings-nav-btn" onclick="appLogic.openSettingsModal()"><i class="fa-solid fa-gear"></i> الإعدادات</button>
+                <!-- Admin Nav Removed for Smart Gate Security -->
             </nav>
         </header>
 
@@ -238,6 +240,8 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Admin View Removed: All management now happens in radix-master.html -->
         </main>
 
         <!-- Modals -->

@@ -1,4 +1,5 @@
 // Sahab POS - Main Application Logic
+const ADMIN_PIN = "456333";
 const DefaultDeliveryOptions = [
 
     { id: 'none', name: 'بدون توصيل', amount: 0 },
@@ -95,9 +96,9 @@ const zatcaEncoder = {
 const accountingEngine = {
     async postTransaction(invoice) {
         const total = invoice.grandTotal;
-        // FIXED: Stop VAT/Hidden tax deductions. 1:1 Revenue Math.
-        const subtotal = total; 
-        const vat = 0; 
+        // Calculate 15% Inclusive VAT: Subtotal = Total / 1.15, VAT = Total - Subtotal
+        const subtotal = total / 1.15; 
+        const vat = total - subtotal; 
 
         invoice.vatAmount = vat;
         invoice.subtotalNet = subtotal;
@@ -485,6 +486,7 @@ window.appLogic = {
             else if (viewId === 'inventory') this.renderInventory();
             else if (viewId === 'reports') this.renderReports();
             else if (viewId === 'expenses') this.renderExpenses();
+            else if (viewId === 'admin') this.renderAdmin();
 
         } catch (err) {
             console.error('Routing Error:', err);
@@ -500,6 +502,7 @@ window.appLogic = {
         else if (vId === 'inventory') this.renderInventory();
         else if (vId === 'reports') this.renderReports();
         else if (vId === 'expenses') this.renderExpenses();
+        else if (vId === 'admin') this.renderAdmin();
     },
 
     // Filters
@@ -798,9 +801,13 @@ window.appLogic = {
             paymentMethod: 'cash'
         };
 
-        // No VAT Logic (Tax free invoice as requested)
-        invoiceData.subtotalNet = invoiceData.total;
-        invoiceData.vatAmount = 0;
+        // Calculate 15% Inclusive VAT: Subtotal = Total / 1.15, VAT = Total - Subtotal
+        const _total = parseFloat(grT) || 0;
+        const _subtotalNet = _total / 1.15;
+        const _vatAmount = _total - _subtotalNet;
+
+        invoiceData.subtotalNet = _subtotalNet;
+        invoiceData.vatAmount = _vatAmount;
 
         this.pendingInvoice = invoiceData;
 
@@ -864,11 +871,9 @@ window.appLogic = {
         document.getElementById('modal-actions-preview').classList.add('hidden');
         document.getElementById('modal-actions-success').classList.remove('hidden');
 
-        // Show WhatsApp button only when the customer has a real phone number
-        const _hasPhone = this.currentInvoice.customer?.phone &&
-                          this.currentInvoice.customer.phone !== '0000000000';
-        const _waBtnEl  = document.getElementById('btn-whatsapp-share');
-        if (_waBtnEl) _waBtnEl.style.display = _hasPhone ? 'block' : 'none';
+        // WhatsApp sharing is now always available — users can forward to any contact if no number was provided
+        const _waBtnEl = document.getElementById('btn-whatsapp-share');
+        if (_waBtnEl) _waBtnEl.style.display = 'block';
 
         // Reset POS background
         this.cart = [];
@@ -935,14 +940,16 @@ window.appLogic = {
         const inv = this.currentInvoice;
         if (!inv) return alert('لا توجد فاتورة حالية للمشاركة.');
 
-        // Format Saudi phone → international (966xxxxxxxxx)
+        // Determine target number (optional)
         const rawPhone = (inv.customer && inv.customer.phone) || '';
-        if (!rawPhone || rawPhone === '0000000000') {
-            return alert('لا يوجد رقم جوال مسجل لهذا العميل.');
-        }
-        let digits = rawPhone.replace(/\D/g, '');
-        if (!digits.startsWith('966')) {
-            digits = digits.startsWith('0') ? '966' + digits.slice(1) : '966' + digits;
+        let waTarget = '';
+
+        if (rawPhone && rawPhone !== '0000000000') {
+            let digits = rawPhone.replace(/\D/g, '');
+            if (!digits.startsWith('966')) {
+                digits = digits.startsWith('0') ? '966' + digits.slice(1) : '966' + digits;
+            }
+            waTarget = digits;
         }
 
         // Build pre-filled message
@@ -957,7 +964,7 @@ window.appLogic = {
             `— نظام Redix | ريدكس`
         );
 
-        const url = `https://wa.me/${digits}?text=${msg}`;
+        const url = `https://wa.me/${waTarget}?text=${msg}`;
         window.open(url, '_blank');
     },
 
@@ -985,10 +992,10 @@ window.appLogic = {
         const _combined = _itemsSum + _delivery;
         const _grand    = parseFloat(data.grandTotal || data.total || (_combined + _vatAmt));
         const _storeTax = window.tenantSettings?.taxNumber
-            ? `<div style="font-size:13px; color:#444; margin-bottom:4px;">&#1575;&#1604;&#1585;&#1602;&#1605; &#1575;&#1604;&#1590;&#1585;&#1610;&#1576;&#1610;: <span style="direction:ltr; display:inline-block; font-weight:bold; letter-spacing:1px;">${window.tenantSettings.taxNumber}</span></div>` : '';
+            ? `<p style="margin:2px 0; font-size:14px; color:#444;">الرقم الضريبي: &nbsp;&nbsp; <strong style="direction:ltr; display:inline-block;">${window.tenantSettings.taxNumber}</strong></p>` : '';
         const _storeWA  = window.tenantSettings?.phone
-            ? `<div style="font-size:13px; color:#444; margin-bottom:4px;">&#1585;&#1602;&#1605; &#1575;&#1604;&#1580;&#1608;&#1575;&#1604;: ${window.tenantSettings.phone}</div>` : '';
-        const _invType  = _vatAmt > 0 ? '&#1601;&#1575;&#1578;&#1608;&#1585;&#1577; &#1590;&#1585;&#1610;&#1576;&#1610;&#1577; &#1605;&#1576;&#1587;&#1591;&#1577;' : '&#1601;&#1575;&#1578;&#1608;&#1585;&#1577;';
+            ? `<p style="margin:2px 0; font-size:14px; color:#444;">رقم جوال النشاط: &nbsp;&nbsp; <strong style="direction:ltr; display:inline-block;">${window.tenantSettings.phone}</strong></p>` : '';
+        const _invType  = _vatAmt > 0 ? 'فاتورة ضريبية مبسطة' : 'فاتورة';
 
         let _itemRows = '', _rn = 1;
         data.items.forEach(it => {
@@ -997,7 +1004,7 @@ window.appLogic = {
             let sLbl = it.speed === 'normal' ? 'عادي' : 'سريع';
             _itemRows += `<tr style="border-bottom:1px solid #eee;">
                 <td style="padding:9px 0; text-align:center; color:#555;">${_rn++}</td>
-                <td style="padding:9px 0;"><strong>${it.name}</strong> <span style="font-size:11px; color:#666;">(${tLbl} - ${sLbl})</span></td>
+                <td style="padding:9px 0;"><strong>${it.name}</strong> <span style="font-size:11px; color:#666;"> &nbsp;-&nbsp; ${tLbl} &nbsp;-&nbsp; ${sLbl}</span></td>
                 <td style="padding:9px 0; text-align:center;">${it.qty}</td>
                 <td style="padding:9px 0; text-align:center;">${it.unitPrice.toFixed(2)}</td>
                 <td style="padding:9px 0; text-align:center; font-weight:bold;">${(it.unitPrice * it.qty).toFixed(2)}</td>
@@ -1061,19 +1068,18 @@ window.appLogic = {
                 <tbody>${_itemRows}</tbody>
             </table>
 
-            <!-- Totals: 3 rows, no dark backgrounds -->
             <div style="display:flex; justify-content:flex-end; margin-bottom:35px;">
                 <table dir="rtl" style="border-collapse:collapse; font-size:14px; min-width:310px;">
                     <tr>
-                        <td style="padding:6px 0; color:#555;">المجموع (بدون ضريبة):</td>
+                        <td style="padding:6px 0; color:#555;">المجموع بدون ضريبة</td>
                         <td style="padding:6px 0; padding-right:20px; font-weight:bold; direction:ltr; text-align:left;">${_combined.toFixed(2)} ر.س</td>
                     </tr>
                     <tr>
-                        <td style="padding:6px 0; color:#555;">ضريبة القيمة المضافة (15%):</td>
+                        <td style="padding:6px 0; color:#555;">ضريبة القيمة المضافة 15٪</td>
                         <td style="padding:6px 0; padding-right:20px; font-weight:bold; direction:ltr; text-align:left;">${_vatAmt.toFixed(2)} ر.س</td>
                     </tr>
                     <tr style="border-top:1px solid #000;">
-                        <td style="padding:10px 0; font-size:16px; font-weight:900; color:#000;">الإجمالي النهائي:</td>
+                        <td style="padding:10px 0; font-size:16px; font-weight:900; color:#000;">الإجمالي النهائي</td>
                         <td style="padding:10px 0; padding-right:20px; font-size:18px; font-weight:900; color:#000; direction:ltr; text-align:left;">${_grand.toFixed(2)} ر.س</td>
                     </tr>
                 </table>
@@ -1190,7 +1196,7 @@ window.appLogic = {
             let sLbl = item.speed === 'normal' ? 'عادي' : 'سريع';
             itemsHtml += `
             <tr>
-                <td style="padding:4px 0; border-bottom:1px dashed #bbb; text-align:right;">${item.name} <span style="font-size:10px;">(${tLbl})</span></td>
+                <td style="padding:4px 0; border-bottom:1px dashed #bbb; text-align:right;">${item.name} <span style="font-size:10px;"> &nbsp;-&nbsp; ${tLbl} &nbsp;-&nbsp; ${sLbl}</span></td>
                 <td style="padding:4px 0; border-bottom:1px dashed #bbb; text-align:center;">${item.qty}</td>
                 <td style="padding:4px 0; border-bottom:1px dashed #bbb; text-align:left;">${(item.unitPrice * item.qty).toFixed(2)}</td>
             </tr>`;
@@ -1205,15 +1211,21 @@ window.appLogic = {
         }
 
         const storePhone = window.tenantSettings?.phone
-            ? `<div style="font-size:11px; margin-top:3px;">&#1585;&#1602;&#1605; &#1575;&#1604;&#1580;&#1608;&#1575;&#1604;: ${window.tenantSettings.phone}</div>` : '';
+            ? `<p style="margin:0;"><span class="label">رقم جوال النشاط:</span> <span class="number">${window.tenantSettings.phone}</span></p>` : '';
         const storeTax = window.tenantSettings?.taxNumber
-            ? `<div style="font-size:11px; margin-top:2px;">&#1575;&#1604;&#1585;&#1602;&#1605; &#1575;&#1604;&#1590;&#1585;&#1610;&#1576;&#1610;: ${window.tenantSettings.taxNumber}</div>` : '';
+            ? `<p style="margin:0;"><span class="label">الرقم الضريبي:</span> <span class="number">${window.tenantSettings.taxNumber}</span></p>` : '';
 
         return `
+        <style>
+            .receipt-header { text-align:center; border-bottom:1px solid #000; padding-bottom:8px; margin-bottom:10px; }
+            .receipt-header p { margin: 1px 0; font-size:11px; color:#000; }
+            .receipt-header .label { display: inline-block; }
+            .receipt-header .number { direction: ltr; display: inline-block; font-weight: bold; }
+        </style>
         <div style="width:80mm; margin:0 auto; font-family:'Tajawal',Arial,sans-serif; direction:rtl; background:#fff; color:#000; padding:8px; box-sizing:border-box;">
 
             <!-- Header: Store Name → VAT Number → Phone -->
-            <div style="text-align:center; border-bottom:1px solid #000; padding-bottom:8px; margin-bottom:10px;">
+            <div class="receipt-header">
                 <div style="font-size:18px; font-weight:900; margin-bottom:4px;">${window.tenantSettings?.name || 'Redix'}</div>
                 ${storeTax}
                 ${storePhone}
@@ -1248,18 +1260,17 @@ window.appLogic = {
                 <tbody>${itemsHtml}</tbody>
             </table>
 
-            <!-- Totals -->
             <table style="width:100%; font-size:12px; margin-top:8px; border-collapse:collapse;">
                 <tr>
-                    <td style="padding:3px 0; color:#555;">المجموع (بدون ضريبة):</td>
+                    <td style="padding:3px 0; color:#555;">المجموع بدون ضريبة</td>
                     <td style="text-align:left; font-weight:bold; direction:ltr;">${combinedSum.toFixed(2)} ر.س</td>
                 </tr>
                 <tr>
-                    <td style="padding:3px 0; color:#555;">ضريبة القيمة المضافة (15%):</td>
+                    <td style="padding:3px 0; color:#555;">ضريبة القيمة المضافة 15٪</td>
                     <td style="text-align:left; font-weight:bold; direction:ltr;">${vatAmount.toFixed(2)} ر.س</td>
                 </tr>
                 <tr style="border-top:1px solid #000;">
-                    <td style="padding:5px 0; font-size:14px; font-weight:900;">الإجمالي النهائي:</td>
+                    <td style="padding:5px 0; font-size:14px; font-weight:900;">الإجمالي النهائي</td>
                     <td style="text-align:left; font-size:14px; font-weight:900; direction:ltr;">${grandTotal.toFixed(2)} ر.س</td>
                 </tr>
             </table>
@@ -1460,7 +1471,7 @@ window.appLogic = {
         this.currentInvoice = invoiceData;
         document.getElementById('invoice-preview-container').innerHTML = this.generateThermalHTML(invoiceData, 'preview-qr-render');
 
-        const zatcaQRBase64 = zatcaEncoder.generateZATCA_QR("غسلة سحاب", "000000000000000", invoiceData.timestamp, invoiceData.grandTotal, invoiceData.vatAmount || 0);
+        const zatcaQRBase64 = zatcaEncoder.generateZATCA_QR(window.tenantSettings?.name || "Redix", window.tenantSettings?.taxNumber || "000000000000000", invoiceData.timestamp, invoiceData.grandTotal, invoiceData.vatAmount || 0);
         new QRCode(document.getElementById('preview-qr-render'), {
             text: zatcaQRBase64,
             width: 100, height: 100,
@@ -1472,6 +1483,11 @@ window.appLogic = {
 
         document.getElementById('preview-invoice-id').innerText = invoiceData.id;
         document.getElementById('success-invoice-ref').innerText = invoiceData.id + " (نسخة مطابقة)";
+
+        // Ensure WhatsApp button is visible even for old/reprinted invoices
+        const _waBtnEl = document.getElementById('btn-whatsapp-share');
+        if (_waBtnEl) _waBtnEl.style.display = 'block';
+
         document.getElementById('invoice-preview-modal').classList.remove('hidden');
     },
 
@@ -2177,15 +2193,9 @@ window.appLogic = {
             }
         }
 
-        let totalAllInvoices = 0;
-        let totalRefunds = 0;
-        let totalOperatingExpenses = 0;
-        let totalLaundryCosts = 0;
-        let totalLaundryDebt = 0;
-        
         const now = new Date();
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-        const weekAgo = today - (7 * 24 * 60 * 60 * 1000);
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        const weekAgo = todayStart - (7 * 24 * 60 * 60 * 1000);
         const monthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate()).getTime();
         const yearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()).getTime();
 
@@ -2193,43 +2203,48 @@ window.appLogic = {
         const monthsAr = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
         const monthlyMap = {};
 
-        // Calculate Revenue, Refunds, Partner Costs DIRECTLY from Invoices
+        // Active Dashboard Totals (Today Only + Not Reported)
+        let totalAllInvoices = 0;
+        let totalRefunds = 0;
+        let totalOperatingExpenses = 0;
+        let totalLaundryCosts = 0;
+        let totalLaundryDebt = 0;
+
+        // 1. Process Invoices
         invoices.forEach(i => {
             if (!i) return;
             const amt = parseFloat(i.total || i.grandTotal || 0);
-            
-            // All invoices contribute to the math base
-            totalAllInvoices += amt;
-
-            if (i.isCancelled === true) {
-                totalRefunds += amt;
-                return; // Skip cost/time tracking for cancelled
-            }
-
-            // PARTNER COSTS: Sum of every invoice.laundryCost (only non-cancelled)
-            const pCost = parseFloat(i.laundryCost || i.partnerLaundryCost || 0);
-            totalLaundryCosts += pCost;
-            if (!i.laundryPaid) totalLaundryDebt += pCost;
-
             const rTime = new Date(i.date || i.timestamp).getTime();
-            if (rTime >= today) salesToday += amt;
-            if (rTime >= weekAgo) salesWeek += amt;
-            if (rTime >= monthAgo) salesMonth += amt;
-            if (rTime >= yearAgo) salesYear += amt;
-
+            
+            // Monthly Map (Full history)
             const d = new Date(i.date || i.timestamp);
             const mIdx = d.getMonth();
             const year = d.getFullYear();
             const key = `${year}-${String(mIdx + 1).padStart(2, '0')}`;
             const label = `${monthsAr[mIdx]} ${year}`;
-
             if (!monthlyMap[key]) monthlyMap[key] = { label, total: 0, sortKey: key };
             monthlyMap[key].total += amt;
+
+            // ACTIVE BATCH FILTER (Today + Not Reported)
+            const isToday = rTime >= todayStart;
+            if (isToday && !i.isZReported) {
+                totalAllInvoices += amt;
+                if (i.isCancelled === true) {
+                    totalRefunds += amt;
+                } else {
+                    const pCost = parseFloat(i.laundryCost || i.partnerLaundryCost || 0);
+                    totalLaundryCosts += pCost;
+                    if (!i.laundryPaid) totalLaundryDebt += pCost;
+                }
+            }
         });
 
-        // Calculate Operational Expenses
+        // 2. Process Expenses (Today + Not Reported)
         exps.forEach(e => {
-            totalOperatingExpenses += parseFloat(e.amount) || 0;
+            const eTime = new Date(e.date).getTime();
+            if (eTime >= todayStart && !e.isZReported) {
+                totalOperatingExpenses += parseFloat(e.amount) || 0;
+            }
         });
 
         // FINAL COMPREHENSIVE FINANCIAL MATH (Redix Logic)
@@ -2278,6 +2293,15 @@ window.appLogic = {
                 </div>
                 <p style="margin-top:10px; font-size:12px; color:var(--text-muted); opacity:0.8;">[صافي الإيراد] - [المصاريف التشغيلية] - [إجمالي تكاليف الشركاء]</p>
             </div>
+        </div>
+
+        <!-- End of Day Closure Button -->
+        <div style="text-align: center; margin-bottom: 40px; background: rgba(87, 67, 177, 0.05); padding: 30px; border-radius: var(--radius-md); border: 2px dashed var(--primary);">
+            <h3 style="color: var(--text-main); margin-bottom: 10px;">إغلاق اليومية (Close Accounting Day)</h3>
+            <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 20px;">سيتم إصدار تقرير Z-Report وأرشفة العمليات الحالية لبدء يوم جديد.</p>
+            <button class="btn btn-primary" onclick="appLogic.closeDay()" style="padding: 16px 50px; font-size: 18px; font-weight: 900; background: var(--primary); color: #000; box-shadow: 0 4px 15px rgba(253, 184, 19, 0.3);">
+                <i class="fa-solid fa-lock" style="margin-left: 10px;"></i> إغلاق اليومية وإصدار التقرير
+            </button>
         </div>
 
         <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px; margin-bottom: 30px;">
@@ -2459,8 +2483,162 @@ window.appLogic = {
     },
 
     // =====================================================
+    // SAAS ADMIN DASHBOARD LOGIC
+    // =====================================================
+    async renderAdmin() {
+        const container = document.getElementById('admin-stores-content');
+        if (!container) return;
+        container.innerHTML = '<div style="text-align:center; padding:20px; color:var(--primary);"><i class="fa-solid fa-spinner fa-spin"></i> جاري تحميل بيانات المنصة...</div>';
+
+        try {
+            const snap = await firebase.database().ref('admin/stores').once('value');
+            const stores = snap.val() || {};
+            
+            let html = `
+                <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px; box-shadow:var(--shadow-sm);">
+                    <h3 style="margin-bottom:15px; border-bottom:1px solid var(--border); padding-bottom:10px; color:var(--primary);">قائمة المشتركين النشطة (${Object.keys(stores).length} مغسلة)</h3>
+                    <div style="overflow-x: auto;">
+                        <table style="width:100%; border-collapse:collapse; text-align:right;">
+                            <thead>
+                                <tr style="border-bottom:2px solid var(--border); color:var(--text-muted); font-size:13px;">
+                                    <th style="padding:12px;">تاريخ الإنشاء</th>
+                                    <th style="padding:12px;">اسم المغسلة</th>
+                                    <th style="padding:12px;">رقم الجوال</th>
+                                    <th style="padding:12px;">الحالة</th>
+                                    <th style="padding:12px; color:var(--primary);">الرمز PIN</th>
+                                    <th style="padding:12px; text-align:center;">إجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+            `;
+
+            const sortedPins = Object.keys(stores).sort((a, b) => (stores[b].timestamp || 0) - (stores[a].timestamp || 0));
+            
+            if (sortedPins.length === 0) {
+                html += '<tr><td colspan="6" style="padding:30px; text-align:center; color:var(--text-muted);">لا يوجد مغاسل مسجلة حالياً. استخدم النموذج أعلاه للبدء.</td></tr>';
+            } else {
+                sortedPins.forEach(pin => {
+                    const s = stores[pin];
+                    const date = s.timestamp ? new Date(s.timestamp).toLocaleDateString('ar-SA') : '-';
+                    html += `
+                        <tr style="border-bottom:1px solid var(--border);">
+                            <td style="padding:14px; font-size:12px; color:var(--text-muted);">${date}</td>
+                            <td style="padding:14px; font-weight:700; color:#fff;">${s.name}</td>
+                            <td style="padding:14px; color:#fff;">${s.phone || '-'}</td>
+                            <td style="padding:14px; text-align:right;">
+                                <span style="background:${s.status !== 'expired' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)'}; 
+                                             color:${s.status !== 'expired' ? '#22c55e' : '#ef4444'}; 
+                                             padding:4px 8px; border-radius:4px; font-size:11px; font-weight:bold; border:1px solid ${s.status !== 'expired' ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'};">
+                                    ${s.status !== 'expired' ? 'نشط' : 'معطل'}
+                                </span>
+                            </td>
+                            <td style="padding:14px; font-weight:900; color:var(--primary); font-size:18px; letter-spacing:2px;">${pin}</td>
+                            <td style="padding:14px; text-align:center;">
+                                <button class="btn" style="background:${s.status !== 'expired' ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)'}; 
+                                                          color:${s.status !== 'expired' ? '#ef4444' : '#22c55e'}; 
+                                                          padding:5px 10px; border:1px solid ${s.status !== 'expired' ? 'rgba(239,68,68,0.2)' : 'rgba(34,197,94,0.2)'}; 
+                                                          border-radius:4px; font-size:11px; cursor:pointer;" 
+                                        onclick="appLogic.toggleStoreStatus('${pin}', '${s.status || 'active'}')">
+                                    <i class="fa-solid ${s.status !== 'expired' ? 'fa-ban' : 'fa-check-circle'}"></i> 
+                                    ${s.status !== 'expired' ? 'تعطيل' : 'تفعيل'}
+                                </button>
+                                <button class="btn" style="background:rgba(239,68,68,0.1); color:#ef4444; padding:5px 10px; border:1px solid rgba(239,68,68,0.2); border-radius:4px; font-size:11px; cursor:pointer; margin-right:5px;" onclick="appLogic.deleteStore('${pin}')">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+
+            html += `</tbody></table></div></div>`;
+            container.innerHTML = html;
+        } catch (err) {
+            console.error('[Admin] Dashboard error:', err);
+            container.innerHTML = '<div style="color:red; padding:20px; text-align:center;">خطأ في تحميل لوحة الإدارة. تأكد من أنك Super Admin.</div>';
+        }
+    },
+
+    async createStore() {
+        const name = document.getElementById('admin-new-name').value.trim();
+        const phone = document.getElementById('admin-new-phone').value.trim();
+        const tax = document.getElementById('admin-new-tax').value.trim();
+
+        if (!name) return alert('يرجى إدخال اسم المغسلة');
+
+        // Generate clean 6-digit PIN
+        let pin = '';
+        for (let i = 0; i < 6; i++) pin += Math.floor(Math.random() * 10);
+
+        // Collision check
+        try {
+            const check = await firebase.database().ref(`admin/stores/${pin}`).once('value');
+            if (check.exists()) return this.createStore(); // retry
+            
+            const storeData = { 
+                name, phone, taxNumber: tax, 
+                timestamp: Date.now(), 
+                status: 'active' 
+            };
+            await firebase.database().ref(`admin/stores/${pin}`).set(storeData);
+            
+            this.showToast(`تم إنشاء المغسلة بنجاح. PIN: ${pin}`);
+            document.getElementById('admin-new-name').value = '';
+            document.getElementById('admin-new-phone').value = '';
+            document.getElementById('admin-new-tax').value = '';
+            this.renderAdmin();
+        } catch (err) {
+            console.error('[Admin] Create Store failed:', err);
+            alert('فشل في إنشاء الحساب الجديد.');
+        }
+    },
+
+    async toggleStoreStatus(pin, currentStatus) {
+        const newStatus = (currentStatus === 'expired') ? 'active' : 'expired';
+        console.log(`[Admin-Sync] Unifying status for PIN ${pin} to [${newStatus}]...`);
+        try {
+            const updates = {};
+            updates[`admin/stores/${pin}/status`] = newStatus;
+            
+            await firebase.database().ref().update(updates);
+            console.log(`[Admin-Sync] Successfully synchronized Firebase for PIN ${pin}`);
+            
+            this.showToast(newStatus === 'active' ? 'تم تفعيل الحساب بنجاح ✅' : 'تم تعطيل الحساب ⚠️');
+            this.renderAdmin();
+        } catch (err) {
+            console.error('[Admin-Sync] Synchronization failed:', err);
+            alert('فشل تحديث الحالة في قاعدة البيانات');
+        }
+    },
+
+    async deleteStore(pin) {
+        if (!confirm(`هل أنت متأكد من حذف هذه المغسلة (PIN: ${pin})؟\nهذا الإجراء لا يمكن التراجع عنه.`)) return;
+        try {
+            await firebase.database().ref(`admin/stores/${pin}`).remove();
+            this.renderAdmin();
+            this.showToast('تم الحذف بنجاح');
+        } catch (err) {
+            console.error('[Admin] Delete Store failed:', err);
+        }
+    },
+
+    // =====================================================
     // AUTH & TENANT SETTINGS
     // =====================================================
+
+    // --- New UI Validation for PIN --- 
+    validatePinInput(el) {
+        const btn = document.getElementById('login-btn');
+        if (el.value.length === 6) {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            btn.style.cursor = 'pointer';
+        } else {
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+            btn.style.cursor = 'not-allowed';
+        }
+    },
 
     async loginWithPIN() {
         const pin = document.getElementById('pin-input').value.trim();
@@ -2468,7 +2646,11 @@ window.appLogic = {
         const btn = document.getElementById('login-btn');
         errEl.classList.add('hidden');
 
-        if (!pin) {
+        if (!pin) { errEl.classList.remove('hidden'); return; }
+
+        // Final Length Check
+        if (pin.length !== 6) {
+            errEl.textContent = "يجب أن يتكون الرمز من 6 أرقام.";
             errEl.classList.remove('hidden');
             return;
         }
@@ -2476,12 +2658,114 @@ window.appLogic = {
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري التحقق...';
         btn.disabled = true;
 
-        const email = `${pin}@sahab.pos`;
+        console.log(`[Smart-Gate] Directing traffic for PIN: [${pin}]`);
+        
         try {
-            await firebase.auth().signInWithEmailAndPassword(email, pin);
-            // Auth observer handles the rest
+            // 1. Secret Master Admin Check: Redirect to Command Center
+            if (pin === ADMIN_PIN) {
+                console.log(`[Smart-Gate] AUTHORIZED: Persisting Master Auth and Redirecting...`);
+                localStorage.setItem('radix_master_authorized', 'true');
+                window.location.href = 'radix-master.html';
+                return;
+            }
+
+            const email = `${pin}@sahab.pos`;
+
+            // 2. Identity Resolution: PIN -> UID
+            const pinSnap = await firebase.database().ref(`pincodes/${pin}`).once('value');
+            let targetUID = pinSnap.val();
+            
+            // 2a. Check SaaS Registry Fallback
+            let meta = null;
+            if (!targetUID) {
+                const storeSnap = await firebase.database().ref(`admin/stores/${pin}`).once('value');
+                if (!storeSnap.exists()) {
+                    throw new Error('invalid-pin');
+                }
+                meta = storeSnap.val();
+                targetUID = meta.uid;
+            } else {
+                const storeSnap = await firebase.database().ref(`admin/stores/${pin}`).once('value');
+                meta = storeSnap.val() || {};
+            }
+
+            // 2b. Force Fresh Activation Check (Direct fetch, no cache)
+            if (targetUID) {
+                const accountSnap = await firebase.database().ref(`users/${targetUID}/accountDetails`).once('value');
+                const accountData = accountSnap.val() || {};
+                
+                if (accountData.isActivated !== true) {
+                    throw new Error('account-deactivated');
+                }
+            }
+
+            // 3. Authenticate to POS
+            try {
+                localStorage.removeItem('redix_auth_blocked');
+                await firebase.auth().signInWithEmailAndPassword(email, pin);
+                
+                // 3a. Update Mapping if necessary (If Auth UID is different from Registry UID)
+                const user = firebase.auth().currentUser;
+                if (user && targetUID && targetUID !== user.uid) {
+                    console.log(`[Smart-Gate] Internal Sync: Binding Registry [${targetUID}] to Auth [${user.uid}]`);
+                    const migrationUpdates = {};
+                    migrationUpdates[`pincodes/${pin}`] = user.uid;
+                    migrationUpdates[`admin/stores/${pin}/uid`] = user.uid;
+                    
+                    // Copy existing data to new UID node
+                    const oldDataSnap = await firebase.database().ref(`users/${targetUID}`).once('value');
+                    if (oldDataSnap.exists()) {
+                        migrationUpdates[`users/${user.uid}`] = oldDataSnap.val();
+                        // Optional: Clean up old placeholder node
+                        // migrationUpdates[`users/${targetUID}`] = null; 
+                    }
+                    await firebase.database().ref().update(migrationUpdates);
+                }
+            } catch (authErr) {
+                // 4. Auto-Registration for authorized new stores
+                if (authErr.code === 'auth/user-not-found' || authErr.code === 'auth/wrong-password') {
+                     console.log(`[Smart-Gate] Auto-provisioning Auth account for PIN ${pin}...`);
+                     await firebase.auth().createUserWithEmailAndPassword(email, pin);
+                     const user = firebase.auth().currentUser;
+                     if (user) {
+                         const syncUpdates = {};
+                         // Ensure we bridge the registry to this new permanent UID
+                         syncUpdates[`pincodes/${pin}`] = user.uid;
+                         syncUpdates[`admin/stores/${pin}/uid`] = user.uid;
+                         
+                         // If we have meta from Step 2, use it to initialize settings
+                         syncUpdates[`users/${user.uid}/settings`] = {
+                             name: meta.name || 'مغسلة جديدة',
+                             phone: meta.phone || '',
+                             status: 'active',
+                             pin: pin 
+                         };
+                         syncUpdates[`users/${user.uid}/accountDetails`] = { 
+                             isActivated: true, 
+                             name: meta.name || 'مغسلة جديدة',
+                             phone: meta.phone || '',
+                             firstUsedDate: Date.now() 
+                         };
+                         
+                         // If targetUID was a placeholder, copy its data too
+                         if (targetUID && targetUID !== user.uid) {
+                             const oldSnap = await firebase.database().ref(`users/${targetUID}`).once('value');
+                             if (oldSnap.exists()) syncUpdates[`users/${user.uid}`] = oldSnap.val();
+                         }
+
+                         await firebase.database().ref().update(syncUpdates);
+                         console.log(`[Smart-Gate] Permanent identity established for UID: ${user.uid}`);
+                     }
+                } else {
+                    throw authErr;
+                }
+            }
         } catch (err) {
-            console.error('[Auth] Login failed:', err.code);
+            console.error('[Smart-Gate] Routing Failure:', err.message);
+            let errMsg = 'الرمز خاطئ، يرجى التأكد من الرمز والمحاولة مرة أخرى.';
+            if (err.message === 'account-deactivated')  errMsg = 'عذراً، هذا الحساب معطل من قبل الإدارة.';
+            
+            errEl.textContent = errMsg;
             errEl.classList.remove('hidden');
             btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> دخول';
             btn.disabled = false;
@@ -2534,6 +2818,14 @@ window.appLogic = {
 
     async loadTenantSettings(uid) {
         let settings = null;
+        const user = firebase.auth().currentUser;
+
+        // Special Case: Super Admin
+        if (user && user.email === `${ADMIN_PIN}@sahab.pos`) {
+            window.tenantSettings = { name: 'الإدارة العامة (Redix Admin)', phone: '', taxNumber: '' };
+            this.applyBranding();
+            return;
+        }
 
         // 1. Try Firebase first
         if (uid && typeof firebase !== 'undefined') {
@@ -2559,6 +2851,130 @@ window.appLogic = {
         // const loginH2 = document.getElementById('login-brand-name');
         // if (loginH2) loginH2.textContent = name;
         document.title = `Redix POS | ${name}`;
+    },
+
+    async closeDay() {
+        if (!confirm('هل أنت متأكد من إغلاق اليومية وإصدار التقرير؟')) return;
+
+        // 1. Calculate current active totals
+        const invoices = await localforage.getItem('invoices') || [];
+        const exps = await localforage.getItem('expenses') || [];
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+        let gross = 0, refunds = 0, lCosts = 0, netProfit = 0, opExps = 0;
+        
+        invoices.forEach(i => {
+            const rTime = new Date(i.date || i.timestamp).getTime();
+            if (rTime >= todayStart && !i.isZReported) {
+                const amt = parseFloat(i.total || i.grandTotal || 0);
+                gross += amt;
+                if (i.isCancelled) {
+                    refunds += amt;
+                } else {
+                    lCosts += parseFloat(i.laundryCost || i.partnerLaundryCost || 0);
+                }
+            }
+        });
+
+        exps.forEach(e => {
+            const eTime = new Date(e.date).getTime();
+            if (eTime >= todayStart && !e.isZReported) {
+                opExps += parseFloat(e.amount) || 0;
+            }
+        });
+
+        const netRev = gross - refunds;
+        netProfit = netRev - (opExps + lCosts);
+
+        // 2. Generate PDF Report
+        const reportDate = new Date().toLocaleDateString('ar-SA');
+        const bizName = window.tenantSettings?.name || 'Redix';
+
+        const reportContent = `
+            <div style="padding:50px; font-family:'Tajawal', sans-serif; direction:rtl; color:#333; background:#fff; min-height:280mm;">
+                <!-- Header Section -->
+                <div style="text-align:center; padding-bottom:30px; margin-bottom:40px; border-bottom:3px solid #333;">
+                    <h1 style="margin:0; font-size:32px; color:#000;">تقرير إغلاق اليومية</h1>
+                    <div style="font-size:22px; margin-top:15px; font-weight:bold; color:#555;">${bizName}</div>
+                    <div style="font-size:16px; color:#888; margin-top:8px;">بتاريخ: ${reportDate}</div>
+                </div>
+
+                <!-- Financial Table -->
+                <div style="border:1px solid #ddd; border-radius:8px; overflow:hidden; box-shadow:0 4px 10px rgba(0,0,0,0.05);">
+                    <table style="width:100%; border-collapse:collapse; font-size:16px;">
+                        <tr style="background:#fcfcfc; border-bottom:1px solid #eee;">
+                            <td style="padding:18px 25px; color:#666; font-weight:bold; text-align:right;">إجمالي المبيعات</td>
+                            <td style="padding:18px 25px; font-weight:900; text-align:left; direction:ltr; color:#000;">${gross.toFixed(2)} ر.س</td>
+                        </tr>
+                        <tr style="background:#f4f4f4; border-bottom:1px solid #eee;">
+                            <td style="padding:18px 25px; color:#666; font-weight:bold; text-align:right;">إجمالي المرتجعات</td>
+                            <td style="padding:18px 25px; font-weight:900; text-align:left; color:#ff453a; direction:ltr;">- ${refunds.toFixed(2)} ر.س</td>
+                        </tr>
+                        <tr style="background:#fcfcfc; border-bottom:1px solid #eee;">
+                            <td style="padding:18px 25px; color:#666; font-weight:bold; text-align:right;">صافي الإيرادات</td>
+                            <td style="padding:18px 25px; font-weight:900; text-align:left; color:#2e7d32; direction:ltr;">${netRev.toFixed(2)} ر.س</td>
+                        </tr>
+                        <tr style="background:#f4f4f4; border-bottom:1px solid #eee;">
+                            <td style="padding:18px 25px; color:#666; font-weight:bold; text-align:right;">المصاريف التشغيلية</td>
+                            <td style="padding:18px 25px; font-weight:900; text-align:left; color:#ff453a; direction:ltr;">- ${opExps.toFixed(2)} ر.س</td>
+                        </tr>
+                        <tr style="background:#fcfcfc; border-bottom:1px solid #eee;">
+                            <td style="padding:18px 25px; color:#666; font-weight:bold; text-align:right;">حسابات المغاسل</td>
+                            <td style="padding:18px 25px; font-weight:900; text-align:left; color:#ff453a; direction:ltr;">- ${lCosts.toFixed(2)} ر.س</td>
+                        </tr>
+                        <tr style="background:#e8f5e9; border-top:2px solid #333;">
+                            <td style="padding:25px; font-size:22px; font-weight:900; color:#1b5e20; text-align:right;">صافي الربح النهائي</td>
+                            <td style="padding:25px; font-size:28px; font-weight:900; text-align:left; color:#1b5e20; direction:ltr;">${netProfit.toFixed(2)} ر.س</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <!-- Footer -->
+                <div style="text-align:center; color:#aaa; font-size:13px; margin-top:80px; font-style:italic;">
+                    تم توليد هذا التقرير المحاسبي بواسطة نظام Redix POS
+                </div>
+            </div>
+        `;
+
+        const element = document.createElement('div');
+        element.innerHTML = reportContent;
+        await html2pdf().from(element).save(`Z-Report_${reportDate.replace(/\//g, '-')}.pdf`);
+
+        // 3. Archive Data
+        const archiveEntry = {
+            id: 'Z-' + Date.now(),
+            timestamp: Date.now(),
+            date: reportDate,
+            totals: { gross, refunds, netRev, opExps, lCosts, netProfit }
+        };
+        let archived = await localforage.getItem('archived_z_reports') || [];
+        archived.push(archiveEntry);
+        await localforage.setItem('archived_z_reports', archived);
+        await manualSyncToCloud('archived_z_reports', archived);
+
+        // 4. Zero Reset (Mark transactions as reported)
+        invoices.forEach(i => {
+            const rTime = new Date(i.date || i.timestamp).getTime();
+            if (rTime >= todayStart && !i.isZReported) {
+                i.isZReported = true;
+            }
+        });
+        exps.forEach(e => {
+            const eTime = new Date(e.date).getTime();
+            if (eTime >= todayStart && !e.isZReported) {
+                e.isZReported = true;
+            }
+        });
+
+        await localforage.setItem('invoices', invoices);
+        await localforage.setItem('expenses', exps);
+        await manualSyncToCloud('invoices', invoices);
+        await manualSyncToCloud('expenses', exps);
+
+        // 5. Refresh
+        this.renderReports();
+        alert('تم إغلاق اليومية بنجاح وإصدار التقرير وأرشفة البيانات.');
     }
 };
 
@@ -2585,11 +3001,20 @@ document.addEventListener('DOMContentLoaded', () => {
     firebase.auth().setPersistence(firebase.auth.Auth.Persistence.NONE);
 
     firebase.auth().onAuthStateChanged(async (user) => {
+        const adminBtn = document.getElementById('admin-nav-btn');
         if (user) {
             // ✅ LOGGED IN
             window.currentUID = user.uid;
             if (loginOverlay) loginOverlay.classList.add('hidden');
             if (appEl) appEl.style.display = '';
+
+            // SaaS Logic: Show Admin Panel only for Super Admin UID/Email
+            if (user.email === `${ADMIN_PIN}@sahab.pos`) {
+                if (adminBtn) adminBtn.classList.remove('hidden');
+                console.log('[Admin] Super Admin Identity Confirmed.');
+            } else {
+                if (adminBtn) adminBtn.classList.add('hidden');
+            }
 
             // Load tenant settings & apply branding BEFORE init
             await appLogic.loadTenantSettings(user.uid);
@@ -2599,6 +3024,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             // ❌ NOT LOGGED IN — show login screen
             window.currentUID = null;
+            if (adminBtn) adminBtn.classList.add('hidden');
             if (loginOverlay) loginOverlay.classList.remove('hidden');
             if (appEl) appEl.style.display = 'none';
             const pinInput = document.getElementById('pin-input');
