@@ -815,7 +815,8 @@ window.appLogic = {
         document.getElementById('invoice-preview-container').innerHTML = this.generateThermalHTML(invoiceData, 'preview-qr-render');
 
         // Render QR in Preview (ZATCA Base64 TLV Format)
-        const zatcaQRBase64 = zatcaEncoder.generateZATCA_QR("غسلة سحاب", "000000000000000", invoiceData.timestamp, invoiceData.grandTotal, invoiceData.vatAmount);
+        const bizNamePreview = window.tenantSettings?.name || 'Redix';
+        const zatcaQRBase64 = zatcaEncoder.generateZATCA_QR(bizNamePreview, window.tenantSettings?.taxNumber || "000000000000000", invoiceData.timestamp, invoiceData.grandTotal, invoiceData.vatAmount);
 
         new QRCode(document.getElementById('preview-qr-render'), {
             text: zatcaQRBase64,
@@ -973,11 +974,14 @@ window.appLogic = {
         if (!this.currentInvoice) return;
 
         const data = this.currentInvoice;
-        const dStr = new Date(data.timestamp).toLocaleDateString('ar-SA', { year: 'numeric', month: '2-digit', day: '2-digit' });
+        const dObj = new Date(data.timestamp);
+        const dStrHijri = dObj.toLocaleDateString('ar-SA', { year: 'numeric', month: '2-digit', day: '2-digit' });
+        const dStrGregorian = dObj.toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
+        const dStr = `${dStrHijri} / ${dStrGregorian}`;
 
         // WhatsApp link helper — formats Saudi numbers to wa.me/966xxxxxxxxx
         const _waLink = (phone, display) => {
-            if (!phone || phone === '0000000000') return display || '-';
+            if (!phone || phone === '0000000000') return '-';
             let digits = phone.replace(/\D/g, '');
             if (digits.startsWith('966')) { /* already international */ }
             else if (digits.startsWith('0')) digits = '966' + digits.slice(1);
@@ -988,13 +992,15 @@ window.appLogic = {
 
         const _vatAmt   = parseFloat(data.vatAmount || 0);
         const _delivery = parseFloat(data.deliveryFee || 0);
-        const _itemsSum = data.items.reduce((a, it) => a + (it.unitPrice * it.qty), 0);
-        const _combined = _itemsSum + _delivery;
-        const _grand    = parseFloat(data.grandTotal || data.total || (_combined + _vatAmt));
+        const _grand    = parseFloat(data.grandTotal || data.total || 0);
+        const _subtotal = _grand - _vatAmt;
         const _storeTax = window.tenantSettings?.taxNumber
             ? `<p style="margin:2px 0; font-size:14px; color:#444;">الرقم الضريبي: &nbsp;&nbsp; <strong style="direction:ltr; display:inline-block;">${window.tenantSettings.taxNumber}</strong></p>` : '';
         const _storeWA  = window.tenantSettings?.phone
             ? `<p style="margin:2px 0; font-size:14px; color:#444;">رقم جوال النشاط: &nbsp;&nbsp; <strong style="direction:ltr; display:inline-block;">${window.tenantSettings.phone}</strong></p>` : '';
+        const _storeAddress = window.tenantSettings?.address
+            ? `<p style="margin:2px 0; font-size:14px; color:#444;">العنوان: &nbsp;&nbsp; <strong style="direction:rtl; display:inline-block;">${window.tenantSettings.address}</strong></p>`
+            : `<p style="margin:2px 0; font-size:14px; color:#444;">العنوان: &nbsp;&nbsp; <strong style="direction:rtl; display:inline-block;">المملكة العربية السعودية</strong></p>`;
         const _invType  = _vatAmt > 0 ? 'فاتورة ضريبية مبسطة' : 'فاتورة';
 
         let _itemRows = '', _rn = 1;
@@ -1033,6 +1039,7 @@ window.appLogic = {
             <!-- Header: Store Name → VAT Number → Phone -->
             <div style="text-align:center; margin-bottom:30px; padding-bottom:20px; border-bottom:2px solid #000;">
                 <div style="font-size:32px; font-weight:900; color:#000; margin-top:6px; margin-bottom:14px;">${window.tenantSettings?.name || 'Redix'}</div>
+                ${_storeAddress}
                 ${_storeTax}
                 ${_storeWA}
                 <div style="margin-top:14px; font-size:16px; font-weight:bold; color:#000;">${_invType}</div>
@@ -1072,7 +1079,7 @@ window.appLogic = {
                 <table dir="rtl" style="border-collapse:collapse; font-size:14px; min-width:310px;">
                     <tr>
                         <td style="padding:6px 0; color:#555;">المجموع بدون ضريبة</td>
-                        <td style="padding:6px 0; padding-right:20px; font-weight:bold; direction:ltr; text-align:left;">${_combined.toFixed(2)} ر.س</td>
+                        <td style="padding:6px 0; padding-right:20px; font-weight:bold; direction:ltr; text-align:left;">${_subtotal.toFixed(2)} ر.س</td>
                     </tr>
                     <tr>
                         <td style="padding:6px 0; color:#555;">ضريبة القيمة المضافة 15٪</td>
@@ -1096,9 +1103,9 @@ window.appLogic = {
 
         document.body.appendChild(container);
 
-        // Standard ZATCA QR (Updated with zero tax)
+        // Standard ZATCA QR (Updated with Real Tax)
         const bizName = window.tenantSettings?.name || 'Redix';
-        const zatcaQRBase64 = zatcaEncoder.generateZATCA_QR(bizName, window.tenantSettings?.taxNumber || "000000000000000", data.timestamp, data.grandTotal, 0);
+        const zatcaQRBase64 = zatcaEncoder.generateZATCA_QR(bizName, window.tenantSettings?.taxNumber || "000000000000000", data.timestamp, data.grandTotal, data.vatAmount);
         new QRCode(container.querySelector('#pdf-qr-container'), {
             text: zatcaQRBase64,
             width: 140, height: 140,
@@ -1170,7 +1177,10 @@ window.appLogic = {
 
     // HTML Generator for Thermal Receipt (Zero Ink — white background, RTL Arabic)
     generateThermalHTML(data, qrContainerId) {
-        const dStr = new Date(data.timestamp).toLocaleString('ar-SA');
+        const dObj = new Date(data.timestamp);
+        const dStrHijri = dObj.toLocaleDateString('ar-SA', { year: 'numeric', month: '2-digit', day: '2-digit' });
+        const dStrGregorian = dObj.toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
+        const dStr = `${dStrHijri} / ${dStrGregorian}`;
         const vatAmount  = parseFloat(data.vatAmount  || 0);
         const deliveryFee = parseFloat(data.deliveryFee || 0);
         const grandTotal  = parseFloat(data.grandTotal  || data.total || 0);
@@ -1178,7 +1188,7 @@ window.appLogic = {
 
         // WhatsApp link helper — formats Saudi numbers to wa.me/966xxxxxxxxx
         const _waLink = (phone, display) => {
-            if (!phone || phone === '0000000000') return display || '-';
+            if (!phone || phone === '0000000000') return '-';
             let digits = phone.replace(/\D/g, '');
             if (digits.startsWith('966')) { /* already international */ }
             else if (digits.startsWith('0')) digits = '966' + digits.slice(1);
@@ -1214,6 +1224,9 @@ window.appLogic = {
             ? `<p style="margin:0;"><span class="label">رقم جوال النشاط:</span> <span class="number">${window.tenantSettings.phone}</span></p>` : '';
         const storeTax = window.tenantSettings?.taxNumber
             ? `<p style="margin:0;"><span class="label">الرقم الضريبي:</span> <span class="number">${window.tenantSettings.taxNumber}</span></p>` : '';
+        const storeAddress = window.tenantSettings?.address
+            ? `<p style="margin:0;"><span class="label">العنوان:</span> <span class="number">${window.tenantSettings.address}</span></p>`
+            : `<p style="margin:0;"><span class="label">العنوان:</span> <span class="number">المملكة العربية السعودية</span></p>`;
 
         return `
         <style>
@@ -1227,6 +1240,7 @@ window.appLogic = {
             <!-- Header: Store Name → VAT Number → Phone -->
             <div class="receipt-header">
                 <div style="font-size:18px; font-weight:900; margin-bottom:4px;">${window.tenantSettings?.name || 'Redix'}</div>
+                ${storeAddress}
                 ${storeTax}
                 ${storePhone}
             </div>
@@ -1288,7 +1302,8 @@ window.appLogic = {
     printInvoice(data) {
         document.getElementById('invoice-print-container').innerHTML = this.generateThermalHTML(data, 'print-qr-render');
 
-        const zatcaQRBase64 = zatcaEncoder.generateZATCA_QR("غسلة سحاب", "000000000000000", data.timestamp, data.grandTotal, 0);
+        const bizName = window.tenantSettings?.name || 'Redix';
+        const zatcaQRBase64 = zatcaEncoder.generateZATCA_QR(bizName, window.tenantSettings?.taxNumber || "000000000000000", data.timestamp, data.grandTotal, data.vatAmount);
         new QRCode(document.getElementById('print-qr-render'), {
             text: zatcaQRBase64,
             width: 120, height: 120,

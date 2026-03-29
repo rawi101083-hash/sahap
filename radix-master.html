@@ -64,6 +64,16 @@
         .btn-suspend:hover { background: var(--danger); color: #fff; }
         .btn-activate { background: rgba(34,197,94,0.1); color: var(--success); border: 1px solid rgba(34,197,94,0.3); }
         .btn-activate:hover { background: var(--success); color: #fff; }
+
+        /* Mobile Responsiveness */
+        @media (max-width: 768px) {
+            #dashboard { padding: 20px; }
+            .header { flex-direction: column; align-items: flex-start; gap: 20px; }
+            .stats-grid { grid-template-columns: 1fr; }
+            table { display: block; overflow-x: auto; white-space: nowrap; }
+            .stat-card { padding: 15px; }
+            .stat-value { font-size: 28px; }
+        }
     </style>
 </head>
 <body>
@@ -90,8 +100,8 @@
                 <p style="color: var(--text-muted); font-size: 14px; margin-top: 5px;">Tenant Management & Kill Switch Controls</p>
             </div>
             <div>
-                <button onclick="masterApp.logout()" style="background: transparent; color: var(--text-muted); border: 1px solid var(--border); padding: 10px 20px; border-radius: 8px; cursor: pointer;">
-                    <i class="fa-solid fa-power-off"></i> Disconnect
+                <button onclick="masterApp.logout()" style="background: var(--danger); color: #fff; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold;">
+                    <i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج
                 </button>
             </div>
         </div>
@@ -220,8 +230,8 @@
             },
 
             logout() {
-                localStorage.removeItem('radix_master_authorized');
-                location.reload();
+                localStorage.clear();
+                window.location.href = 'index.html';
             },
 
             async fetchData() {
@@ -230,15 +240,10 @@
                 document.getElementById('loading-spinner').style.display = 'block';
 
                 try {
-                    // We now use 'admin/stores' as the Master Registry of licenses
-                    const storesSnap = await db.ref('admin/stores').once('value');
-                    const stores = storesSnap.val() || {};
-                    
-                    // We also fetch 'users' to get deeper account details if they exist
-                    const usersSnap = await db.ref('users').once('value');
-                    const users = usersSnap.val() || {};
-
-                    this.renderTable(stores, users);
+                    // treating /users as the primary source of truth for the dashboard
+                    const snap = await db.ref('users').once('value');
+                    const users = snap.val() || {};
+                    this.renderTable(users);
                 } catch (e) {
                     console.error("Firebase read error:", e);
                     alert("Error reaching Firebase. Check permissions.");
@@ -246,27 +251,26 @@
                 }
             },
 
-            renderTable(storesData, usersData) {
+            renderTable(usersData) {
                 const tbody = document.getElementById('tenants-table-body');
                 tbody.innerHTML = '';
                 let total = 0, active = 0, expired = 0;
 
-                Object.keys(storesData).forEach(pin => {
-                    total++;
-                    const store = storesData[pin];
-                    const uid = store.uid;
-                    const status = store.status || 'active';
+                Object.keys(usersData).forEach(uid => {
+                    const user = usersData[uid];
+                    const account = user.accountDetails || {};
+                    const settings = user.settings || {};
                     
-                    if (status === 'expired') expired++;
-                    else active++;
+                    // Specific mapping from user instructions
+                    const name = account.laundryName || account.name || settings.name || 'Unnamed';
+                    const phone = account.phone || settings.phone || '--';
+                    const isActivated = (account.isActivated === true);
+                    const pin = settings.pin || '--';
+                    const createdAt = account.firstUsedDate || null;
 
-                    // Enrich with real user data if available
-                    const realUser = usersData[uid] || {};
-                    const account = realUser.accountDetails || {};
-                    
-                    const name = store.name || account.name || 'Unnamed';
-                    const phone = store.phone || account.phone || '--';
-                    const createdAt = store.timestamp || account.firstUsedDate || null;
+                    total++;
+                    if (isActivated) active++;
+                    else expired++;
 
                     let dateStr = 'لم يسجل دخول بعد';
                     if (createdAt) {
@@ -276,17 +280,16 @@
                         } catch(e){}
                     }
 
-                    const isExpired = (status === 'expired');
-                    const badge = isExpired 
-                        ? '<span class="status-badge status-expired"><i class="fa-solid fa-ban"></i> Suspended</span>' 
-                        : '<span class="status-badge status-active"><i class="fa-solid fa-check"></i> Active</span>';
+                    const badge = isActivated 
+                        ? '<span class="status-badge status-active"><i class="fa-solid fa-check"></i> Active</span>' 
+                        : '<span class="status-badge status-expired"><i class="fa-solid fa-ban"></i> Suspended</span>';
 
-                    const actionBtn = isExpired
-                        ? `<button class="btn-action btn-activate" onclick="masterApp.toggleStatus('${uid}', 'active', '${pin}')"><i class="fa-solid fa-play"></i> Reactivate</button>`
-                        : `<button class="btn-action btn-suspend" onclick="masterApp.toggleStatus('${uid}', 'expired', '${pin}')"><i class="fa-solid fa-power-off"></i> Suspend</button>`;
+                    const actionBtn = !isActivated
+                        ? `<button class="btn-action btn-activate" onclick="masterApp.toggleStatus('${uid}', true, '${pin}')"><i class="fa-solid fa-play"></i> Reactivate</button>`
+                        : `<button class="btn-action btn-suspend" onclick="masterApp.toggleStatus('${uid}', false, '${pin}')"><i class="fa-solid fa-power-off"></i> Suspend</button>`;
 
                     const tr = document.createElement('tr');
-                    tr.style.opacity = isExpired ? '0.6' : '1';
+                    tr.style.opacity = !isActivated ? '0.6' : '1';
                     tr.innerHTML = `
                         <td dir="ltr" style="font-size:12px; color:#888;">${dateStr}</td>
                         <td style="font-weight:bold; color:#fff;">${name}</td>
@@ -343,13 +346,19 @@
                     updates[`admin/stores/${pin}`] = {
                         uid: newID, name, phone, status: 'active', timestamp
                     };
-                    // 3. User activation node
+                    // 3. User activation node - specifically using laundryName
                     updates[`users/${newID}/accountDetails`] = {
-                        name, phone, isActivated: true, firstUsedDate: timestamp
+                        laundryName: name, 
+                        phone: phone, 
+                        isActivated: true, 
+                        firstUsedDate: timestamp
                     };
                     // 4. User settings record
                     updates[`users/${newID}/settings`] = {
-                        name, phone, status: 'active', pin: pin
+                        name: name, 
+                        phone: phone, 
+                        status: 'active', 
+                        pin: pin
                     };
 
                     await db.ref().update(updates);
@@ -362,25 +371,27 @@
                 }
             },
 
-            async toggleStatus(uid, newStatus, pin) {
-                const confirmMsg = newStatus === 'expired' 
+            async toggleStatus(uid, shouldActivate, pin) {
+                const confirmMsg = !shouldActivate 
                     ? "WARNING: This will instantly lock out the tenant and block their POS. Proceed?"
                     : "This will restore full access to the tenant. Proceed?";
                 
                 if (!confirm(confirmMsg)) return;
 
                 try {
+                    const statusVal = shouldActivate ? 'active' : 'expired';
                     const updates = {};
                     if (uid && uid !== 'undefined') {
-                        updates[`users/${uid}/accountDetails/isActivated`] = (newStatus !== 'expired');
-                        updates[`users/${uid}/settings/status`] = newStatus;
+                        // Authority node update
+                        updates[`users/${uid}/accountDetails/isActivated`] = shouldActivate;
+                        updates[`users/${uid}/settings/status`] = statusVal;
                     }
                     if (pin) {
-                        updates[`admin/stores/${pin}/status`] = newStatus;
+                        updates[`admin/stores/${pin}/status`] = statusVal;
                     }
 
                     await db.ref().update(updates);
-                    console.log(`[Master-Sync] Successfully synchronized status for PIN: ${pin}`);
+                    console.log(`[Master-Sync] Status toggled for PIN: ${pin} (${shouldActivate})`);
                     
                     this.fetchData(); // Refresh UI
                 } catch (e) {
