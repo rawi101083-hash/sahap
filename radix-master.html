@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Radix Systems - Master Control</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-master: #0a0a0a;
+            --bg-card: #141414;
+            --primary: #f59e0b; /* Admin Gold */
+            --danger: #ef4444;
+            --success: #22c55e;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --border: #27272a;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Tajawal', sans-serif; }
+        body { background: var(--bg-master); color: var(--text-main); line-height: 1.6; }
+
+        .hidden { display: none !important; }
+
+        /* Login Screen */
+        #login-screen {
+            height: 100vh; width: 100vw; display: flex; flex-direction: column; justify-content: center; align-items: center;
+            background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%);
+        }
+        .login-box {
+            background: var(--bg-card); padding: 40px; border-radius: 12px; border: 1px solid var(--border);
+            text-align: center; width: 400px; box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+        }
+        .login-box input {
+            width: 100%; padding: 15px; background: #000; border: 1px solid var(--border); color: #fff; border-radius: 8px; font-size: 18px; text-align: center; margin-bottom: 20px; letter-spacing: 5px; font-family: monospace;
+        }
+        .login-box input:focus { border-color: var(--primary); outline: none; }
+        .btn-gold {
+            width: 100%; padding: 15px; background: var(--primary); color: #000; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s;
+        }
+        .btn-gold:hover { background: #d97706; transform: translateY(-2px); }
+
+        /* Dashboard */
+        #dashboard { padding: 40px; max-width: 1200px; margin: 0 auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; border-bottom: 1px solid var(--border); padding-bottom: 20px; }
+        
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 40px; }
+        .stat-card { background: var(--bg-card); padding: 25px; border-radius: 12px; border: 1px solid var(--border); text-align: center; }
+        .stat-value { font-size: 36px; font-weight: 900; color: var(--primary); margin: 10px 0; }
+        
+        table { width: 100%; border-collapse: collapse; background: var(--bg-card); border-radius: 12px; overflow: hidden; }
+        th, td { padding: 18px; text-align: right; border-bottom: 1px solid var(--border); }
+        th { background: #1a1a1a; color: var(--text-muted); font-size: 14px; font-weight: 700; }
+        tr:hover { background: rgba(255,255,255,0.02); }
+
+        .status-badge { padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; display: inline-block; }
+        .status-active { background: rgba(34,197,94,0.1); color: var(--success); border: 1px solid rgba(34,197,94,0.3); }
+        .status-expired { background: rgba(239,68,68,0.1); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); }
+
+        .btn-action { padding: 8px 16px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px; transition: 0.2s; }
+        .btn-suspend { background: rgba(239,68,68,0.1); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); }
+        .btn-suspend:hover { background: var(--danger); color: #fff; }
+        .btn-activate { background: rgba(34,197,94,0.1); color: var(--success); border: 1px solid rgba(34,197,94,0.3); }
+        .btn-activate:hover { background: var(--success); color: #fff; }
+    </style>
+</head>
+<body>
+
+    <!-- 1. LOGIN OVERLAY (Gated Access) -->
+    <div id="login-screen">
+        <div style="margin-bottom: 30px; text-align: center;">
+            <h1 style="color: var(--primary); font-size: 32px; font-weight: 900; letter-spacing: 2px;">RADIX MASTER</h1>
+            <p style="color: var(--text-muted); font-size: 14px; margin-top: 5px;">Classified Access Panel</p>
+        </div>
+        <div class="login-box">
+            <h3 style="margin-bottom: 25px; color: #fff;"><i class="fa-solid fa-fingerprint"></i> Authentication Required</h3>
+            <input type="password" id="master-pin" placeholder="••••••••" autocomplete="new-password">
+            <button class="btn-gold" onclick="masterApp.login()"><i class="fa-solid fa-unlock-keyhole"></i> AUTHORIZE</button>
+            <p id="login-error" style="color: var(--danger); font-size: 13px; margin-top: 15px; font-weight: bold; display: none;">Access Denied. Incorrect Signature.</p>
+        </div>
+    </div>
+
+    <!-- 2. MAIN DASHBOARD CONTENT -->
+    <div id="dashboard" class="hidden">
+        <div class="header">
+            <div>
+                <h1 style="color: #fff; font-size: 28px; font-weight: 900;"><i class="fa-solid fa-server" style="color: var(--primary); margin-left: 10px;"></i> Radix Command Center</h1>
+                <p style="color: var(--text-muted); font-size: 14px; margin-top: 5px;">Tenant Management & Kill Switch Controls</p>
+            </div>
+            <div>
+                <button onclick="location.reload()" style="background: transparent; color: var(--text-muted); border: 1px solid var(--border); padding: 10px 20px; border-radius: 8px; cursor: pointer;">
+                    <i class="fa-solid fa-power-off"></i> Disconnect
+                </button>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <i class="fa-solid fa-building" style="font-size: 30px; color: #3b82f6;"></i>
+                <div class="stat-value" id="stat-total" style="color: #3b82f6;">0</div>
+                <div style="color: var(--text-muted); font-size: 14px;">Total Tenants</div>
+            </div>
+            <div class="stat-card">
+                <i class="fa-solid fa-circle-check" style="font-size: 30px; color: var(--success);"></i>
+                <div class="stat-value" id="stat-active" style="color: var(--success);">0</div>
+                <div style="color: var(--text-muted); font-size: 14px;">Active Systems</div>
+            </div>
+            <div class="stat-card">
+                <i class="fa-solid fa-circle-xmark" style="font-size: 30px; color: var(--danger);"></i>
+                <div class="stat-value" id="stat-expired" style="color: var(--danger);">0</div>
+                <div style="color: var(--text-muted); font-size: 14px;">Suspended Systems</div>
+            </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 style="font-size: 20px; color: #fff;">Registered Nodes (Laundries)</h2>
+            <button onclick="masterApp.fetchData()" style="background: var(--primary); color: #000; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer;"><i class="fa-solid fa-rotate"></i> Refresh Network Data</button>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Node ID (UID)</th>
+                    <th>Business Name</th>
+                    <th>Phone</th>
+                    <th>Registration Date</th>
+                    <th>System Status</th>
+                    <th style="text-align: center;">Controls</th>
+                </tr>
+            </thead>
+            <tbody id="tenants-table-body">
+                <!-- Data injected via JS -->
+            </tbody>
+        </table>
+        <div id="loading-spinner" style="text-align: center; padding: 40px; color: var(--primary); font-size: 24px; display: none;">
+            <i class="fa-solid fa-circle-notch fa-spin"></i>
+        </div>
+    </div>
+
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-database-compat.js"></script>
+
+    <script>
+        // FIREBASE INITIALIZATION 
+        const firebaseConfig = {
+            apiKey: "AIzaSyBTE1YodqeIKjG-RBCe8pHbnRM7EQNSemU",
+            authDomain: "sahab-3089b.firebaseapp.com",
+            databaseURL: "https://sahab-3089b-default-rtdb.firebaseio.com",
+            projectId: "sahab-3089b",
+            storageBucket: "sahab-3089b.firebasestorage.app",
+            messagingSenderId: "236842364975",
+            appId: "1:236842364975:web:1ecd34c708e7a9096596da",
+            measurementId: "G-H5J0L3JN0J"
+        };
+        firebase.initializeApp(firebaseConfig);
+
+        const MASTER_PASSWORD = "RadixMaster2026"; // Hardcoded specific admin password
+        const db = firebase.database();
+
+        const masterApp = {
+            login() {
+                const pin = document.getElementById('master-pin').value;
+                if (pin === MASTER_PASSWORD) {
+                    document.getElementById('login-screen').classList.add('hidden');
+                    document.getElementById('dashboard').classList.remove('hidden');
+                    
+                    // We must trick Firebase into letting us read if rules are tight.
+                    // But usually admin needs auth. Since we don't know the exact Firebase Auth rules, 
+                    // we'll attempt an anonymous login or just fetch immediately.
+                    // If the Realtime DB is secure, this might require proper Firebase Auth Admin credentials.
+                    // We will attempt read directly first.
+                    this.fetchData();
+                } else {
+                    document.getElementById('login-error').style.display = 'block';
+                    document.getElementById('master-pin').value = '';
+                }
+            },
+
+            async fetchData() {
+                document.getElementById('tenants-table-body').innerHTML = '';
+                document.getElementById('loading-spinner').style.display = 'block';
+
+                try {
+                    const snap = await db.ref('users').once('value');
+                    const users = snap.val() || {};
+                    this.renderTable(users);
+                } catch (e) {
+                    console.error("Firebase read error:", e);
+                    alert("Error reaching Firebase. Make sure database rules allow read access, or you are signed into an authorized admin account.");
+                    document.getElementById('loading-spinner').style.display = 'none';
+                }
+            },
+
+            renderTable(usersData) {
+                const tbody = document.getElementById('tenants-table-body');
+                tbody.innerHTML = '';
+                let total = 0, active = 0, expired = 0;
+
+                Object.keys(usersData).forEach(uid => {
+                    total++;
+                    const user = usersData[uid];
+                    const settings = user.settings || {};
+                    const account = user.accountDetails || {};
+                    
+                    const name = settings.name || '<span style="color:#666">Unnamed Node</span>';
+                    const phone = settings.phone || '--';
+                    const status = settings.status || 'active'; // Default active
+                    
+                    if (status === 'expired') expired++;
+                    else active++;
+
+                    // Format Date
+                    let dateStr = 'Unknown';
+                    if (account.firstUsedDate) {
+                        try {
+                            const d = new Date(account.firstUsedDate);
+                            dateStr = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        } catch(e){}
+                    }
+
+                    const isExpired = (status === 'expired');
+                    const badge = isExpired 
+                        ? '<span class="status-badge status-expired"><i class="fa-solid fa-ban"></i> Suspended</span>' 
+                        : '<span class="status-badge status-active"><i class="fa-solid fa-check"></i> Active</span>';
+
+                    const actionBtn = isExpired
+                        ? `<button class="btn-action btn-activate" onclick="masterApp.toggleStatus('${uid}', 'active')"><i class="fa-solid fa-play"></i> Reactivate Node</button>`
+                        : `<button class="btn-action btn-suspend" onclick="masterApp.toggleStatus('${uid}', 'expired')"><i class="fa-solid fa-power-off"></i> Suspend Node</button>`;
+
+                    const tr = document.createElement('tr');
+                    tr.style.opacity = isExpired ? '0.6' : '1';
+                    tr.innerHTML = `
+                        <td style="font-family: monospace; color:#6b7280; font-size:12px;" dir="ltr">${uid.substring(0,8)}...</td>
+                        <td style="font-weight:bold; color:#fff;">${name}</td>
+                        <td dir="ltr" style="font-family: monospace;">${phone}</td>
+                        <td dir="ltr" style="font-size:12px; color:#888;">${dateStr}</td>
+                        <td>${badge}</td>
+                        <td style="text-align: center;">${actionBtn}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                document.getElementById('stat-total').innerText = total;
+                document.getElementById('stat-active').innerText = active;
+                document.getElementById('stat-expired').innerText = expired;
+                document.getElementById('loading-spinner').style.display = 'none';
+            },
+
+            async toggleStatus(uid, newStatus) {
+                const confirmMsg = newStatus === 'expired' 
+                    ? "WARNING: This will instantly lock out the tenant and block their POS. Proceed?"
+                    : "This will restore full access to the tenant. Proceed?";
+                
+                if (!confirm(confirmMsg)) return;
+
+                try {
+                    await db.ref(`users/${uid}/settings/status`).set(newStatus);
+                    this.fetchData(); // Refresh UI
+                } catch (e) {
+                    console.error("Failed to update status:", e);
+                    alert("Update failed. Permission denied.");
+                }
+            }
+        };
+
+        // Listen for Enter key on login
+        document.getElementById('master-pin').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') masterApp.login();
+        });
+    </script>
+</body>
+</html>

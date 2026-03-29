@@ -3,8 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>غسلة سحاب - نظام إدارة المبيعات</title>
+    <title>Redix POS | نظام ريدكس</title>
     
+    <!-- THEME INITIALIZATION: Prevents White Flash -->
+    <script>
+        (function() {
+            try {
+                const theme = localStorage.getItem('redix-theme') || 'dark';
+                if (theme === 'light') {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                } else {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                }
+            } catch (e) {}
+        })();
+    </script>
+    
+    <!-- Meta -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0a0a0a">
+
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,9 +40,9 @@
     <div id="login-overlay">
         <div class="login-card">
             <div class="login-logo">
-                <img src="logo.png" alt="Logo" onerror="this.style.display='none'">
-                <h2 id="login-brand-name">مغسلة جديدة</h2>
-                <p>نظام نقاط البيع</p>
+                <img src="logo.png" alt="Redix Logo" onerror="this.style.display='none'">
+                <h2 id="login-brand-name" style="margin-bottom: 5px;">تسجيل دخول نظام Redix</h2>
+
             </div>
             <div class="login-body">
                 <label>الرمز السري (PIN)</label>
@@ -41,10 +60,10 @@
         <!-- Header -->
         <header class="main-header no-print">
             <div class="logo-area">
-                <img src="logo.png" alt="غسلة سحاب" class="logo-icon" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' fill=\'%23FDB813\' viewBox=\'0 0 24 24\'><path d=\'M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM12 18H6c-2.21 0-4-1.79-4-4 0-2.05 1.53-3.76 3.56-3.97l1.07-.11.5-.95C8.08 7.14 9.94 6 12 6c2.62 0 4.88 1.86 5.39 4.43l.3 1.5 1.53.11c1.56.1 2.78 1.41 2.78 2.96 0 1.65-1.35 3-3 3h-2z\'/></svg>'">
+                <img src="logo.png" alt="Redix Logo" class="logo-icon" onerror="this.style.display='none'">
                 <div class="brand-text">
-                    <h1 id="header-brand-name">مغسلة جديدة</h1>
-                    <p>نظام نقاط البيع</p>
+                    <h1 id="header-brand-name">Redix POS</h1>
+                    <p>Redix POS</p>
                 </div>
             </div>
             <nav class="main-nav">
@@ -96,8 +115,9 @@
                     <div class="cart-header">
                         <h2>تفاصيل الطلب</h2>
                         <div class="customer-select">
-                            <input type="text" placeholder="اسم العميل" id="customer-name" autocomplete="off" oninput="appLogic.updateCustomerName(this.value)">
-                            <input type="text" placeholder="رقم جوال العميل" id="customer-phone" class="mt-2" onblur="appLogic.handleCustomerPhoneBlur(this.value)" autocomplete="off">
+                            <input type="text" placeholder="اسم العميل (اختياري)" id="customer-name" autocomplete="off" oninput="appLogic.updateCustomerName(this.value)">
+                            <input type="tel" placeholder="رقم الجوال (اختياري)" id="customer-phone" class="mt-2" inputmode="numeric" maxlength="10" oninput="appLogic.validateSaudiPhone(this)" onblur="appLogic.handleCustomerPhoneBlur(this.value)" autocomplete="off">
+                            <span id="phone-error" style="display:none; color:#ef4444; font-size:12px; margin-top:4px; display:block;"></span>
                         </div>
                     </div>
                     
@@ -302,7 +322,8 @@
                             <h4 style="margin-top: 15px; margin-bottom: 10px; color: var(--text-muted); font-size: 14px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">إجراءات الفاتورة:</h4>
                             
                             <button class="btn btn-primary w-100" onclick="appLogic.printThermalReceipt()" style="font-size: 16px; padding: 15px; margin-bottom: 10px;"><i class="fa-solid fa-print"></i> <span>طباعة إيصال حراري (80mm)</span></button>
-                            <button class="btn w-100" style="background-color: var(--bg-elevated); color: var(--text-main); border: 1px solid var(--border); font-size: 15px;" onclick="appLogic.downloadDigitalPDF(event)"><i class="fa-solid fa-file-pdf"></i> تحميل الفاتورة الرقمية (PDF)</button>
+                            <button class="btn w-100" style="background-color: var(--bg-elevated); color: var(--text-main); border: 1px solid var(--border); font-size: 15px; margin-bottom: 10px;" onclick="appLogic.downloadDigitalPDF(event)"><i class="fa-solid fa-file-pdf"></i> تحميل الفاتورة الرقمية (PDF)</button>
+                            <button id="btn-whatsapp-share" class="btn w-100" style="background-color: transparent; color: #25D366; border: 1px solid #25D366; font-size: 15px; display:none;" onclick="appLogic.shareInvoiceWhatsApp()"><i class="fa-brands fa-whatsapp" style="font-size:18px;"></i> مشاركة عبر WhatsApp</button>
                         </div>
                     </div>
                 </div>
@@ -484,7 +505,15 @@
                 </div>
                 <div class="selector-group">
                     <label style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:13px; font-weight:700;">الرقم الضريبي (اختياري)</label>
-                    <input type="text" id="setting-tax" placeholder="300xxxxxxxxx" dir="ltr" style="width:100%; padding:12px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm); font-family:inherit; font-size:15px;">
+                    <input type="text" id="setting-tax" placeholder="300xxxxxxxxx" dir="ltr" style="width:100%; padding:12px; background:var(--bg-body); border:1px solid var(--border); color:var(--text-main); border-radius:var(--radius-sm); font-family:inherit; font-size:15px;">
+                </div>
+                <!-- Theme Toggle -->
+                <div class="selector-group" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border);">
+                    <label style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:13px; font-weight:700;">مظهر النظام (Theme)</label>
+                    <button class="btn w-100" id="theme-toggle-btn" onclick="appLogic.toggleTheme()" style="background:var(--bg-elevated); color:var(--text-main); border:1px solid var(--border); transition:0.3s; display:flex; justify-content:space-between; align-items:center; padding: 12px 18px;">
+                        <span>تبديل المظهر</span>
+                        <span id="theme-status-icon"><i class="fa-solid fa-sun"></i></span>
+                    </button>
                 </div>
                 <button class="btn btn-primary w-100" onclick="appLogic.saveTenantSettings()" style="margin-top:8px; font-size:16px;">
                     <i class="fa-solid fa-floppy-disk"></i> حفظ الإعدادات

@@ -4,26 +4,48 @@
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
 
 :root {
+    /* SHARED BRAND COLORS */
     --primary: #FDB813;
-    /* Gold/Yellow Accent */
     --primary-dark: #cc940f;
     --primary-light: #ffdc7a;
+    --danger: #ff453a;
+    --success: #4CAF50;
 
+    /* DARK THEME (Default - The 'Gold Standard') */
     --bg-body: #0a0a0a;
     --bg-surface: #121212;
     --bg-elevated: #1e1e1e;
-
     --text-main: #ffffff;
     --text-muted: #9e9e9e;
-
     --border: #333333;
-    --danger: #ff453a;
 
+    /* DARK MODE SHADOWS */
+    --shadow-sm: none;
+    --shadow-md: 0 8px 16px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 12px 24px rgba(0,0,0,0.6);
+    --shadow-xl: 0 20px 60px rgba(0, 0, 0, 0.8);
+
+    /* SHARED RADII & FONT */
     --radius-sm: 8px;
     --radius-md: 14px;
     --radius-lg: 24px;
-
     --font-family: 'Tajawal', sans-serif;
+}
+
+[data-theme="light"] {
+    /* LIGHT THEME (Override) */
+    --bg-body: #FFFFFF;
+    --bg-surface: #F8F9FA;
+    --bg-elevated: #FFFFFF;
+    --text-main: #333333;
+    --text-muted: #6C757D;
+    --border: #DEE2E6;
+    
+    /* LIGHT MODE SHADOWS (Apple Premium Style) */
+    --shadow-sm: 0 2px 8px rgba(0,0,0,0.05);
+    --shadow-md: 0 8px 16px rgba(0,0,0,0.08);
+    --shadow-lg: 0 12px 24px rgba(0,0,0,0.1);
+    --shadow-xl: 0 20px 40px rgba(0,0,0,0.12);
 }
 
 body,
@@ -102,13 +124,10 @@ button:active {
 }
 
 .logo-icon {
-    width: 44px;
-    height: 44px;
+    width: 48px;
+    height: 48px;
     object-fit: contain;
-    background: #222;
-    border-radius: 8px;
-    padding: 4px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    background: transparent;
 }
 
 .brand-text h1 {
@@ -144,13 +163,13 @@ button:active {
 
 .nav-btn:hover {
     color: var(--text-main);
-    background: #1a1a1a;
+    background: var(--bg-surface);
 }
 
 .nav-btn.active {
     background-color: var(--primary);
     color: #000;
-    box-shadow: 0 4px 12px rgba(253, 184, 19, 0.2);
+    box-shadow: 0 4px 12px rgba(253, 184, 19, 0.3);
 }
 
 /* Layout - Cart on Left */
@@ -219,7 +238,7 @@ button:active {
 
 .search-bar:focus-within {
     border-color: var(--primary);
-    box-shadow: 0 0 0 2px rgba(253, 184, 19, 0.2);
+    box-shadow: 0 0 0 3px rgba(253, 184, 19, 0.15);
 }
 
 .search-bar i {
@@ -240,8 +259,9 @@ button:active {
 }
 
 .search-bar input::placeholder {
-    color: #666;
+    color: var(--text-muted);
     text-align: right;
+    opacity: 0.6;
 }
 
 .category-filter {
@@ -264,9 +284,9 @@ button:active {
 }
 
 .btn-cat.active {
-    background: var(--text-main);
-    color: var(--bg-body);
-    border-color: var(--text-main);
+    background: var(--primary);
+    color: #000;
+    border-color: var(--primary);
 }
 
 .items-grid {
@@ -289,7 +309,7 @@ button:active {
     border-color: var(--primary);
     background: var(--bg-elevated);
     transform: translateY(-2px);
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
+    box-shadow: var(--shadow-md);
 }
 
 .item-icon {
@@ -350,6 +370,12 @@ button:active {
 
 .customer-select input::placeholder {
     color: #666;
+    text-align: right;
+}
+
+#customer-phone {
+    direction: rtl;
+    text-align: right;
 }
 
 .cart-items {
@@ -1429,7 +1455,7 @@ button:active {
     position: fixed;
     inset: 0;
     z-index: 99999;
-    background: #0a0a0a;
+    background: var(--bg-body);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1442,8 +1468,8 @@ button:active {
 }
 
 .login-card {
-    background: linear-gradient(135deg, #161616, #1e1e1e);
-    border: 1px solid rgba(253, 184, 19, 0.3);
+    background: var(--bg-elevated);
+    border: 1px solid var(--primary);
     border-radius: 20px;
     width: 360px;
     max-width: 90%;
@@ -1455,12 +1481,12 @@ button:active {
     padding: 32px 28px 20px;
     text-align: center;
     background: linear-gradient(180deg, rgba(253,184,19,0.07) 0%, transparent 100%);
-    border-bottom: 1px solid rgba(255,255,255,0.05);
+    border-bottom: 1px solid var(--border);
 }
 
 .login-logo img {
-    width: 68px;
-    height: 68px;
+    width: 80px;
+    height: 80px;
     object-fit: contain;
     margin-bottom: 12px;
 }
@@ -1498,10 +1524,10 @@ button:active {
     font-size: 22px;
     letter-spacing: 6px;
     text-align: center;
-    background: #0d0d0d;
+    background: var(--bg-body);
     border: 1.5px solid rgba(253, 184, 19, 0.25);
     border-radius: 10px;
-    color: #fff;
+    color: var(--text-main);
     font-family: 'Tajawal', sans-serif;
     box-sizing: border-box;
     transition: border-color 0.2s;

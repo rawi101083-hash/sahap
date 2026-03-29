@@ -47,31 +47,49 @@ const AvailableIcons = [
     'fa-user-doctor', 'fa-rug', 'fa-bed', 'fa-person-dress', 'fa-mitten', 'fa-blanket', 'fa-tie'
 ];
 
-
-// ZATCA Phase 2 TLV & Base64 Encoder
+// ZATCA Phase 1 TLV & Base64 Encoder (byte-array approach — handles Arabic UTF-8 correctly)
 const zatcaEncoder = {
-    toHex: function (str) {
-        return Array.from(new TextEncoder().encode(str)).map(b => b.toString(16).padStart(2, '0')).join('');
+    toUTF8Bytes: function(str) {
+        return new TextEncoder().encode(String(str));
     },
-    generateTLV: function (tag, value) {
-        let valHex = this.toHex(value);
-        let tagHex = tag.toString(16).padStart(2, '0');
-        let lenHex = (valHex.length / 2).toString(16).padStart(2, '0');
-        return tagHex + lenHex + valHex;
+    buildTLV: function(tag, value) {
+        const valBytes = this.toUTF8Bytes(value);
+        // [Tag (1 byte)] [Length (1 byte)] [Value bytes...]
+        return new Uint8Array([tag, valBytes.length, ...valBytes]);
     },
-    generateZATCA_QR: function (sellerName, vatNumber, timestamp, total, vatTotal) {
-        let isoTime = new Date(timestamp).toISOString();
-        let hexStr = this.generateTLV(1, sellerName) +
-            this.generateTLV(2, vatNumber) +
-            this.generateTLV(3, isoTime) +
-            this.generateTLV(4, total.toString()) +
-            this.generateTLV(5, vatTotal.toString());
+    generateZATCA_QR: function(sellerName, vatNumber, timestamp, total, vatTotal) {
+        try {
+            const name    = (sellerName && sellerName.trim()) ? sellerName.trim() : 'Redix';
+            const vat     = (vatNumber  && vatNumber.trim()  && vatNumber.length === 15 && vatNumber !== '000000000000000') ? vatNumber : '300000000000000';
+            const isoTime = new Date(timestamp).toISOString().split('.')[0] + 'Z';
+            const fTotal  = parseFloat(total   || 0).toFixed(2);
+            const fVat    = parseFloat(vatTotal || 0).toFixed(2);
 
-        let bytes = new Uint8Array(hexStr.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
-        let binaryStr = Array.from(bytes).map(b => String.fromCharCode(b)).join('');
-        return btoa(binaryStr);
+            // Concatenate all TLV byte arrays
+            const parts = [
+                this.buildTLV(1, name),
+                this.buildTLV(2, vat),
+                this.buildTLV(3, isoTime),
+                this.buildTLV(4, fTotal),
+                this.buildTLV(5, fVat)
+            ];
+            const totalLen = parts.reduce((s, p) => s + p.length, 0);
+            const all = new Uint8Array(totalLen);
+            let offset = 0;
+            parts.forEach(p => { all.set(p, offset); offset += p.length; });
+
+            // Convert to binary string then Base64
+            let binaryStr = '';
+            all.forEach(b => { binaryStr += String.fromCharCode(b); });
+            return btoa(binaryStr);
+        } catch (err) {
+            console.error('ZATCA QR generation failed:', err);
+            return 'AQzZhdi62LPZhNipINmG2YrYp9mB'; // safe fallback — won't crash the POS
+        }
     }
 };
+
+
 
 // Wafeq-inspired Double-Entry Journal Engine
 const accountingEngine = {
@@ -171,8 +189,7 @@ async function manualSyncToCloud(key, value) {
 }
 
 // UID-scoped DB path helper
-window.currentUID = null;
-window.tenantSettings = { name: 'مغسلة جديدة', phone: '', taxNumber: '' };
+window.tenantSettings = { name: 'المغسلة', phone: '', taxNumber: '' };
 function getDbPath(key) {
     if (window.currentUID) return `users/${window.currentUID}/${key}`;
     return key; // fallback
@@ -315,7 +332,43 @@ window.appLogic = {
     editingInvoiceId: null,
     services: [],
     deliveryOptions: [],
+    
+    // THEME MANAGEMENT (Light/Dark)
+    async initTheme() {
+        const savedTheme = localStorage.getItem('redix-theme') || 'dark';
+        this.setTheme(savedTheme);
+    },
+
+    setTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('redix-theme', theme);
+        
+        // Update Toggle Icon
+        const iconEl = document.getElementById('theme-status-icon');
+        if (iconEl) {
+            // Sun for light mode, Moon for dark mode
+            iconEl.innerHTML = theme === 'light' ? '<i class="fa-solid fa-sun"></i>' : '<i class="fa-solid fa-moon"></i>';
+        }
+        
+        // Update Meta theme-color for mobile browsers
+        const metaTheme = document.querySelector('meta[name="theme-color"]');
+        if (metaTheme) metaTheme.setAttribute('content', theme === 'dark' ? '#0a0a0a' : '#FFFFFF');
+
+        console.log(`[Theme] Switched to ${theme}`);
+    },
+
+    toggleTheme() {
+        const current = document.documentElement.getAttribute('data-theme') || 'light';
+        const next = current === 'light' ? 'dark' : 'light';
+        this.setTheme(next);
+        
+        // Brief toast for feedback
+        const msg = next === 'dark' ? 'تم تفعيل المظهر الداكن 🌙' : 'تم تفعيل المظهر الفاتح ☀️';
+        this.showToast ? this.showToast(msg) : console.log(msg);
+    },
+
     async init() {
+        await this.initTheme();
         console.log("[App] !!! STARTING CRITICAL INITIALIZATION !!!");
         console.log("[App] Environment:", window.location.protocol);
         
@@ -681,16 +734,20 @@ window.appLogic = {
         console.log('Button Clicked: previewCheckout - Start processing checkout preview');
         if (this.cart.length === 0) return alert('السلة فارغة!');
 
-        const custNameInput = document.getElementById('customer-name') ? document.getElementById('customer-name').value.trim() : (this.customer.name || '').trim();
+        const custNameInput  = document.getElementById('customer-name')  ? document.getElementById('customer-name').value.trim()  : (this.customer.name  || '').trim();
         const custPhoneInput = document.getElementById('customer-phone') ? document.getElementById('customer-phone').value.trim() : (this.customer.phone || '').trim();
 
-        if (!custNameInput || !custPhoneInput) {
-            alert('الرجاء إدخال اسم العميل ورقم الجوال لإصدار الفاتورة');
+        // Phone is optional — but if entered it MUST be a valid Saudi number (10 digits, starts with 05)
+        if (custPhoneInput && !/^05\d{8}$/.test(custPhoneInput)) {
+            const errEl = document.getElementById('phone-error');
+            if (errEl) { errEl.textContent = 'رقم الجوال يجب أن يكون 10 أرقام ويبدأ بـ 05'; errEl.style.display = 'block'; }
+            document.getElementById('customer-phone').focus();
             return;
         }
 
-        let cName = this.customer.name || 'عميل نقدي';
-        let cPhone = this.customer.phone || '0000000000';
+        let cName  = custNameInput  || 'عميل نقدي';
+        let cPhone = custPhoneInput || '0000000000';
+
 
         // Generate Invoice Num
         let invoices = await localforage.getItem('invoices') || [];
@@ -807,11 +864,21 @@ window.appLogic = {
         document.getElementById('modal-actions-preview').classList.add('hidden');
         document.getElementById('modal-actions-success').classList.remove('hidden');
 
+        // Show WhatsApp button only when the customer has a real phone number
+        const _hasPhone = this.currentInvoice.customer?.phone &&
+                          this.currentInvoice.customer.phone !== '0000000000';
+        const _waBtnEl  = document.getElementById('btn-whatsapp-share');
+        if (_waBtnEl) _waBtnEl.style.display = _hasPhone ? 'block' : 'none';
+
         // Reset POS background
         this.cart = [];
         this.customer = { phone: '', name: '' };
-        document.getElementById('customer-phone').value = '';
+        const _phoneEl = document.getElementById('customer-phone');
+        const _errEl   = document.getElementById('phone-error');
+        if (_phoneEl) { _phoneEl.value = ''; _phoneEl.style.borderColor = ''; }
+        if (_errEl)   { _errEl.style.display = 'none'; _errEl.textContent = ''; }
         document.getElementById('customer-name').value = '';
+
         if (document.getElementById('pos-laundry-name')) document.getElementById('pos-laundry-name').value = '';
         if (document.getElementById('pos-laundry-cost')) document.getElementById('pos-laundry-cost').value = '';
         if (document.getElementById('pos-laundry-paid')) document.getElementById('pos-laundry-paid').value = 'false';
@@ -828,9 +895,70 @@ window.appLogic = {
         this.pendingInvoice = null;
     },
 
+    // Live Saudi phone validator — called oninput on the phone field
+    validateSaudiPhone(input) {
+        // Strip any non-digit characters typed by accident
+        input.value = input.value.replace(/\D/g, '').slice(0, 10);
+
+        const errEl = document.getElementById('phone-error');
+        if (!errEl) return;
+
+        const v = input.value;
+        if (v.length === 0) {
+            // Empty is fine (field is optional)
+            errEl.style.display = 'none';
+            errEl.textContent = '';
+            input.style.borderColor = '';
+        } else if (!/^05/.test(v)) {
+            errEl.textContent = 'رقم الجوال يجب أن يبدأ بـ 05';
+            errEl.style.display = 'block';
+            input.style.borderColor = '#ef4444';
+        } else if (v.length < 10) {
+            errEl.textContent = `أدخل ${10 - v.length} أرقام إضافية`;
+            errEl.style.display = 'block';
+            input.style.borderColor = '#f59e0b';
+        } else {
+            // Valid!
+            errEl.style.display = 'none';
+            errEl.textContent = '';
+            input.style.borderColor = '#22c55e';
+        }
+    },
+
     printThermalReceipt() {
         if (!this.currentInvoice) return;
         this.printInvoice(this.currentInvoice);
+    },
+
+
+    shareInvoiceWhatsApp() {
+        const inv = this.currentInvoice;
+        if (!inv) return alert('لا توجد فاتورة حالية للمشاركة.');
+
+        // Format Saudi phone → international (966xxxxxxxxx)
+        const rawPhone = (inv.customer && inv.customer.phone) || '';
+        if (!rawPhone || rawPhone === '0000000000') {
+            return alert('لا يوجد رقم جوال مسجل لهذا العميل.');
+        }
+        let digits = rawPhone.replace(/\D/g, '');
+        if (!digits.startsWith('966')) {
+            digits = digits.startsWith('0') ? '966' + digits.slice(1) : '966' + digits;
+        }
+
+        // Build pre-filled message
+        const storeName  = window.tenantSettings?.name || 'المغسلة';
+        const invId      = inv.id || '';
+        const total      = (inv.grandTotal || inv.total || 0).toFixed(2);
+        const msg = encodeURIComponent(
+            `مرحباً ${inv.customer.name || 'عزيزي العميل'}،\n` +
+            `شكراً لتعاملكم مع ${storeName}.\n` +
+            `فاتورتكم رقم ${invId} بمبلغ ${total} ر.س جاهزة.\n` +
+            `نسعد بخدمتكم دائماً 😊\n` +
+            `— نظام Redix | ريدكس`
+        );
+
+        const url = `https://wa.me/${digits}?text=${msg}`;
+        window.open(url, '_blank');
     },
 
     async downloadDigitalPDF(event) {
@@ -839,42 +967,49 @@ window.appLogic = {
 
         const data = this.currentInvoice;
         const dStr = new Date(data.timestamp).toLocaleDateString('ar-SA', { year: 'numeric', month: '2-digit', day: '2-digit' });
-        const subtotal = data.items.reduce((acc, item) => acc + (item.unitPrice * item.qty), 0);
-        const vatRate = 0; // Tax Removed
-        const vatAmount = 0;
-        const grandTotal = subtotal + (data.deliveryFee || 0);
 
-        // Professional Items Table
-        let itemsHtml = '';
-        data.items.forEach((item, i) => {
-            let tLbl = item.type === 'iron' ? 'كوي' : (item.type === 'wash_iron' ? 'غسيل وكوي' : 'غسيل فقط');
-            let sLbl = item.speed === 'normal' ? 'عادي' : 'سريع';
-            let lineTotal = (item.unitPrice * item.qty).toFixed(2);
+        // WhatsApp link helper — formats Saudi numbers to wa.me/966xxxxxxxxx
+        const _waLink = (phone, display) => {
+            if (!phone || phone === '0000000000') return display || '-';
+            let digits = phone.replace(/\D/g, '');
+            if (digits.startsWith('966')) { /* already international */ }
+            else if (digits.startsWith('0')) digits = '966' + digits.slice(1);
+            else digits = '966' + digits;
+            const shown = display || phone;
+            return `<a href="https://wa.me/${digits}" target="_blank" style="color:#25D366; text-decoration:none; font-weight:bold;">&#x1F4AC; ${shown}</a>`;
+        };
 
-            itemsHtml += `
-            <tr style="border-bottom: 1px solid #edf2f7;">
-                <td style="padding: 12px; text-align: center; border-right: 1px solid #edf2f7; font-weight: bold;">${lineTotal}</td>
-                <td style="padding: 12px; text-align: center; border-right: 1px solid #edf2f7;">${item.unitPrice.toFixed(2)}</td>
-                <td style="padding: 12px; text-align: center; border-right: 1px solid #edf2f7;">${item.qty}</td>
-                <td style="padding: 12px; text-align: right; line-height: 1.5;">
-                    <strong style="display: block; color: #1a202c;">${item.name}</strong>
-                    <span style="font-size: 11px; color: #718096;">${tLbl} - ${sLbl}</span>
-                </td>
-                <td style="padding: 12px; text-align: center; border-left: 1px solid #edf2f7; color: #a0aec0;">${i + 1}</td>
+        const _vatAmt   = parseFloat(data.vatAmount || 0);
+        const _delivery = parseFloat(data.deliveryFee || 0);
+        const _itemsSum = data.items.reduce((a, it) => a + (it.unitPrice * it.qty), 0);
+        const _combined = _itemsSum + _delivery;
+        const _grand    = parseFloat(data.grandTotal || data.total || (_combined + _vatAmt));
+        const _storeTax = window.tenantSettings?.taxNumber
+            ? `<div style="font-size:13px; color:#444; margin-bottom:4px;">&#1575;&#1604;&#1585;&#1602;&#1605; &#1575;&#1604;&#1590;&#1585;&#1610;&#1576;&#1610;: <span style="direction:ltr; display:inline-block; font-weight:bold; letter-spacing:1px;">${window.tenantSettings.taxNumber}</span></div>` : '';
+        const _storeWA  = window.tenantSettings?.phone
+            ? `<div style="font-size:13px; color:#444; margin-bottom:4px;">&#1585;&#1602;&#1605; &#1575;&#1604;&#1580;&#1608;&#1575;&#1604;: ${window.tenantSettings.phone}</div>` : '';
+        const _invType  = _vatAmt > 0 ? '&#1601;&#1575;&#1578;&#1608;&#1585;&#1577; &#1590;&#1585;&#1610;&#1576;&#1610;&#1577; &#1605;&#1576;&#1587;&#1591;&#1577;' : '&#1601;&#1575;&#1578;&#1608;&#1585;&#1577;';
+
+        let _itemRows = '', _rn = 1;
+        data.items.forEach(it => {
+            if (!it) return;
+            let tLbl = it.type === 'iron' ? 'كوي' : (it.type === 'wash_iron' ? 'غسيل وكوي' : 'غسيل فقط');
+            let sLbl = it.speed === 'normal' ? 'عادي' : 'سريع';
+            _itemRows += `<tr style="border-bottom:1px solid #eee;">
+                <td style="padding:9px 0; text-align:center; color:#555;">${_rn++}</td>
+                <td style="padding:9px 0;"><strong>${it.name}</strong> <span style="font-size:11px; color:#666;">(${tLbl} - ${sLbl})</span></td>
+                <td style="padding:9px 0; text-align:center;">${it.qty}</td>
+                <td style="padding:9px 0; text-align:center;">${it.unitPrice.toFixed(2)}</td>
+                <td style="padding:9px 0; text-align:center; font-weight:bold;">${(it.unitPrice * it.qty).toFixed(2)}</td>
             </tr>`;
         });
-
-        if (data.deliveryFee > 0) {
-            itemsHtml += `
-            <tr style="border-bottom: 1px solid #edf2f7;">
-                <td style="padding: 12px; text-align: center; border-right: 1px solid #edf2f7; font-weight: bold;">${data.deliveryFee.toFixed(2)}</td>
-                <td style="padding: 12px; text-align: center; border-right: 1px solid #edf2f7;">${data.deliveryFee.toFixed(2)}</td>
-                <td style="padding: 12px; text-align: center; border-right: 1px solid #edf2f7;">1</td>
-                <td style="padding: 12px; text-align: right; line-height: 1.5;">
-                    <strong style="display: block; color: #1a202c;">رسوم التوصيل</strong>
-                    <span style="font-size: 11px; color: #718096;">Delivery Fee</span>
-                </td>
-                <td style="padding: 12px; text-align: center; border-left: 1px solid #edf2f7; color: #a0aec0;">${data.items.length + 1}</td>
+        if (_delivery > 0) {
+            _itemRows += `<tr style="border-bottom:1px solid #eee;">
+                <td style="padding:9px 0; text-align:center; color:#555;">${_rn++}</td>
+                <td style="padding:9px 0;"><strong>رسوم التوصيل</strong></td>
+                <td style="padding:9px 0; text-align:center;">1</td>
+                <td style="padding:9px 0; text-align:center;">${_delivery.toFixed(2)}</td>
+                <td style="padding:9px 0; text-align:center; font-weight:bold;">${_delivery.toFixed(2)}</td>
             </tr>`;
         }
 
@@ -886,103 +1021,77 @@ window.appLogic = {
         container.style.background = '#fff';
 
         container.innerHTML = `
-        <div class="formal-invoice-wrapper" style="width: 210mm; margin: 0 auto; padding: 40px; box-sizing: border-box; font-family: 'Tajawal', sans-serif; direction: rtl; color: #2d3748; line-height: 1.6; background: #fff;">
-            
-            <!-- ERP Header Section -->
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; box-sizing: border-box;">
-                <div style="text-align: right;">
-                    <h2 style="margin: 0; color: #1a202c; font-size: 28px; font-weight: 800;">${window.tenantSettings?.name || 'مغسلة جديدة'}</h2>
-                    <p style="margin: 4px 0; color: #718096; font-size: 14px;">Sahab Laundry</p>
-                </div>
-                <div style="text-align: center; flex: 1; display:flex; justify-content:center; align-items:center;">
-                    <!-- Robust Title Box -->
-                    <div style="width: 220px; height: 110px; border: 5px solid #1a202c; background: #ffffff; border-radius: 4px; display: block; overflow: hidden; box-sizing: border-box;">
-                        <div style="font-size: 38px; font-weight: 900; color: #1a202c !important; text-align: center; line-height: 70px; margin: 0; padding: 0;">فاتورة</div>
-                        <div style="font-size: 18px; font-weight: 700; color: #718096 !important; text-align: center; line-height: 1; margin: 0; padding: 0; text-transform: uppercase; letter-spacing: 2px;">INVOICE</div>
-                    </div>
-                </div>
-                <div style="text-align: left; width: 150px; box-sizing: border-box;">
-                    <!-- Placeholder for potential logo -->
-                </div>
+        <div style="width:210mm; margin:0 auto; padding:45px; box-sizing:border-box; font-family:'Tajawal',sans-serif; direction:rtl; color:#000; line-height:1.7; background:#fff;">
+
+            <!-- Header: Store Name → VAT Number → Phone -->
+            <div style="text-align:center; margin-bottom:30px; padding-bottom:20px; border-bottom:2px solid #000;">
+                <div style="font-size:32px; font-weight:900; color:#000; margin-top:6px; margin-bottom:14px;">${window.tenantSettings?.name || 'Redix'}</div>
+                ${_storeTax}
+                ${_storeWA}
+                <div style="margin-top:14px; font-size:16px; font-weight:bold; color:#000;">${_invType}</div>
             </div>
 
-            <!-- Invoice Info Grid -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; background: #f7fafc; padding: 20px; border-radius: 8px; box-sizing: border-box;">
-                <div>
-                    <div style="display: flex; margin-bottom: 8px; box-sizing: border-box;">
-                        <span style="width: 100px; color: #718096; font-size: 13px;">رقم الفاتورة:</span>
-                        <strong style="color: #1a202c;">#${data.id}</strong>
-                    </div>
-                    <div style="display: flex; margin-bottom: 8px; box-sizing: border-box;">
-                        <span style="width: 100px; color: #718096; font-size: 13px;">التاريخ:</span>
-                        <strong style="color: #1a202c;">${dStr}</strong>
-                    </div>
-                </div>
-                <div>
-                    <div style="display: flex; margin-bottom: 8px; box-sizing: border-box;">
-                        <span style="width: 100px; color: #718096; font-size: 13px;">العميل:</span>
-                        <strong style="color: #1a202c;">${data.customer.name || 'عميل نقدي'}</strong>
-                    </div>
-                    <div style="display: flex; box-sizing: border-box;">
-                        <span style="width: 100px; color: #718096; font-size: 13px;">رقم الجوال:</span>
-                        <strong style="color: #1a202c;">${data.customer.phone || 'N/A'}</strong>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Professional Table -->
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; border: 1px solid #edf2f7; box-sizing: border-box;">
-                <thead>
-                    <tr style="background: #2d3748; color: #fff;">
-                        <th style="padding: 12px; text-align: center; width: 15%; border: 1px solid #334155;">الإجمالي Total</th>
-                        <th style="padding: 12px; text-align: center; width: 15%; border: 1px solid #334155;">السعر Price</th>
-                        <th style="padding: 12px; text-align: center; width: 10%; border: 1px solid #334155;">الكمية Qty</th>
-                        <th style="padding: 12px; text-align: right; border: 1px solid #334155;">الصنف Item</th>
-                        <th style="padding: 12px; text-align: center; width: 5%; border: 1px solid #334155;">#</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${itemsHtml}
-                </tbody>
+            <!-- Invoice & Customer Info — RTL table with colon on the correct left side -->
+            <table style="width:100%; border-collapse:collapse; margin-bottom:25px; font-size:14px; direction:rtl;">
+                <tr>
+                    <td style="padding:5px 0; color:#555; white-space:nowrap; width:120px; unicode-bidi:plaintext; direction:rtl;">&#x202B;رقم الفاتورة:&#x200F;</td>
+                    <td style="padding:5px 10px; font-weight:bold; color:#000;">${data.id}</td>
+                    <td style="padding:5px 0; color:#555; white-space:nowrap; width:80px; unicode-bidi:plaintext; direction:rtl;">&#x202B;التاريخ:&#x200F;</td>
+                    <td style="padding:5px 10px; font-weight:bold; color:#000; direction:ltr; text-align:right;">${dStr}</td>
+                </tr>
+                <tr>
+                    <td style="padding:5px 0; color:#555; unicode-bidi:plaintext; direction:rtl;">&#x202B;العميل:&#x200F;</td>
+                    <td style="padding:5px 10px; font-weight:bold; color:#000;">${data.customer.name || 'عميل نقدي'}</td>
+                    <td style="padding:5px 0; color:#555; unicode-bidi:plaintext; direction:rtl;">&#x202B;رقم الجوال:&#x200F;</td>
+                    <td style="padding:5px 10px; font-weight:bold; color:#000; direction:ltr; text-align:right;">${_waLink(data.customer.phone, data.customer.phone)}</td>
+                </tr>
             </table>
 
-            <!-- Summary Section -->
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; box-sizing: border-box;">
-                <!-- QR Code & ZATCA Note -->
-                <div style="text-align: center; width: 250px; box-sizing: border-box;">
-                    <div id="pdf-qr-container" style="margin-bottom: 10px; display: inline-block;"></div>
-                    <p style="font-size: 10px; color: #718096; line-height: 1.4;">
-                        هذا الرمز مشفر حسب متطلبات<br>
-                        هيئة الزكاة والضريبة والجمارك<br>
-                        ZATCA Compliant QR Code
-                    </p>
-                </div>
+            <!-- Items Table — thin lines, pure white, strict RTL -->
+            <table dir="rtl" style="width:100%; border-collapse:collapse; margin-bottom:25px;">
+                <thead>
+                    <tr style="border-top:1px solid #000; border-bottom:1px solid #000;">
+                        <th style="padding:10px 0; text-align:center; width:5%; color:#000;">#</th>
+                        <th style="padding:10px 0; text-align:right; color:#000;">الصنف</th>
+                        <th style="padding:10px 0; text-align:center; width:12%; color:#000;">الكمية</th>
+                        <th style="padding:10px 0; text-align:center; width:14%; color:#000;">السعر</th>
+                        <th style="padding:10px 0; text-align:center; width:14%; color:#000;">الإجمالي</th>
+                    </tr>
+                </thead>
+                <tbody>${_itemRows}</tbody>
+            </table>
 
-                <!-- Totals Table -->
-                <div style="width: 300px; box-sizing: border-box;">
-                    <div style="display: flex; justify-content: space-between; padding: 12px 0; margin-top: 5px; background: #f7fafc; padding: 12px; border-radius: 4px; box-sizing: border-box;">
-                        <span style="font-weight: 800; color: #1a202c;">الإجمالي النهائي (Total):</span>
-                        <span style="font-weight: 900; color: #1a202c; font-size: 18px;">${grandTotal.toFixed(2)} SAR</span>
-                    </div>
-                </div>
+            <!-- Totals: 3 rows, no dark backgrounds -->
+            <div style="display:flex; justify-content:flex-end; margin-bottom:35px;">
+                <table dir="rtl" style="border-collapse:collapse; font-size:14px; min-width:310px;">
+                    <tr>
+                        <td style="padding:6px 0; color:#555;">المجموع (بدون ضريبة):</td>
+                        <td style="padding:6px 0; padding-right:20px; font-weight:bold; direction:ltr; text-align:left;">${_combined.toFixed(2)} ر.س</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:6px 0; color:#555;">ضريبة القيمة المضافة (15%):</td>
+                        <td style="padding:6px 0; padding-right:20px; font-weight:bold; direction:ltr; text-align:left;">${_vatAmt.toFixed(2)} ر.س</td>
+                    </tr>
+                    <tr style="border-top:1px solid #000;">
+                        <td style="padding:10px 0; font-size:16px; font-weight:900; color:#000;">الإجمالي النهائي:</td>
+                        <td style="padding:10px 0; padding-right:20px; font-size:18px; font-weight:900; color:#000; direction:ltr; text-align:left;">${_grand.toFixed(2)} ر.س</td>
+                    </tr>
+                </table>
             </div>
 
-            <!-- Footer Note -->
-            <div style="margin-top: 60px; border-top: 1px solid #edf2f7; padding-top: 20px; text-align: center; box-sizing: border-box;">
-                <p style="font-size: 12px; color: #a0aec0; margin: 0;">شكراً لتعاملكم مع ${window.tenantSettings?.name || 'مغسلة جديدة'} - نسعد بخدمتكم دائماً</p>
-                <div style="font-size: 10px; color: #cbd5e0; margin: 4px 0; display: flex; justify-content: center; gap: 5px; align-items: center;">
-                    <span>المملكة العربية السعودية</span>
-                    <span>|</span>
-                    <span style="font-family: -apple-system, BlinkMacSystemFont, Arial, sans-serif; direction: ltr; letter-spacing: 1px;">Kingdom of Saudi Arabia</span>
-                </div>
+            <!-- ZATCA QR centered at bottom -->
+            <div style="text-align:center; border-top:1px solid #ccc; padding-top:25px;">
+                <div id="pdf-qr-container" style="display:inline-block; margin-bottom:10px;"></div>
+                <div style="font-size:13px; color:#555;">شكراً لتعاملكم معنا - نظام Redix | ريدكس</div>
             </div>
+
         </div>
         `;
 
         document.body.appendChild(container);
 
         // Standard ZATCA QR (Updated with zero tax)
-        const bizName = window.tenantSettings?.name || 'مغسلة جديدة';
+        const bizName = window.tenantSettings?.name || 'Redix';
         const zatcaQRBase64 = zatcaEncoder.generateZATCA_QR(bizName, window.tenantSettings?.taxNumber || "000000000000000", data.timestamp, data.grandTotal, 0);
         new QRCode(container.querySelector('#pdf-qr-container'), {
             text: zatcaQRBase64,
@@ -1053,69 +1162,114 @@ window.appLogic = {
         setTimeout(() => t.style.opacity = '0', 4000);
     },
 
-    // HTML Generator for Thermal Receipt
+    // HTML Generator for Thermal Receipt (Zero Ink — white background, RTL Arabic)
     generateThermalHTML(data, qrContainerId) {
         const dStr = new Date(data.timestamp).toLocaleString('ar-SA');
+        const vatAmount  = parseFloat(data.vatAmount  || 0);
+        const deliveryFee = parseFloat(data.deliveryFee || 0);
+        const grandTotal  = parseFloat(data.grandTotal  || data.total || 0);
+        const combinedSum = grandTotal - vatAmount; // subtotal before VAT
+
+        // WhatsApp link helper — formats Saudi numbers to wa.me/966xxxxxxxxx
+        const _waLink = (phone, display) => {
+            if (!phone || phone === '0000000000') return display || '-';
+            let digits = phone.replace(/\D/g, '');
+            if (digits.startsWith('966')) { /* already international */ }
+            else if (digits.startsWith('0')) digits = '966' + digits.slice(1);
+            else digits = '966' + digits;
+            const shown = display || phone;
+            return `<a href="https://wa.me/${digits}" target="_blank" style="color:#25D366; text-decoration:none; font-weight:bold;">&#x1F4AC; ${shown}</a>`;
+        };
+
+
+        // Build item rows
         let itemsHtml = '';
-        data.items.forEach((item, i) => {
-            let tLbl = item.type === 'iron' ? 'كوي' : (item.type === 'wash_iron' ? 'غ.كوي' : 'غسيل');
+        data.items.forEach(item => {
+            if (!item) return;
+            let tLbl = item.type === 'iron' ? 'كوي' : (item.type === 'wash_iron' ? 'غسيل وكوي' : 'غسيل');
             let sLbl = item.speed === 'normal' ? 'عادي' : 'سريع';
             itemsHtml += `
             <tr>
-                <td style="text-align:center;">${item.qty}</td>
-                <td>${item.name}<br><span style="font-size:10px;color:#444">${tLbl}-${sLbl}</span></td>
-                <td>${item.unitPrice.toFixed(2)}</td>
-                <td style="font-weight:bold;">${(item.unitPrice * item.qty).toFixed(2)}</td>
+                <td style="padding:4px 0; border-bottom:1px dashed #bbb; text-align:right;">${item.name} <span style="font-size:10px;">(${tLbl})</span></td>
+                <td style="padding:4px 0; border-bottom:1px dashed #bbb; text-align:center;">${item.qty}</td>
+                <td style="padding:4px 0; border-bottom:1px dashed #bbb; text-align:left;">${(item.unitPrice * item.qty).toFixed(2)}</td>
             </tr>`;
         });
-
-        if (data.deliveryFee > 0) {
+        if (deliveryFee > 0) {
             itemsHtml += `
             <tr>
-                <td style="text-align:center;">1</td>
-                <td>رسوم التوصيل<br><span style="font-size:10px;color:#444">Delivery Fee</span></td>
-                <td>${data.deliveryFee.toFixed(2)}</td>
-                <td style="font-weight:bold;">${data.deliveryFee.toFixed(2)}</td>
+                <td style="padding:4px 0; border-bottom:1px dashed #bbb; text-align:right;">رسوم التوصيل</td>
+                <td style="padding:4px 0; border-bottom:1px dashed #bbb; text-align:center;">1</td>
+                <td style="padding:4px 0; border-bottom:1px dashed #bbb; text-align:left;">${deliveryFee.toFixed(2)}</td>
             </tr>`;
         }
 
+        const storePhone = window.tenantSettings?.phone
+            ? `<div style="font-size:11px; margin-top:3px;">&#1585;&#1602;&#1605; &#1575;&#1604;&#1580;&#1608;&#1575;&#1604;: ${window.tenantSettings.phone}</div>` : '';
+        const storeTax = window.tenantSettings?.taxNumber
+            ? `<div style="font-size:11px; margin-top:2px;">&#1575;&#1604;&#1585;&#1602;&#1605; &#1575;&#1604;&#1590;&#1585;&#1610;&#1576;&#1610;: ${window.tenantSettings.taxNumber}</div>` : '';
+
         return `
-        <div class="thermal-receipt" style="margin:0 auto;">
-            <div class="thermal-header">
-                <img src="logo.png" alt="Logo" onerror="this.style.display='none'">
-                <h1>${window.tenantSettings?.name || 'مغسلة جديدة'}</h1>
-                <p>للغسيل والكوي | Sahab Laundry</p>
+        <div style="width:80mm; margin:0 auto; font-family:'Tajawal',Arial,sans-serif; direction:rtl; background:#fff; color:#000; padding:8px; box-sizing:border-box;">
+
+            <!-- Header: Store Name → VAT Number → Phone -->
+            <div style="text-align:center; border-bottom:1px solid #000; padding-bottom:8px; margin-bottom:10px;">
+                <div style="font-size:18px; font-weight:900; margin-bottom:4px;">${window.tenantSettings?.name || 'Redix'}</div>
+                ${storeTax}
+                ${storePhone}
             </div>
-            
-            <div class="thermal-meta">
-                <div><span>رقم الفاتورة:</span> <strong>${data.id}</strong></div>
-                <div><span>التاريخ:</span> <span>${dStr}</span></div>
-                <div><span>العميل:</span> <strong>${data.customer.name}</strong></div>
-            </div>
-            
-            <table class="thermal-table">
+
+            <!-- Meta info — colon pinned to left of each label via unicode-bidi -->
+            <table style="width:100%; font-size:12px; margin-bottom:8px; border-collapse:collapse; direction:rtl;">
+                <tr>
+                    <td style="color:#555; unicode-bidi:plaintext; direction:rtl;">&#x202B;رقم الفاتورة:&#x200F;</td>
+                    <td style="font-weight:bold; text-align:left; direction:ltr;">${data.id}</td>
+                </tr>
+                <tr>
+                    <td style="color:#555; unicode-bidi:plaintext; direction:rtl;">&#x202B;التاريخ:&#x200F;</td>
+                    <td style="text-align:left; direction:ltr;">${dStr}</td>
+                </tr>
+                <tr>
+                    <td style="color:#555; unicode-bidi:plaintext; direction:rtl;">&#x202B;العميل:&#x200F;</td>
+                    <td style="font-weight:bold;">${data.customer.name || 'عميل نقدي'}</td>
+                </tr>
+                ${data.customer.phone && data.customer.phone !== '0000000000' ? `<tr><td style="color:#555; unicode-bidi:plaintext; direction:rtl;">&#x202B;&#x1585;&#x1602;&#x1605; &#x1575;&#x1604;&#x1580;&#x1608;&#x1575;&#x1604;:&#x200F;</td><td style="direction:ltr; text-align:left;">${_waLink(data.customer.phone, data.customer.phone)}</td></tr>` : ''}
+            </table>
+
+            <!-- Items Table -->
+            <table style="width:100%; border-collapse:collapse; font-size:12px;">
                 <thead>
-                    <tr>
-                        <th style="text-align:center">م</th>
-                        <th>الصنف</th>
-                        <th>سعر</th>
-                        <th>إجمالي</th>
+                    <tr style="border-top:1px solid #000; border-bottom:1px solid #000;">
+                        <th style="padding:3px 0; text-align:right;">الصنف</th>
+                        <th style="padding:3px 0; text-align:center; width:25px;">م</th>
+                        <th style="padding:3px 0; text-align:left;">إجمالي</th>
                     </tr>
                 </thead>
-                <tbody>
-                    ${itemsHtml}
-                </tbody>
+                <tbody>${itemsHtml}</tbody>
             </table>
-            
-            <div class="thermal-totals">
-                <div><span>رسوم التوصيل:</span> <span>${data.deliveryFee.toFixed(2)} ر.س</span></div>
-                <div class="thermal-grand"><span>الإجمالي:</span> <span>${data.grandTotal.toFixed(2)} ر.س</span></div>
+
+            <!-- Totals -->
+            <table style="width:100%; font-size:12px; margin-top:8px; border-collapse:collapse;">
+                <tr>
+                    <td style="padding:3px 0; color:#555;">المجموع (بدون ضريبة):</td>
+                    <td style="text-align:left; font-weight:bold; direction:ltr;">${combinedSum.toFixed(2)} ر.س</td>
+                </tr>
+                <tr>
+                    <td style="padding:3px 0; color:#555;">ضريبة القيمة المضافة (15%):</td>
+                    <td style="text-align:left; font-weight:bold; direction:ltr;">${vatAmount.toFixed(2)} ر.س</td>
+                </tr>
+                <tr style="border-top:1px solid #000;">
+                    <td style="padding:5px 0; font-size:14px; font-weight:900;">الإجمالي النهائي:</td>
+                    <td style="text-align:left; font-size:14px; font-weight:900; direction:ltr;">${grandTotal.toFixed(2)} ر.س</td>
+                </tr>
+            </table>
+
+            <!-- ZATCA QR + Footer -->
+            <div style="text-align:center; margin-top:12px; border-top:1px solid #ccc; padding-top:10px;">
+                <div id="${qrContainerId}" style="display:inline-block; margin-bottom:6px;"></div>
+                <div style="font-size:11px; color:#555;">شكراً لتعاملكم معنا - نظام Redix | ريدكس</div>
             </div>
-            
-            <div class="thermal-footer">
-                <div id="${qrContainerId}" class="thermal-qr"></div>
-                <p>شكراً لثقتكم بنا</p>
-            </div>
+
         </div>`;
     },
 
@@ -1999,21 +2153,35 @@ window.appLogic = {
                 await manualSyncToCloud('journal_entries', []);
             }
         } else {
-            // SELF-HEALING: Filter tax_records that don't have a matching invoice anymore
-            const validInvoiceIds = new Set(invoices.filter(i => i && i.id).map(i => i.id.toString()));
-            const originalCount = taxRecords.length;
-            taxRecords = taxRecords.filter(r => r && r.ref_invoice && validInvoiceIds.has(r.ref_invoice.toString()));
+            // SELF-HEALING: Filter tax_records and journal_entries that don't have a matching VALID invoice anymore
+            // DATA UPLOAD (بص الرفع) FILTER: Exclude cancelled (refunded) invoices from these collections
+            const validInvoiceIds = new Set(invoices.filter(i => i && i.id && !i.isCancelled).map(i => i.id.toString()));
             
-            if (taxRecords.length !== originalCount) {
-                console.log(`[Self-Healing] Purged ${originalCount - taxRecords.length} orphan tax records.`);
+            // Purge Tax Records
+            const originalTaxCount = taxRecords.length;
+            taxRecords = taxRecords.filter(r => r && r.ref_invoice && validInvoiceIds.has(r.ref_invoice.toString()));
+            if (taxRecords.length !== originalTaxCount) {
+                console.log(`[Self-Healing] Purged ${originalTaxCount - taxRecords.length} orphan tax records.`);
                 await localforage.setItem('tax_records', taxRecords);
                 await manualSyncToCloud('tax_records', taxRecords);
             }
+
+            // Purge Journal Entries
+            let journals = await localforage.getItem('journal_entries') || [];
+            const originalJournalCount = journals.length;
+            journals = journals.filter(j => j && j.ref_invoice && validInvoiceIds.has(j.ref_invoice.toString()));
+            if (journals.length !== originalJournalCount) {
+                console.log(`[Self-Healing] Purged ${originalJournalCount - journals.length} orphan journal entries.`);
+                await localforage.setItem('journal_entries', journals);
+                await manualSyncToCloud('journal_entries', journals);
+            }
         }
 
-        let totalRevenue = 0;
-        let totalExpensesCost = 0;
-        let totalPartnerCosts = 0;
+        let totalAllInvoices = 0;
+        let totalRefunds = 0;
+        let totalOperatingExpenses = 0;
+        let totalLaundryCosts = 0;
+        let totalLaundryDebt = 0;
         
         const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -2025,17 +2193,23 @@ window.appLogic = {
         const monthsAr = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
         const monthlyMap = {};
 
-        // Calculate Revenue, Partner Costs, and Time-based Analytics DIRECTLY from Invoices
-        // ACCOUNTING RULE: Cancelled invoices (isCancelled === true) are EXCLUDED from all totals
+        // Calculate Revenue, Refunds, Partner Costs DIRECTLY from Invoices
         invoices.forEach(i => {
-            if (!i || i.isCancelled === true) return; // Skip cancelled invoices
-            // REVENUE: Sum of every invoice.total
+            if (!i) return;
             const amt = parseFloat(i.total || i.grandTotal || 0);
-            totalRevenue += amt;
             
-            // PARTNER COSTS: Sum of every invoice.laundryCost
+            // All invoices contribute to the math base
+            totalAllInvoices += amt;
+
+            if (i.isCancelled === true) {
+                totalRefunds += amt;
+                return; // Skip cost/time tracking for cancelled
+            }
+
+            // PARTNER COSTS: Sum of every invoice.laundryCost (only non-cancelled)
             const pCost = parseFloat(i.laundryCost || i.partnerLaundryCost || 0);
-            totalPartnerCosts += pCost;
+            totalLaundryCosts += pCost;
+            if (!i.laundryPaid) totalLaundryDebt += pCost;
 
             const rTime = new Date(i.date || i.timestamp).getTime();
             if (rTime >= today) salesToday += amt;
@@ -2055,40 +2229,54 @@ window.appLogic = {
 
         // Calculate Operational Expenses
         exps.forEach(e => {
-            totalExpensesCost += parseFloat(e.amount) || 0;
+            totalOperatingExpenses += parseFloat(e.amount) || 0;
         });
 
-        // PROFIT FORMULA
-        let netProfit = totalRevenue - totalPartnerCosts - totalExpensesCost;
+        // FINAL COMPREHENSIVE FINANCIAL MATH (Redix Logic)
+        let totalNetRevenue = totalAllInvoices - totalRefunds;
+        // Net Profit = [Net Revenue] - [Operating Expenses] - [Total Outsourcing Costs]
+        let netProfit = totalNetRevenue - (totalOperatingExpenses + totalLaundryCosts);
 
         let html = `
-        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:20px; margin-bottom:30px;">
-            <!-- 1. Total Revenue -->
-            <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:24px; text-align:center; box-shadow:0 4px 15px rgba(0,0,0,0.2);">
-                <i class="fa-solid fa-sack-dollar" style="font-size:32px; color:#4CAF50; margin-bottom:15px;"></i>
-                <h3 style="color:var(--text-muted); font-size:16px; margin-bottom:5px;">إجمالي الإيرادات (Total Revenue)</h3>
-                <div style="font-size:28px; font-weight:900; color:#fff; direction:ltr;">${totalRevenue.toFixed(2)} SAR</div>
-            </div>
-
-            <!-- 2. Partner Costs -->
-            <div style="background:var(--bg-surface); border:1px solid #3f51b5; border-radius:var(--radius-md); padding:24px; text-align:center; box-shadow:0 4px 15px rgba(63, 81, 181, 0.2);">
-                <i class="fa-solid fa-truck-ramp-box" style="font-size:32px; color:#5c6bc0; margin-bottom:15px;"></i>
-                <h3 style="color:var(--text-muted); font-size:16px; margin-bottom:5px;">إجمالي حسابات المغاسل (Partner Costs)</h3>
-                <div style="font-size:28px; font-weight:900; color:#fff; direction:ltr;">${totalPartnerCosts.toFixed(2)} SAR</div>
-            </div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:20px; margin-bottom:40px;">
             
-            <!-- 3. Operational Expenses -->
-            <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:24px; text-align:center; box-shadow:0 4px 15px rgba(0,0,0,0.2);">
-                <i class="fa-solid fa-arrow-right-from-bracket" style="font-size:32px; color:#e91e63; margin-bottom:15px;"></i>
-                <h3 style="color:var(--text-muted); font-size:16px; margin-bottom:5px;">المصروفات التشغيلية (Operational Expenses)</h3>
-                <div style="font-size:28px; font-weight:900; color:#e91e63; direction:ltr;">- ${totalExpensesCost.toFixed(2)} SAR</div>
+            <!-- 1. Gross Sales -->
+            <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px; text-align:center; box-shadow:var(--shadow-sm);">
+                <h3 style="color:var(--text-muted); font-size:13px; margin-bottom:5px;">إجمالي المبيعات (Gross Sales)</h3>
+                <div style="font-size:24px; font-weight:800; direction:ltr; color:var(--text-main);">${totalAllInvoices.toFixed(2)} ر.س</div>
             </div>
 
-            <!-- 4. Net Profit -->
-            <div style="background:var(--bg-surface); border:1px solid var(--primary); border-radius:var(--radius-md); padding:24px; text-align:center; box-shadow:0 4px 15px rgba(253,184,19,0.2);">
-                <i class="fa-solid fa-chart-pie" style="font-size:32px; color:var(--primary); margin-bottom:15px;"></i>
-                <h3 style="color:var(--text-muted); font-size:16px; margin-bottom:5px;">صافي الربح (Net Profit)</h3>
-                <div style="font-size:28px; font-weight:900; color:${netProfit >= 0 ? '#4CAF50' : '#e91e63'}; direction:ltr;">${netProfit.toFixed(2)} SAR</div>
+            <!-- 2. Refunds -->
+            <div style="background:var(--bg-surface); border:1px solid rgba(255, 69, 58, 0.2); border-radius:var(--radius-md); padding:20px; text-align:center; box-shadow:var(--shadow-sm);">
+                <h3 style="color:var(--text-muted); font-size:13px; margin-bottom:5px;">إجمالي المرتجعات (Refunds)</h3>
+                <div style="font-size:24px; font-weight:800; direction:ltr; color:#ff453a;">- ${totalRefunds.toFixed(2)} ر.س</div>
+            </div>
+
+            <!-- 3. Net Revenue -->
+            <div style="background:var(--bg-surface); border:1px solid rgba(76, 175, 80, 0.2); border-radius:var(--radius-md); padding:20px; text-align:center; box-shadow:var(--shadow-sm);">
+                <h3 style="color:var(--text-muted); font-size:13px; margin-bottom:5px;">صافي الإيرادات (Net Revenue)</h3>
+                <div style="font-size:24px; font-weight:800; direction:ltr; color:#4CAF50;">${totalNetRevenue.toFixed(2)} ر.س</div>
+            </div>
+
+            <!-- 4. Operating Expenses -->
+            <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px; text-align:center; box-shadow:var(--shadow-sm);">
+                <h3 style="color:var(--text-muted); font-size:13px; margin-bottom:5px;">المصاريف التشغيلية (Expenses)</h3>
+                <div style="font-size:24px; font-weight:800; direction:ltr; color:var(--text-main);">- ${totalOperatingExpenses.toFixed(2)} ر.س</div>
+            </div>
+
+            <!-- 5. Partner Laundry Debt -->
+            <div style="background:var(--bg-surface); border:1px solid rgba(253, 184, 19, 0.2); border-radius:var(--radius-md); padding:20px; text-align:center; box-shadow:var(--shadow-sm);">
+                <h3 style="color:var(--text-muted); font-size:13px; margin-bottom:5px;">حسابات المغاسل (Debt)</h3>
+                <div style="font-size:24px; font-weight:800; direction:ltr; color:var(--primary);">${totalLaundryDebt.toFixed(2)} ر.س</div>
+            </div>
+
+            <!-- 6. FINAL NET PROFIT OVERLAY -->
+            <div style="grid-column: 1 / -1; background:var(--bg-elevated); border:2px solid var(--primary); border-radius:var(--radius-md); padding:25px; text-align:center; box-shadow:var(--shadow-lg);">
+                <h3 style="color:var(--text-muted); font-size:15px; margin-bottom:10px;">صافي الربح النهائي (Net Profit)</h3>
+                <div style="font-size:42px; font-weight:900; color:${netProfit >= 0 ? 'var(--primary)' : '#ff453a'}; direction:ltr; text-shadow:0 0 20px rgba(253,184,19,0.1);">
+                    ${netProfit.toFixed(2)} <span style="font-size:20px;"> ر.س</span>
+                </div>
+                <p style="margin-top:10px; font-size:12px; color:var(--text-muted); opacity:0.8;">[صافي الإيراد] - [المصاريف التشغيلية] - [إجمالي تكاليف الشركاء]</p>
             </div>
         </div>
 
@@ -2321,14 +2509,14 @@ window.appLogic = {
     },
 
     async saveTenantSettings() {
-        const name  = document.getElementById('setting-name').value.trim()  || 'مغسلة جديدة';
+        const name  = document.getElementById('setting-name').value.trim()  || 'Redix';
         const phone = document.getElementById('setting-phone').value.trim();
         const tax   = document.getElementById('setting-tax').value.trim();
 
         window.tenantSettings = { name, phone, taxNumber: tax };
 
-        // Persist locally
-        localStorage.setItem('tenant_settings', JSON.stringify(window.tenantSettings));
+        // window.tenantSettings = { name, phone, taxNumber: tax }; // Already set above
+        // REMOVED local storage persistence for security
 
         // Persist to Firebase under user node
         if (window.currentUID && typeof firebase !== 'undefined') {
@@ -2357,22 +2545,20 @@ window.appLogic = {
             }
         }
 
-        // 2. Fallback to localStorage
-        if (!settings) {
-            try { settings = JSON.parse(localStorage.getItem('tenant_settings')); } catch (e) {}
-        }
+        // 2. Local fallback removed for security
 
-        window.tenantSettings = settings || { name: 'مغسلة جديدة', phone: '', taxNumber: '' };
+        window.tenantSettings = settings || { name: 'المغسلة', phone: '', taxNumber: '' };
         this.applyBranding();
     },
 
     applyBranding() {
-        const name = window.tenantSettings?.name || 'مغسلة جديدة';
+        const name = window.tenantSettings?.name || 'Redix';
         const h1 = document.getElementById('header-brand-name');
         if (h1) h1.textContent = name;
-        const loginH2 = document.getElementById('login-brand-name');
-        if (loginH2) loginH2.textContent = name;
-        document.title = `${name} - نظام إدارة المبيعات`;
+        // LOGIN HEADING IS NOW STATIC: "تسجيل دخول نظام Redix"
+        // const loginH2 = document.getElementById('login-brand-name');
+        // if (loginH2) loginH2.textContent = name;
+        document.title = `Redix POS | ${name}`;
     }
 };
 
@@ -2394,6 +2580,9 @@ document.addEventListener('DOMContentLoaded', () => {
         appLogic.init();
         return;
     }
+
+    // STRICT AUTH: No session persistence. Login required on every reload.
+    firebase.auth().setPersistence(firebase.auth.Auth.Persistence.NONE);
 
     firebase.auth().onAuthStateChanged(async (user) => {
         if (user) {
