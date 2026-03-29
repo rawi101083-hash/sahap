@@ -1,0 +1,229 @@
+renderReports() {
+        const invoices = await localforage.getItem('invoices') || [];
+        const exps = await localforage.getItem('expenses') || [];
+        let taxRecords = await localforage.getItem('tax_records') || [];
+
+        // ZERO-STATE GUARD: If no invoices, force data to be empty
+        if (invoices.length === 0) {
+            taxRecords = [];
+            const staleTax = await localforage.getItem('tax_records') || [];
+            const staleJournals = await localforage.getItem('journal_entries') || [];
+            if (staleTax.length > 0 || staleJournals.length > 0) {
+                console.log('[Zero-State-Guard] Purging ghost collections because invoices is empty.');
+                await localforage.setItem('tax_records', []);
+                await manualSyncToCloud('tax_records', []);
+                await localforage.setItem('journal_entries', []);
+                await manualSyncToCloud('journal_entries', []);
+            }
+        } else {
+            // SELF-HEALING: Filter tax_records and journal_entries that don't have a matching VALID invoice anymore
+            // DATA UPLOAD (بص الرفع) FILTER: Exclude cancelled (refunded) invoices from these collections
+            const validInvoiceIds = new Set(invoices.filter(i => i && i.id && !i.isCancelled).map(i => i.id.toString()));
+            
+            // Purge Tax Records
+            const originalTaxCount = taxRecords.length;
+            taxRecords = taxRecords.filter(r => r && r.ref_invoice && validInvoiceIds.has(r.ref_invoice.toString()));
+            if (taxRecords.length !== originalTaxCount) {
+                console.log(`[Self-Healing] Purged ${originalTaxCount - taxRecords.length} orphan tax records.`);
+                await localforage.setItem('tax_records', taxRecords);
+                await manualSyncToCloud('tax_records', taxRecords);
+            }
+
+            // Purge Journal Entries
+            let journals = await localforage.getItem('journal_entries') || [];
+            const originalJournalCount = journals.length;
+            journals = journals.filter(j => j && j.ref_invoice && validInvoiceIds.has(j.ref_invoice.toString()));
+            if (journals.length !== originalJournalCount) {
+                console.log(`[Self-Healing] Purged ${originalJournalCount - journals.length} orphan journal entries.`);
+                await localforage.setItem('journal_entries', journals);
+                await manualSyncToCloud('journal_entries', journals);
+            }
+        }
+
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        const weekAgo = todayStart - (7 * 24 * 60 * 60 * 1000);
+        const monthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate()).getTime();
+        const yearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()).getTime();
+
+        let salesToday = 0, salesWeek = 0, salesMonth = 0, salesYear = 0;
+        const monthsAr = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+        const monthlyMap = {};
+
+        // Active Dashboard Totals (Today Only + Not Reported)
+        let totalAllInvoices = 0;
+        let totalRefunds = 0;
+        let totalOperatingExpenses = 0;
+        let totalLaundryCosts = 0;
+        let totalLaundryDebt = 0;
+
+        // 1. Process Invoices
+        invoices.forEach(i => {
+            if (!i) return;
+            const amt = parseFloat(i.total || i.grandTotal || 0);
+            const rTime = new Date(i.date || i.timestamp).getTime();
+            
+            // Monthly Map (Full history)
+            const d = new Date(i.date || i.timestamp);
+            const mIdx = d.getMonth();
+            const year = d.getFullYear();
+            const key = `${year}-${String(mIdx + 1).padStart(2, '0')}`;
+            const label = `${monthsAr[mIdx]} ${year}`;
+            if (!monthlyMap[key]) monthlyMap[key] = { label, total: 0, sortKey: key };
+            monthlyMap[key].total += amt;
+
+            // ACTIVE BATCH FILTER (Today + Not Reported)
+            const isToday = rTime >= todayStart;
+            if (isToday && !i.isZReported) {
+                totalAllInvoices += amt;
+                if (i.isCancelled === true) {
+                    totalRefunds += amt;
+                } else {
+                    const pCost = parseFloat(i.laundryCost || i.partnerLaundryCost || 0);
+                    totalLaundryCosts += pCost;
+                    if (!i.laundryPaid) totalLaundryDebt += pCost;
+                }
+            }
+        });
+
+        // 2. Process Expenses (Today + Not Reported)
+        exps.forEach(e => {
+            const eTime = new Date(e.date).getTime();
+            if (eTime >= todayStart && !e.isZReported) {
+                totalOperatingExpenses += parseFloat(e.amount) || 0;
+            }
+        });
+
+        // FINAL COMPREHENSIVE FINANCIAL MATH (Redix Logic)
+        let totalNetRevenue = totalAllInvoices - totalRefunds;
+        // Net Profit = [Net Revenue] - [Operating Expenses] - [Total Outsourcing Costs]
+        let netProfit = totalNetRevenue - (totalOperatingExpenses + totalLaundryCosts);
+
+        let html = `
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:20px; margin-bottom:40px;">
+            
+            <!-- 1. Gross Sales -->
+            <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px; text-align:center; box-shadow:var(--shadow-sm);">
+                <h3 style="color:var(--text-muted); font-size:13px; margin-bottom:5px;">إجمالي المبيعات (Gross Sales)</h3>
+                <div style="font-size:24px; font-weight:800; direction:ltr; color:var(--text-main);">${totalAllInvoices.toFixed(2)} ر.س</div>
+            </div>
+
+            <!-- 2. Refunds -->
+            <div style="background:var(--bg-surface); border:1px solid rgba(255, 69, 58, 0.2); border-radius:var(--radius-md); padding:20px; text-align:center; box-shadow:var(--shadow-sm);">
+                <h3 style="color:var(--text-muted); font-size:13px; margin-bottom:5px;">إجمالي المرتجعات (Refunds)</h3>
+                <div style="font-size:24px; font-weight:800; direction:ltr; color:#ff453a;">- ${totalRefunds.toFixed(2)} ر.س</div>
+            </div>
+
+            <!-- 3. Net Revenue -->
+            <div style="background:var(--bg-surface); border:1px solid rgba(76, 175, 80, 0.2); border-radius:var(--radius-md); padding:20px; text-align:center; box-shadow:var(--shadow-sm);">
+                <h3 style="color:var(--text-muted); font-size:13px; margin-bottom:5px;">صافي الإيرادات (Net Revenue)</h3>
+                <div style="font-size:24px; font-weight:800; direction:ltr; color:#4CAF50;">${totalNetRevenue.toFixed(2)} ر.س</div>
+            </div>
+
+            <!-- 4. Operating Expenses -->
+            <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px; text-align:center; box-shadow:var(--shadow-sm);">
+                <h3 style="color:var(--text-muted); font-size:13px; margin-bottom:5px;">المصاريف التشغيلية (Expenses)</h3>
+                <div style="font-size:24px; font-weight:800; direction:ltr; color:var(--text-main);">- ${totalOperatingExpenses.toFixed(2)} ر.س</div>
+            </div>
+
+            <!-- 5. Partner Laundry Debt -->
+            <div style="background:var(--bg-surface); border:1px solid rgba(253, 184, 19, 0.2); border-radius:var(--radius-md); padding:20px; text-align:center; box-shadow:var(--shadow-sm);">
+                <h3 style="color:var(--text-muted); font-size:13px; margin-bottom:5px;">حسابات المغاسل (Debt)</h3>
+                <div style="font-size:24px; font-weight:800; direction:ltr; color:var(--primary);">${totalLaundryDebt.toFixed(2)} ر.س</div>
+            </div>
+
+            <!-- 6. FINAL NET PROFIT OVERLAY -->
+            <div style="grid-column: 1 / -1; background:var(--bg-elevated); border:2px solid var(--primary); border-radius:var(--radius-md); padding:25px; text-align:center; box-shadow:var(--shadow-lg);">
+                <h3 style="color:var(--text-muted); font-size:15px; margin-bottom:10px;">صافي الربح النهائي (Net Profit)</h3>
+                <div style="font-size:42px; font-weight:900; color:${netProfit >= 0 ? 'var(--primary)' : '#ff453a'}; direction:ltr; text-shadow:0 0 20px rgba(253,184,19,0.1);">
+                    ${netProfit.toFixed(2)} <span style="font-size:20px;"> ر.س</span>
+                </div>
+                <p style="margin-top:10px; font-size:12px; color:var(--text-muted); opacity:0.8;">[صافي الإيراد] - [المصاريف التشغيلية] - [إجمالي تكاليف الشركاء]</p>
+            </div>
+        </div>
+
+        <!-- End of Day Closure Button -->
+        <div style="text-align: center; margin-bottom: 40px; background: rgba(87, 67, 177, 0.05); padding: 30px; border-radius: var(--radius-md); border: 2px dashed var(--primary);">
+            <h3 style="color: var(--text-main); margin-bottom: 10px;">إغلاق اليومية (Close Accounting Day)</h3>
+            <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 20px;">سيتم إصدار تقرير Z-Report وأرشفة العمليات الحالية لبدء يوم جديد.</p>
+            <button class="btn btn-primary" onclick="appLogic.closeDay()" style="padding: 16px 50px; font-size: 18px; font-weight: 900; background: var(--primary); color: #000; box-shadow: 0 4px 15px rgba(253, 184, 19, 0.3);">
+                <i class="fa-solid fa-lock" style="margin-left: 10px;"></i> إغلاق اليومية وإصدار التقرير
+            </button>
+        </div>
+
+        <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px; margin-bottom: 30px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:15px; margin-bottom:20px;">
+                <div>
+                    <h3 style="margin-bottom:5px; color:var(--text-main); font-size: 18px;"><i class="fa-solid fa-calendar-days" style="color:var(--primary); margin-left:8px;"></i> مبيعات الأشهر (Monthly Sales Breakdown)</h3>
+                    <p style="color:var(--text-muted); font-size:13px;">تفصيل المبيعات الإيرادية مجمعة حسب الشهر والميلادي.</p>
+                </div>
+            </div>
+            
+            <div style="overflow-x: auto;">
+                <table style="width:100%; border-collapse:collapse; text-align:right;">
+                    <thead>
+                        <tr style="border-bottom:2px solid var(--border); color:var(--text-muted); font-size: 14px;">
+                            <th style="padding:12px;">الشهر / السنة (Period)</th>
+                            <th style="padding:12px;">إجمالي المبيعات (Total Revenue)</th>
+                            <th style="padding:12px; text-align:center;">الحالة (Status)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        const sortedMonths = Object.values(monthlyMap).sort((a, b) => b.sortKey.localeCompare(a.sortKey));
+
+        if (sortedMonths.length === 0) {
+            html += `<tr><td colspan="3" style="padding:20px; text-align:center; color:var(--text-muted);">لا توجد مبيعات مسجلة حتى الآن</td></tr>`;
+        } else {
+            sortedMonths.forEach(m => {
+                html += `
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                    <td style="padding:14px; font-weight:700; color:#fff;">${m.label}</td>
+                    <td style="padding:14px; font-weight:900; color:var(--primary); direction:ltr;">${m.total.toFixed(2)} SAR</td>
+                    <td style="padding:14px; text-align:center;">
+                        <span style="background:rgba(76, 175, 80, 0.15); color:#4CAF50; padding:4px 10px; border-radius:12px; font-size:11px; font-weight:bold;">محقق</span>
+                    </td>
+                </tr>`;
+            });
+        }
+
+        html += `
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:15px; margin-bottom:20px;">
+                <div>
+                    <h3 style="margin-bottom:5px; color:var(--text-main); font-size: 18px;"><i class="fa-solid fa-chart-bar" style="color:var(--primary); margin-left:8px;"></i> ملخص المبيعات (Sales Analytics)</h3>
+                    <p style="color:var(--text-muted); font-size:13px;">مقارنة سريعة لأداء المبيعات خلال فترات زمنية للنشاط.</p>
+                </div>
+            </div>
+            
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:15px;">
+                <div style="background:linear-gradient(135deg, rgba(253,184,19,0.1), rgba(253,184,19,0.02)); border:1px solid rgba(253,184,19,0.2); border-radius:12px; padding:20px; text-align:center;">
+                    <div style="color:var(--text-muted); font-size:14px; margin-bottom:10px;">مبيعات اليوم</div>
+                    <div style="font-size:24px; font-weight:800; color:var(--primary); direction:ltr;">${salesToday.toFixed(2)} SAR</div>
+                </div>
+                <div style="background:linear-gradient(135deg, rgba(76,175,80,0.1), rgba(76,175,80,0.02)); border:1px solid rgba(76,175,80,0.2); border-radius:12px; padding:20px; text-align:center;">
+                    <div style="color:var(--text-muted); font-size:14px; margin-bottom:10px;">آخر 7 أيام</div>
+                    <div style="font-size:24px; font-weight:800; color:#4CAF50; direction:ltr;">${salesWeek.toFixed(2)} SAR</div>
+                </div>
+                <div style="background:linear-gradient(135deg, rgba(33,150,243,0.1), rgba(33,150,243,0.02)); border:1px solid rgba(33,150,243,0.2); border-radius:12px; padding:20px; text-align:center;">
+                    <div style="color:var(--text-muted); font-size:14px; margin-bottom:10px;">آخر 30 يوم</div>
+                    <div style="font-size:24px; font-weight:800; color:#2196F3; direction:ltr;">${salesMonth.toFixed(2)} SAR</div>
+                </div>
+                <div style="background:linear-gradient(135deg, rgba(156,39,176,0.1), rgba(156,39,176,0.02)); border:1px solid rgba(156,39,176,0.2); border-radius:12px; padding:20px; text-align:center;">
+                    <div style="color:var(--text-muted); font-size:14px; margin-bottom:10px;">آخر 365 يوم</div>
+                    <div style="font-size:24px; font-weight:800; color:#9c27b0; direction:ltr;">${salesYear.toFixed(2)} SAR</div>
+                </div>
+            </div>
+        </div>
+        `;
+        document.getElementById('reports-content').innerHTML = html;
+        this.renderLaundryAccounts();
+    },
+
+No zr

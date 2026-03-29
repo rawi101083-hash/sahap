@@ -1,0 +1,30 @@
+    async closeDay() {
+        if (!confirm('هل أنت متأكد من إغلاق اليومية وإصدار التقرير؟')) return;
+
+        // 1. Calculate current active totals
+        const invoices = await localforage.getItem('invoices') || [];
+        const exps = await localforage.getItem('expenses') || [];
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+        let gross = 0, refunds = 0, lCosts = 0, netProfit = 0, opExps = 0;
+        
+        invoices.forEach(i => {
+            const rTime = new Date(i.date || i.timestamp).getTime();
+            if (rTime >= todayStart && !i.isZReported) {
+                const amt = parseFloat(i.total || i.grandTotal || 0);
+                gross += amt;
+                if (i.isCancelled) {
+                    refunds += amt;
+                } else {
+                    lCosts += parseFloat(i.laundryCost || i.partnerLaundryCost || 0);
+                }
+            }
+        });
+
+        exps.forEach(e => {
+            const eTime = new Date(e.date).getTime();
+            if (eTime >= todayStart && !e.isZReported) {
+                opExps += parseFloat(e.amount) || 0;
+            }
+        });

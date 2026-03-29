@@ -48,47 +48,61 @@ const AvailableIcons = [
     'fa-user-doctor', 'fa-rug', 'fa-bed', 'fa-person-dress', 'fa-mitten', 'fa-blanket', 'fa-tie'
 ];
 
-// ZATCA Phase 1 TLV & Base64 Encoder (byte-array approach — handles Arabic UTF-8 correctly)
-const zatcaEncoder = {
-    toUTF8Bytes: function(str) {
-        return new TextEncoder().encode(String(str));
-    },
-    buildTLV: function(tag, value) {
-        const valBytes = this.toUTF8Bytes(value);
-        // [Tag (1 byte)] [Length (1 byte)] [Value bytes...]
-        return new Uint8Array([tag, valBytes.length, ...valBytes]);
-    },
-    generateZATCA_QR: function(sellerName, vatNumber, timestamp, total, vatTotal) {
+// ZATCA Phase 1 TLV & Base64 Encoder (Standalone function mapping to global scopes)
+function generateZatcaBase64(sellerName, vatNumber, timestamp, totalAmount, vatAmount) {
+    try {
+        const name = (sellerName && sellerName.trim()) ? sellerName.trim() : 'Redix';
+        // Non-existent VAT defaults to empty string rather than crashing validators
+        const vat = (vatNumber && vatNumber.trim() && vatNumber !== '000000000000000') ? vatNumber : '';
+        const fTotal = parseFloat(totalAmount || 0).toFixed(2);
+        const fVat = parseFloat(vatAmount || 0).toFixed(2);
+        
+        let isoTime = timestamp;
         try {
-            const name    = (sellerName && sellerName.trim()) ? sellerName.trim() : 'Redix';
-            const vat     = (vatNumber  && vatNumber.trim()  && vatNumber.length === 15 && vatNumber !== '000000000000000') ? vatNumber : '300000000000000';
-            const isoTime = new Date(timestamp).toISOString().split('.')[0] + 'Z';
-            const fTotal  = parseFloat(total   || 0).toFixed(2);
-            const fVat    = parseFloat(vatTotal || 0).toFixed(2);
-
-            // Concatenate all TLV byte arrays
-            const parts = [
-                this.buildTLV(1, name),
-                this.buildTLV(2, vat),
-                this.buildTLV(3, isoTime),
-                this.buildTLV(4, fTotal),
-                this.buildTLV(5, fVat)
-            ];
-            const totalLen = parts.reduce((s, p) => s + p.length, 0);
-            const all = new Uint8Array(totalLen);
-            let offset = 0;
-            parts.forEach(p => { all.set(p, offset); offset += p.length; });
-
-            // Convert to binary string then Base64
-            let binaryStr = '';
-            all.forEach(b => { binaryStr += String.fromCharCode(b); });
-            return btoa(binaryStr);
-        } catch (err) {
-            console.error('ZATCA QR generation failed:', err);
-            return 'AQzZhdi62LPZhNipINmG2YrYp9mB'; // safe fallback — won't crash the POS
+            isoTime = new Date(timestamp).toISOString();
+        } catch (e) {
+            isoTime = new Date().toISOString();
         }
+
+        // Pure JS helpers to assemble strict ZATCA TLV buffers
+        const toUTF8Bytes = (str) => new TextEncoder().encode(String(str));
+        
+        const buildTLV = (tag, value) => {
+            const valBytes = toUTF8Bytes(value || "");
+            // Tag (1 byte) | Length (1 byte) | Unicode UTF-8 Bytes
+            return new Uint8Array([tag, valBytes.length, ...valBytes]);
+        };
+
+        const parts = [
+            buildTLV(1, name),
+            buildTLV(2, vat),
+            buildTLV(3, isoTime),
+            buildTLV(4, fTotal),
+            buildTLV(5, fVat)
+        ];
+
+        // Combine into unified array buffer exactly to standard memory
+        const totalLen = parts.reduce((acc, curr) => acc + curr.length, 0);
+        const binaryBuffer = new Uint8Array(totalLen);
+        let offset = 0;
+        parts.forEach(p => { 
+            binaryBuffer.set(p, offset); 
+            offset += p.length; 
+        });
+
+        // Convert byte sequences directly to native base64 without leaking memory
+        let payloadStr = '';
+        for (let i = 0; i < binaryBuffer.length; i++) {
+            payloadStr += String.fromCharCode(binaryBuffer[i]);
+        }
+        
+        return btoa(payloadStr);
+
+    } catch (err) {
+        console.error('ZATCA Standalone Encoding err:', err);
+        return unescape(encodeURIComponent('فاتورة ضريبية مبسطة')); 
     }
-};
+}
 
 
 
@@ -170,21 +184,22 @@ localforage.setItem = async function (key, value) {
     return await originalSetItem.call(localforage, key, value);
 };
 
-// 2. EXPLICIT SYNC: Manual helper to send data to Firebase (UID-scoped)
-async function manualSyncToCloud(key, value) {
+// 2. EXPLICIT SYNC: Targeted helper to send specific records or collections to Firebase (UID-scoped)
+async function manualSyncToCloud(key, value, recordId = null) {
     if (!window.isDataInitialized) {
         console.warn(`[Sync-Blocked] Cannot save ${key}. System is still initializing.`);
         return;
     }
     
     if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "YOUR_API_KEY" && !!firebaseConfig.apiKey) {
+        const path = recordId ? `${key}/${recordId}` : key;
         try {
-            console.log(`[Manual-Sync] Sending ${key} to cloud...`);
+            console.log(`[Manual-Sync] Sending ${path} to cloud...`);
             const safePayload = JSON.parse(JSON.stringify(value, (k, v) => (v === undefined ? null : v)));
-            await firebase.database().ref(getDbPath(key)).set(safePayload);
-            console.log(`[Manual-Sync] ${key} saved successfully.`);
+            await firebase.database().ref(getDbPath(path)).set(safePayload);
+            console.log(`[Manual-Sync] ${path} saved successfully.`);
         } catch (err) {
-            console.error(`[Manual-Sync] Error saving ${key}:`, err);
+            console.error(`[Manual-Sync] Error saving ${path}:`, err);
         }
     }
 }
@@ -206,9 +221,18 @@ async function initFirebaseSync() {
         return;
     }
 
+    const fourHundredDaysAgo = Date.now() - (400 * 24 * 60 * 60 * 1000);
+
     const fetchPromises = collectionsToSync.map(key => {
         return new Promise((resolve) => {
-            const dbRef = firebase.database().ref(getDbPath(key));
+            let dbRef = firebase.database().ref(getDbPath(key));
+            
+            // OPTIMIZATION: Only fetch last 400 days for heavy transactional collections
+            if (key === 'invoices' || key === 'expenses') {
+                console.log(`[Recovery] Applying 400-day optimization for ${key}...`);
+                dbRef = dbRef.orderByChild('timestamp').startAt(fourHundredDaysAgo);
+            }
+
             console.log(`[Recovery] Requesting ${key} from cloud...`);
             
             dbRef.once('value', async (snapshot) => {
@@ -224,7 +248,10 @@ async function initFirebaseSync() {
                     await originalSetItem.call(localforage, key, cloudData);
                     window.__syncingFromFirebase = false;
                 } else {
-                    console.log(`[Recovery] No cloud data for ${key}. Local cache remains intact.`);
+                    console.log(`[Multi-Tenant] Provisioning fresh isolated data space for ${key}. Zero-State Enforced.`);
+                    window.__syncingFromFirebase = true;
+                    await originalSetItem.call(localforage, key, []); // ZERO STATE PROMISE!
+                    window.__syncingFromFirebase = false;
                 }
                 resolve();
             }, (err) => {
@@ -748,7 +775,7 @@ window.appLogic = {
             return;
         }
 
-        let cName  = custNameInput  || 'عميل نقدي';
+        let cName  = custNameInput  || '';
         let cPhone = custPhoneInput || '0000000000';
 
 
@@ -764,7 +791,7 @@ window.appLogic = {
                     if (num > max) max = num;
                 }
             });
-            newInvId = `INV-${String(max + 1).padStart(6, '0')}`;
+            newInvId = String(max + 1).padStart(6, '0');
         }
 
         // Prepare Invoice Details (Not Saved Yet)
@@ -816,7 +843,7 @@ window.appLogic = {
 
         // Render QR in Preview (ZATCA Base64 TLV Format)
         const bizNamePreview = window.tenantSettings?.name || 'Redix';
-        const zatcaQRBase64 = zatcaEncoder.generateZATCA_QR(bizNamePreview, window.tenantSettings?.taxNumber || "000000000000000", invoiceData.timestamp, invoiceData.grandTotal, invoiceData.vatAmount);
+        const zatcaQRBase64 = generateZatcaBase64(bizNamePreview, window.tenantSettings?.taxNumber || "000000000000000", invoiceData.timestamp, invoiceData.grandTotal, invoiceData.vatAmount);
 
         new QRCode(document.getElementById('preview-qr-render'), {
             text: zatcaQRBase64,
@@ -828,7 +855,7 @@ window.appLogic = {
         document.getElementById('modal-actions-preview').classList.remove('hidden');
         document.getElementById('modal-actions-success').classList.add('hidden');
 
-        document.getElementById('preview-invoice-id').innerText = invoiceData.id;
+        document.getElementById('preview-invoice-id').innerText = (invoiceData.id || '').toString().replace(/^INV-/, '');
         document.getElementById('invoice-preview-modal').classList.remove('hidden');
     },
 
@@ -840,7 +867,7 @@ window.appLogic = {
         if (this.customer.phone && this.customer.phone !== '0000000000') {
             let customers = await localforage.getItem('customers') || [];
             let cIdx = customers.findIndex(c => c.phone === this.customer.phone);
-            let cData = { phone: this.customer.phone, name: this.customer.name || 'عميل نقدي', timestamp: Date.now() };
+            let cData = { phone: this.customer.phone, name: this.customer.name || '', timestamp: Date.now() };
             if (cIdx >= 0) customers[cIdx] = cData; else customers.push(cData);
             await localforage.setItem('customers', customers);
             await manualSyncToCloud('customers', customers);
@@ -868,7 +895,7 @@ window.appLogic = {
         this.pendingInvoice = null;
 
         // Switch Modal State
-        document.getElementById('success-invoice-ref').innerText = this.currentInvoice.id;
+        document.getElementById('success-invoice-ref').innerText = (this.currentInvoice.id || '').toString().replace(/^INV-/, '');
         document.getElementById('modal-actions-preview').classList.add('hidden');
         document.getElementById('modal-actions-success').classList.remove('hidden');
 
@@ -975,9 +1002,7 @@ window.appLogic = {
 
         const data = this.currentInvoice;
         const dObj = new Date(data.timestamp);
-        const dStrHijri = dObj.toLocaleDateString('ar-SA', { year: 'numeric', month: '2-digit', day: '2-digit' });
-        const dStrGregorian = dObj.toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
-        const dStr = `${dStrHijri} / ${dStrGregorian}`;
+        const dStr = dObj.toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
 
         // WhatsApp link helper — formats Saudi numbers to wa.me/966xxxxxxxxx
         const _waLink = (phone, display) => {
@@ -994,6 +1019,8 @@ window.appLogic = {
         const _delivery = parseFloat(data.deliveryFee || 0);
         const _grand    = parseFloat(data.grandTotal || data.total || 0);
         const _subtotal = _grand - _vatAmt;
+        const _invId    = (data.id || '').toString().replace(/^INV-/, '');
+        const _custName = (!data.customer.name || data.customer.name === 'عميل نقدي' || data.customer.name === 'عميل دون اسم') ? '' : data.customer.name;
         const _storeTax = window.tenantSettings?.taxNumber
             ? `<p style="margin:2px 0; font-size:14px; color:#444;">الرقم الضريبي: &nbsp;&nbsp; <strong style="direction:ltr; display:inline-block;">${window.tenantSettings.taxNumber}</strong></p>` : '';
         const _storeWA  = window.tenantSettings?.phone
@@ -1001,7 +1028,8 @@ window.appLogic = {
         const _storeAddress = window.tenantSettings?.address
             ? `<p style="margin:2px 0; font-size:14px; color:#444;">العنوان: &nbsp;&nbsp; <strong style="direction:rtl; display:inline-block;">${window.tenantSettings.address}</strong></p>`
             : `<p style="margin:2px 0; font-size:14px; color:#444;">العنوان: &nbsp;&nbsp; <strong style="direction:rtl; display:inline-block;">المملكة العربية السعودية</strong></p>`;
-        const _invType  = _vatAmt > 0 ? 'فاتورة ضريبية مبسطة' : 'فاتورة';
+        const _hasValTax = !!(window.tenantSettings && window.tenantSettings.taxNumber && window.tenantSettings.taxNumber.trim() !== '');
+        const _invType  = _hasValTax ? 'فاتورة ضريبية مبسطة' : 'فاتورة مبيعات';
 
         let _itemRows = '', _rn = 1;
         data.items.forEach(it => {
@@ -1049,13 +1077,13 @@ window.appLogic = {
             <table style="width:100%; border-collapse:collapse; margin-bottom:25px; font-size:14px; direction:rtl;">
                 <tr>
                     <td style="padding:5px 0; color:#555; white-space:nowrap; width:120px; unicode-bidi:plaintext; direction:rtl;">&#x202B;رقم الفاتورة:&#x200F;</td>
-                    <td style="padding:5px 10px; font-weight:bold; color:#000;">${data.id}</td>
+                    <td style="padding:5px 10px; font-weight:bold; color:#000;">${_invId}</td>
                     <td style="padding:5px 0; color:#555; white-space:nowrap; width:80px; unicode-bidi:plaintext; direction:rtl;">&#x202B;التاريخ:&#x200F;</td>
                     <td style="padding:5px 10px; font-weight:bold; color:#000; direction:ltr; text-align:right;">${dStr}</td>
                 </tr>
                 <tr>
                     <td style="padding:5px 0; color:#555; unicode-bidi:plaintext; direction:rtl;">&#x202B;العميل:&#x200F;</td>
-                    <td style="padding:5px 10px; font-weight:bold; color:#000;">${data.customer.name || 'عميل نقدي'}</td>
+                    <td style="padding:5px 10px; font-weight:bold; color:#000;">${_custName}</td>
                     <td style="padding:5px 0; color:#555; unicode-bidi:plaintext; direction:rtl;">&#x202B;رقم الجوال:&#x200F;</td>
                     <td style="padding:5px 10px; font-weight:bold; color:#000; direction:ltr; text-align:right;">${_waLink(data.customer.phone, data.customer.phone)}</td>
                 </tr>
@@ -1077,6 +1105,7 @@ window.appLogic = {
 
             <div style="display:flex; justify-content:flex-end; margin-bottom:35px;">
                 <table dir="rtl" style="border-collapse:collapse; font-size:14px; min-width:310px;">
+                    ${_hasValTax ? `
                     <tr>
                         <td style="padding:6px 0; color:#555;">المجموع بدون ضريبة</td>
                         <td style="padding:6px 0; padding-right:20px; font-weight:bold; direction:ltr; text-align:left;">${_subtotal.toFixed(2)} ر.س</td>
@@ -1084,7 +1113,7 @@ window.appLogic = {
                     <tr>
                         <td style="padding:6px 0; color:#555;">ضريبة القيمة المضافة 15٪</td>
                         <td style="padding:6px 0; padding-right:20px; font-weight:bold; direction:ltr; text-align:left;">${_vatAmt.toFixed(2)} ر.س</td>
-                    </tr>
+                    </tr>` : ''}
                     <tr style="border-top:1px solid #000;">
                         <td style="padding:10px 0; font-size:16px; font-weight:900; color:#000;">الإجمالي النهائي</td>
                         <td style="padding:10px 0; padding-right:20px; font-size:18px; font-weight:900; color:#000; direction:ltr; text-align:left;">${_grand.toFixed(2)} ر.س</td>
@@ -1105,7 +1134,7 @@ window.appLogic = {
 
         // Standard ZATCA QR (Updated with Real Tax)
         const bizName = window.tenantSettings?.name || 'Redix';
-        const zatcaQRBase64 = zatcaEncoder.generateZATCA_QR(bizName, window.tenantSettings?.taxNumber || "000000000000000", data.timestamp, data.grandTotal, data.vatAmount);
+        const zatcaQRBase64 = generateZatcaBase64(bizName, window.tenantSettings?.taxNumber || "000000000000000", data.timestamp, data.grandTotal, data.vatAmount);
         new QRCode(container.querySelector('#pdf-qr-container'), {
             text: zatcaQRBase64,
             width: 140, height: 140,
@@ -1114,7 +1143,7 @@ window.appLogic = {
 
         const opt = {
             margin: 0,
-            filename: `Invoice_${data.id}.pdf`,
+            filename: `Invoice_${_invId}.pdf`,
             image: { type: 'jpeg', quality: 1.0 },
             html2canvas: {
                 scale: 2,
@@ -1177,10 +1206,11 @@ window.appLogic = {
 
     // HTML Generator for Thermal Receipt (Zero Ink — white background, RTL Arabic)
     generateThermalHTML(data, qrContainerId) {
+        const _hasValTax = !!(window.tenantSettings && window.tenantSettings.taxNumber && window.tenantSettings.taxNumber.trim() !== '');
         const dObj = new Date(data.timestamp);
-        const dStrHijri = dObj.toLocaleDateString('ar-SA', { year: 'numeric', month: '2-digit', day: '2-digit' });
-        const dStrGregorian = dObj.toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
-        const dStr = `${dStrHijri} / ${dStrGregorian}`;
+        const dStr = dObj.toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
+        const _invId = (data.id || '').toString().replace(/^INV-/, '');
+        const _custName = (!data.customer.name || data.customer.name === 'عميل نقدي' || data.customer.name === 'عميل دون اسم') ? '' : data.customer.name;
         const vatAmount  = parseFloat(data.vatAmount  || 0);
         const deliveryFee = parseFloat(data.deliveryFee || 0);
         const grandTotal  = parseFloat(data.grandTotal  || data.total || 0);
@@ -1240,6 +1270,7 @@ window.appLogic = {
             <!-- Header: Store Name → VAT Number → Phone -->
             <div class="receipt-header">
                 <div style="font-size:18px; font-weight:900; margin-bottom:4px;">${window.tenantSettings?.name || 'Redix'}</div>
+                <div style="font-size:13px; font-weight:bold; margin-bottom:4px;">${_hasValTax ? 'فاتورة ضريبية مبسطة' : 'فاتورة مبيعات'}</div>
                 ${storeAddress}
                 ${storeTax}
                 ${storePhone}
@@ -1249,7 +1280,7 @@ window.appLogic = {
             <table style="width:100%; font-size:12px; margin-bottom:8px; border-collapse:collapse; direction:rtl;">
                 <tr>
                     <td style="color:#555; unicode-bidi:plaintext; direction:rtl;">&#x202B;رقم الفاتورة:&#x200F;</td>
-                    <td style="font-weight:bold; text-align:left; direction:ltr;">${data.id}</td>
+                    <td style="font-weight:bold; text-align:left; direction:ltr;">${_invId}</td>
                 </tr>
                 <tr>
                     <td style="color:#555; unicode-bidi:plaintext; direction:rtl;">&#x202B;التاريخ:&#x200F;</td>
@@ -1257,7 +1288,7 @@ window.appLogic = {
                 </tr>
                 <tr>
                     <td style="color:#555; unicode-bidi:plaintext; direction:rtl;">&#x202B;العميل:&#x200F;</td>
-                    <td style="font-weight:bold;">${data.customer.name || 'عميل نقدي'}</td>
+                    <td style="font-weight:bold;">${_custName}</td>
                 </tr>
                 ${data.customer.phone && data.customer.phone !== '0000000000' ? `<tr><td style="color:#555; unicode-bidi:plaintext; direction:rtl;">&#x202B;&#x1585;&#x1602;&#x1605; &#x1575;&#x1604;&#x1580;&#x1608;&#x1575;&#x1604;:&#x200F;</td><td style="direction:ltr; text-align:left;">${_waLink(data.customer.phone, data.customer.phone)}</td></tr>` : ''}
             </table>
@@ -1275,6 +1306,7 @@ window.appLogic = {
             </table>
 
             <table style="width:100%; font-size:12px; margin-top:8px; border-collapse:collapse;">
+                ${_hasValTax ? `
                 <tr>
                     <td style="padding:3px 0; color:#555;">المجموع بدون ضريبة</td>
                     <td style="text-align:left; font-weight:bold; direction:ltr;">${combinedSum.toFixed(2)} ر.س</td>
@@ -1282,7 +1314,7 @@ window.appLogic = {
                 <tr>
                     <td style="padding:3px 0; color:#555;">ضريبة القيمة المضافة 15٪</td>
                     <td style="text-align:left; font-weight:bold; direction:ltr;">${vatAmount.toFixed(2)} ر.س</td>
-                </tr>
+                </tr>` : ''}
                 <tr style="border-top:1px solid #000;">
                     <td style="padding:5px 0; font-size:14px; font-weight:900;">الإجمالي النهائي</td>
                     <td style="text-align:left; font-size:14px; font-weight:900; direction:ltr;">${grandTotal.toFixed(2)} ر.س</td>
@@ -1303,7 +1335,7 @@ window.appLogic = {
         document.getElementById('invoice-print-container').innerHTML = this.generateThermalHTML(data, 'print-qr-render');
 
         const bizName = window.tenantSettings?.name || 'Redix';
-        const zatcaQRBase64 = zatcaEncoder.generateZATCA_QR(bizName, window.tenantSettings?.taxNumber || "000000000000000", data.timestamp, data.grandTotal, data.vatAmount);
+        const zatcaQRBase64 = generateZatcaBase64(bizName, window.tenantSettings?.taxNumber || "000000000000000", data.timestamp, data.grandTotal, data.vatAmount);
         new QRCode(document.getElementById('print-qr-render'), {
             text: zatcaQRBase64,
             width: 120, height: 120,
@@ -1358,7 +1390,7 @@ window.appLogic = {
                 displayInvoices.forEach(i => {
                     if (!i) return;
                     const isCancelled = i.isCancelled === true;
-                    let customerName = (i.customer && i.customer.name) ? i.customer.name : 'عميل نقدي';
+                    let customerName = (i.customer && i.customer.name) ? i.customer.name : '';
                     let customerPhone = (i.customer && i.customer.phone) ? i.customer.phone : '0000000000';
                     let cellPhone = (customerPhone !== '0000000000') ? `<br><small style="color:var(--text-muted); direction:ltr; display:inline-block">${customerPhone}</small>` : '';
                     let total = i.grandTotal || 0;
@@ -1486,7 +1518,7 @@ window.appLogic = {
         this.currentInvoice = invoiceData;
         document.getElementById('invoice-preview-container').innerHTML = this.generateThermalHTML(invoiceData, 'preview-qr-render');
 
-        const zatcaQRBase64 = zatcaEncoder.generateZATCA_QR(window.tenantSettings?.name || "Redix", window.tenantSettings?.taxNumber || "000000000000000", invoiceData.timestamp, invoiceData.grandTotal, invoiceData.vatAmount || 0);
+        const zatcaQRBase64 = generateZatcaBase64(window.tenantSettings?.name || "Redix", window.tenantSettings?.taxNumber || "000000000000000", invoiceData.timestamp, invoiceData.grandTotal, invoiceData.vatAmount || 0);
         new QRCode(document.getElementById('preview-qr-render'), {
             text: zatcaQRBase64,
             width: 100, height: 100,
@@ -2211,8 +2243,8 @@ window.appLogic = {
         const now = new Date();
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
         const weekAgo = todayStart - (7 * 24 * 60 * 60 * 1000);
-        const monthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate()).getTime();
-        const yearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()).getTime();
+        const monthAgo = todayStart - (30 * 24 * 60 * 60 * 1000);
+        const yearAgo = todayStart - (365 * 24 * 60 * 60 * 1000);
 
         let salesToday = 0, salesWeek = 0, salesMonth = 0, salesYear = 0;
         const monthsAr = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
@@ -2231,6 +2263,13 @@ window.appLogic = {
             const amt = parseFloat(i.total || i.grandTotal || 0);
             const rTime = new Date(i.date || i.timestamp).getTime();
             
+            // DYNAMIC ROLLING TOTALS
+            const isToday = rTime >= todayStart;
+            if (isToday && !i.isZReported) salesToday += amt;
+            if (rTime >= weekAgo) salesWeek += amt;
+            if (rTime >= monthAgo) salesMonth += amt;
+            if (rTime >= yearAgo) salesYear += amt;
+
             // Monthly Map (Full history)
             const d = new Date(i.date || i.timestamp);
             const mIdx = d.getMonth();
@@ -2241,7 +2280,6 @@ window.appLogic = {
             monthlyMap[key].total += amt;
 
             // ACTIVE BATCH FILTER (Today + Not Reported)
-            const isToday = rTime >= todayStart;
             if (isToday && !i.isZReported) {
                 totalAllInvoices += amt;
                 if (i.isCancelled === true) {
@@ -2688,8 +2726,15 @@ window.appLogic = {
 
             // 2. Identity Resolution: PIN -> UID
             const pinSnap = await firebase.database().ref(`pincodes/${pin}`).once('value');
-            let targetUID = pinSnap.val();
+            const pinData = pinSnap.val();
+            let targetUID = null;
             
+            if (pinData && typeof pinData === 'object') {
+                targetUID = pinData.uid;
+            } else if (typeof pinData === 'string') {
+                targetUID = pinData;
+            }
+
             // 2a. Check SaaS Registry Fallback
             let meta = null;
             if (!targetUID) {
@@ -2711,6 +2756,12 @@ window.appLogic = {
                 
                 if (accountData.isActivated !== true) {
                     throw new Error('account-deactivated');
+                }
+
+                if (accountData.isTrial === true && accountData.trialEndDate) {
+                    if (Date.now() > accountData.trialEndDate) {
+                        throw new Error('trial-expired');
+                    }
                 }
             }
 
@@ -2738,14 +2789,15 @@ window.appLogic = {
                 }
             } catch (authErr) {
                 // 4. Auto-Registration for authorized new stores
-                if (authErr.code === 'auth/user-not-found' || authErr.code === 'auth/wrong-password') {
+                const code = authErr.code;
+                if (code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-credential' || code === 'auth/invalid-login-credentials') {
                      console.log(`[Smart-Gate] Auto-provisioning Auth account for PIN ${pin}...`);
                      await firebase.auth().createUserWithEmailAndPassword(email, pin);
                      const user = firebase.auth().currentUser;
                      if (user) {
                          const syncUpdates = {};
                          // Ensure we bridge the registry to this new permanent UID
-                         syncUpdates[`pincodes/${pin}`] = user.uid;
+                         syncUpdates[`pincodes/${pin}`] = { uid: user.uid, isActivated: true };
                          syncUpdates[`admin/stores/${pin}/uid`] = user.uid;
                          
                          // If we have meta from Step 2, use it to initialize settings
@@ -2779,6 +2831,7 @@ window.appLogic = {
             console.error('[Smart-Gate] Routing Failure:', err.message);
             let errMsg = 'الرمز خاطئ، يرجى التأكد من الرمز والمحاولة مرة أخرى.';
             if (err.message === 'account-deactivated')  errMsg = 'عذراً، هذا الحساب معطل من قبل الإدارة.';
+            else if (err.message === 'trial-expired') errMsg = 'انتهت الفترة التجريبية. يرجى التواصل مع الإدارة للتجديد.';
             
             errEl.textContent = errMsg;
             errEl.classList.remove('hidden');
@@ -2787,9 +2840,61 @@ window.appLogic = {
         }
     },
 
+    initRealtimeSecurity(uid) {
+        if (!uid || typeof firebase === 'undefined') return;
+        const authRef = firebase.database().ref(`users/${uid}/accountDetails`);
+        authRef.on('value', async (snap) => {
+            if (!snap.exists()) return;
+            const data = snap.val();
+            
+            // 1. THE KILL SWITCH: Instant Eviction on deactivation
+            if (data.isActivated === false) {
+                console.warn("[SECURITY] Kill switch triggered! Account deactivated from Admin.");
+                alert("النظام معطل، يرجى التواصل مع الإدارة");
+                alert("النظام معطل، يرجى التواصل مع الإدارة");
+                localStorage.clear();
+                sessionStorage.clear();
+                await localforage.clear();
+                firebase.auth().signOut().then(() => {
+                    window.location.reload();
+                });
+                return;
+            }
+
+            // 2. TRIAL BANNER UI Injection
+            const banner = document.getElementById('trial-banner');
+            const trialDays = document.getElementById('trial-days');
+            if (banner && trialDays) {
+                if (data.isTrial === true && data.trialEndDate) {
+                    const daysLeft = Math.ceil((data.trialEndDate - Date.now()) / (1000 * 60 * 60 * 24));
+                    if (daysLeft <= 0) {
+                        // Trial expired mid-session
+                        console.warn("[SECURITY] Trial expired during active session!");
+                        alert("انتهت الفترة التجريبية. سيتم تسجيل خروجك الآن.");
+                        localStorage.clear();
+                        sessionStorage.clear();
+                        await localforage.clear();
+                        firebase.auth().signOut().then(() => {
+                            window.location.reload();
+                        });
+                        return;
+                    }
+                    trialDays.innerText = daysLeft;
+                    banner.classList.remove('hidden');
+                } else {
+                    // Unlimited account - hide banner
+                    banner.classList.add('hidden');
+                }
+            }
+        });
+    },
+
     async logoutUser() {
         this.closeSettingsModal();
         await firebase.auth().signOut();
+        await localforage.clear();
+        localStorage.clear();
+        sessionStorage.clear();
         window.currentUID = null;
         window.isDataInitialized = false;
         location.reload();
@@ -2810,8 +2915,19 @@ window.appLogic = {
     async saveTenantSettings() {
         const name  = document.getElementById('setting-name').value.trim()  || 'Redix';
         const phone = document.getElementById('setting-phone').value.trim();
-        const tax   = document.getElementById('setting-tax').value.trim();
-
+        let taxElement = document.getElementById('setting-tax');
+        if (!taxElement) taxElement = document.getElementById('vatNumberInput'); // fail-safe if UI layout swapped
+        let vatValue = taxElement ? taxElement.value.trim() : '';
+        
+        if (vatValue !== "") {
+            let isValidVat = /^\d{15}$/.test(vatValue) && vatValue.startsWith('3') && vatValue.endsWith('3');
+            if (!isValidVat) {
+                alert("الرقم الضريبي غير صحيح! يجب أن يتكون من 15 رقم ويبدأ وينتهي برقم 3");
+                return; // CRITICAL: STOP EXECUTION HERE. DO NOT SAVE TO FIREBASE.
+            }
+        }
+        const tax = vatValue;
+        
         window.tenantSettings = { name, phone, taxNumber: tax };
 
         // window.tenantSettings = { name, phone, taxNumber: tax }; // Already set above
@@ -3033,6 +3149,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Load tenant settings & apply branding BEFORE init
             await appLogic.loadTenantSettings(user.uid);
+
+            // Deploy Realtime SaaS Daemons
+            appLogic.initRealtimeSecurity(user.uid);
 
             // Now boot the app
             await appLogic.init();

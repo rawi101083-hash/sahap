@@ -46,7 +46,7 @@
             </div>
             <div class="login-body">
                 <label>الرمز السري (PIN)</label>
-                <input type="text" id="pin-input" placeholder="••••••" maxlength="6" inputmode="numeric" 
+                <input type="password" id="pin-input" placeholder="••••••" maxlength="6" inputmode="numeric" 
                     oninput="this.value = this.value.replace(/[^0-9]/g, ''); appLogic.validatePinInput(this)"
                     onkeydown="if(event.key==='Enter') appLogic.loginWithPIN()">
                 <p id="login-error" class="login-error hidden" style="line-height: 1.5; min-height: 40px; margin-top: 10px;"></p>
@@ -58,6 +58,10 @@
     </div>
 
     <div id="app">
+        <!-- Trial Banner -->
+        <div id="trial-banner" class="hidden no-print" style="background:#ff9800; color:#fff; text-align:center; padding:10px 20px; font-weight:bold; font-size:14px; z-index:9000; position:relative;">
+            إصدار تجريبي: متبقي <span id="trial-days">5</span> أيام
+        </div>
         <!-- Header -->
         <header class="main-header no-print">
             <div class="logo-area">

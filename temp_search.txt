@@ -1,0 +1,16 @@
+HTML:315:<p style="color: var(--text-muted); font-size: 12px; line-height: 1.4;">يرجى التأكد من صحة البيانات قبل الإصدار النهائي. سيتم تحميل نسخة PDF تلقائياً بعد التأكيد.</p>
+HTML:332:<button class="btn w-100" style="background-color: var(--bg-elevated); color: var(--text-main); border: 1px solid var(--border); font-size: 15px; margin-bottom: 10px;" onclick="appLogic.downloadDigitalPDF(event)"><i class="fa-solid fa-file-pdf"></i> تحميل الفاتورة الرقمية (PDF)</button>
+HTML:537:<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+JS:907:// Auto Download PDF
+JS:908:await this.downloadDigitalPDF(null);
+JS:984:async downloadDigitalPDF(event) {
+JS:985:console.log('Button Clicked: downloadDigitalPDF - Generating ERP Invoice');
+JS:1111:<div id="pdf-qr-container" style="display:inline-block; margin-bottom:10px;"></div>
+JS:1123:new QRCode(container.querySelector('#pdf-qr-container'), {
+JS:1131:filename: `Invoice_${_invId}.pdf`,
+JS:1143:jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+JS:1159:await html2pdf().set(opt).from(container.firstElementChild).save();
+JS:1168:console.error('PDF Error:', err);
+JS:1174:alert('خطأ في إصدار PDF: ' + err.message);
+JS:3000:// 2. Generate PDF Report
+JS:3052:await html2pdf().from(element).save(`Z-Report_${reportDate.replace(/\//g, '-')}.pdf`);

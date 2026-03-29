@@ -1,0 +1,5 @@
+Line 51: const zatcaEncoder = {
+Line 819: const zatcaQRBase64 = zatcaEncoder.generateZATCA_QR(bizNamePreview, window.tenantSettings?.taxNumber || "000000000000000", invoiceData.timestamp, invoiceData.grandTotal, invoiceData.vatAmount);
+Line 1110: const zatcaQRBase64 = zatcaEncoder.generateZATCA_QR(bizName, window.tenantSettings?.taxNumber || "000000000000000", data.timestamp, data.grandTotal, data.vatAmount);
+Line 1311: const zatcaQRBase64 = zatcaEncoder.generateZATCA_QR(bizName, window.tenantSettings?.taxNumber || "000000000000000", data.timestamp, data.grandTotal, data.vatAmount);
+Line 1494: const zatcaQRBase64 = zatcaEncoder.generateZATCA_QR(window.tenantSettings?.name || "Redix", window.tenantSettings?.taxNumber || "000000000000000", invoiceData.timestamp, invoiceData.grandTotal, invoiceData.vatAmount || 0);

@@ -1540,6 +1540,11 @@ button:active {
     box-shadow: 0 0 8px rgba(253, 184, 19, 0.4);
 }
 
+.login-body input::-ms-reveal,
+.login-body input::-webkit-reveal {
+    display: none !important;
+}
+
 .login-error {
     color: #ff5252;
     font-size: 13px;

@@ -280,23 +280,28 @@
                         } catch(e){}
                     }
 
-                    const badge = isActivated 
+                    let badge = isActivated 
                         ? '<span class="status-badge status-active"><i class="fa-solid fa-check"></i> Active</span>' 
                         : '<span class="status-badge status-expired"><i class="fa-solid fa-ban"></i> Suspended</span>';
+                    
+                    if (isActivated && account.isTrial === true) {
+                        let daysLeft = Math.ceil((account.trialEndDate - Date.now()) / (1000 * 60 * 60 * 24));
+                        badge = `<span class="status-badge" style="background:#ff9800; color:#fff"><i class="fa-solid fa-clock"></i> Trial (${daysLeft}d)</span>`;
+                    }
 
                     const actionBtn = !isActivated
                         ? `<button class="btn-action btn-activate" onclick="masterApp.toggleStatus('${uid}', true, '${pin}')"><i class="fa-solid fa-play"></i> Reactivate</button>`
                         : `<button class="btn-action btn-suspend" onclick="masterApp.toggleStatus('${uid}', false, '${pin}')"><i class="fa-solid fa-power-off"></i> Suspend</button>`;
-
                     const tr = document.createElement('tr');
                     tr.style.opacity = !isActivated ? '0.6' : '1';
+                    const deleteBtn = `<button style="background:var(--danger); border:none; color:white; padding:6px 12px; margin-right:8px; border-radius:4px; font-weight:bold; cursor:pointer;" onclick="masterApp.deleteStore('${uid}', '${pin}')" title="حذف نهائي"><i class="fa-solid fa-trash"></i></button>`;
                     tr.innerHTML = `
                         <td dir="ltr" style="font-size:12px; color:#888;">${dateStr}</td>
                         <td style="font-weight:bold; color:#fff;">${name}</td>
                         <td dir="ltr" style="font-family: monospace;">${phone}</td>
                         <td style="font-family: monospace; color:var(--primary); font-weight:bold; letter-spacing:1px;">${pin}</td>
                         <td>${badge}</td>
-                        <td style="text-align: center;">${actionBtn}</td>
+                        <td style="text-align: center;">${actionBtn}${deleteBtn}</td>
                     `;
                     tbody.appendChild(tr);
                 });
@@ -335,13 +340,33 @@
                         return;
                     }
 
+                    // Native Firebase Auth Provisioning
+                    const email = `${pin}@sahab.pos`;
+                    let newID;
+                    try {
+                        const cred = await firebase.auth().createUserWithEmailAndPassword(email, pin);
+                        newID = cred.user.uid;
+                        await firebase.auth().signOut(); // Keep admin logged out
+                    } catch (authError) {
+                        // If they somehow exist in Auth but not DB, assume their ID
+                        if (authError.code === 'auth/email-already-in-use') {
+                            const errCred = await firebase.auth().signInWithEmailAndPassword(email, pin);
+                            newID = errCred.user.uid;
+                            await firebase.auth().signOut();
+                        } else {
+                            throw authError;
+                        }
+                    }
+
                     // Atomic Multi-Path Update
-                    const newID = db.ref('users').push().key;
                     const timestamp = Date.now();
                     
                     const updates = {};
                     // 1. Pincodes registry for login
-                    updates[`pincodes/${pin}`] = newID;
+                    updates[`pincodes/${pin}`] = {
+                        uid: newID,
+                        isActivated: true
+                    };
                     // 2. Admin registry for metadata
                     updates[`admin/stores/${pin}`] = {
                         uid: newID, name, phone, status: 'active', timestamp
@@ -351,7 +376,9 @@
                         laundryName: name, 
                         phone: phone, 
                         isActivated: true, 
-                        firstUsedDate: timestamp
+                        firstUsedDate: timestamp,
+                        isTrial: true,
+                        trialEndDate: timestamp + (5 * 24 * 60 * 60 * 1000)
                     };
                     // 4. User settings record
                     updates[`users/${newID}/settings`] = {
@@ -384,6 +411,7 @@
                     if (uid && uid !== 'undefined') {
                         // Authority node update
                         updates[`users/${uid}/accountDetails/isActivated`] = shouldActivate;
+                        if (shouldActivate) updates[`users/${uid}/accountDetails/isTrial`] = false;
                         updates[`users/${uid}/settings/status`] = statusVal;
                     }
                     if (pin) {
@@ -397,6 +425,29 @@
                 } catch (e) {
                     console.error("Failed to update status:", e);
                     alert("Update failed. Permission denied.");
+                }
+            },
+
+            async deleteStore(uid, pin) {
+                if (!confirm("هل أنت متأكد من حذف هذه المغسلة وجميع بياناتها نهائياً؟ لا يمكن التراجع عن هذا الإجراء.")) return;
+
+                try {
+                    const updates = {};
+                    if (pin && pin !== '--') {
+                        updates[`pincodes/${pin}`] = null;
+                        updates[`admin/stores/${pin}`] = null;
+                    }
+                    if (uid && uid !== 'undefined') {
+                        updates[`users/${uid}`] = null;
+                    }
+
+                    await db.ref().update(updates);
+                    console.log(`[Master-Sync] NUCLEAR DELETION successful for PIN: ${pin}, UID: ${uid}`);
+                    alert("تم حذف المغسلة نهائياً بنجاح.");
+                    this.fetchData(); // Dynamically remove row by refreshing list
+                } catch (e) {
+                    console.error("Nuke failed:", e);
+                    alert("فشل حذف المغسلة. يرجى المحاولة مرة أخرى.");
                 }
             }
         };
