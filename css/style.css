@@ -185,7 +185,7 @@ button:active {
     min-height: 0;
     flex: 1;
     display: none;
-    overflow: hidden !important; /* Definitive fix for double scrollbar */
+    overflow-y: auto !important; /* Restore scrolling across all managed views */
     background-color: var(--bg-body);
 }
 

@@ -442,6 +442,7 @@ window.appLogic = {
             await manualSyncToCloud('delivery_options', DefaultDeliveryOptions);
         }
         
+        this.deliveryFee = 0; // Fix 2: Strict 0.00 SAR initialization on load
         console.log("[App] Initialization pulse complete. Data is now protected and loaded.");
         
         await this.updateLaundryDatalist();
@@ -756,6 +757,7 @@ window.appLogic = {
     clearCart() {
         if (confirm('إفراغ السلة؟')) {
             this.cart = [];
+            this.deliveryFee = 0; // Fix: Reset delivery fee on manual clear
             this.editingInvoiceId = null; // Reset edit mode
             this.updateCartUI();
         }
@@ -804,7 +806,8 @@ window.appLogic = {
         }
 
         const subt = this.cart.reduce((s, i) => s + (i.unitPrice * i.qty), 0);
-        let finalTotal = (subt + this.deliveryFee).toFixed(2);
+        // Fix 2: If cart is empty, total is STRICTLY 0.00 SAR
+        let finalTotal = (this.cart.length === 0) ? "0.00" : (subt + this.deliveryFee).toFixed(2);
         document.getElementById('grand-total').innerText = finalTotal;
         const mobileTotal = document.getElementById('mobile-grand-total');
         if (mobileTotal) mobileTotal.innerText = finalTotal;
@@ -842,11 +845,11 @@ window.appLogic = {
     openCheckoutModal() {
         if (this.cart.length === 0) return alert('السلة فارغة!');
         
-        // Final sync check before opening modal
+        // Fix 6: Disable annoying auto-fill of Cash Customer if nothing was typed
         const sideName = document.getElementById('sidebar-customer-name')?.value || '';
         const sidePhone = document.getElementById('sidebar-customer-phone')?.value || '';
-        document.getElementById('checkout-customer-name').value = sideName || this.customer.name || '';
-        document.getElementById('checkout-customer-phone').value = sidePhone || this.customer.phone || '';
+        document.getElementById('checkout-customer-name').value = sideName || '';
+        document.getElementById('checkout-customer-phone').value = sidePhone || '';
 
         const errEl = document.getElementById('checkout-phone-error');
         if (errEl) errEl.style.display = 'none';
@@ -860,6 +863,36 @@ window.appLogic = {
 
     closeCheckoutModal() {
         document.getElementById('checkout-modal').classList.add('hidden');
+    },
+
+    closePaymentModal() {
+        document.getElementById('payment-method-modal').classList.add('hidden');
+    },
+
+    async finalizeWithPayment(method) {
+        if (!this.pendingInvoice) return;
+        this.paymentMethod = method;
+        this.pendingInvoice.paymentMethod = method;
+        
+        // Re-generate thermal HTML with the selected payment method
+        document.getElementById('invoice-preview-container').innerHTML = this.generateThermalHTML(this.pendingInvoice, 'preview-qr-render');
+
+        // Re-render QR for preview
+        const bizNamePreview = window.tenantSettings?.name || 'Redix';
+        const zatcaQRBase64 = generateZatcaBase64(bizNamePreview, window.tenantSettings?.taxNumber || "000000000000000", this.pendingInvoice.timestamp, this.pendingInvoice.grandTotal, this.pendingInvoice.vatAmount);
+        
+        const qrBox = document.getElementById('preview-qr-render');
+        if (qrBox) {
+            qrBox.innerHTML = '';
+            new QRCode(qrBox, {
+                text: zatcaQRBase64,
+                width: 100, height: 100,
+                colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L
+            });
+        }
+
+        this.closePaymentModal();
+        document.getElementById('invoice-preview-modal').classList.remove('hidden');
     },
 
     setPaymentMethod(method) {
@@ -1010,28 +1043,9 @@ window.appLogic = {
 
         this.pendingInvoice = invoiceData;
 
-        // Render Thermal HTML into Preview Container
-        document.getElementById('invoice-preview-container').innerHTML = this.generateThermalHTML(invoiceData, 'preview-qr-render');
-
-        // Render QR in Preview (ZATCA Base64 TLV Format)
-        const bizNamePreview = window.tenantSettings?.name || 'Redix';
-        const zatcaQRBase64 = generateZatcaBase64(bizNamePreview, window.tenantSettings?.taxNumber || "000000000000000", invoiceData.timestamp, invoiceData.grandTotal, invoiceData.vatAmount);
-
-        new QRCode(document.getElementById('preview-qr-render'), {
-            text: zatcaQRBase64,
-            width: 100, height: 100,
-            colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L
-        });
-
-        // Setup UI State for Preview
-        document.getElementById('modal-actions-preview').classList.remove('hidden');
-        document.getElementById('modal-actions-success').classList.add('hidden');
-
-        document.getElementById('preview-invoice-id').innerText = (invoiceData.id || '').toString().replace(/^INV-/, '');
-        
-        // Finalize 2-Step Handshake
+        // Fix 5: Open Payment Method Modal (New Step 2)
         this.closeCheckoutModal();
-        document.getElementById('invoice-preview-modal').classList.remove('hidden');
+        document.getElementById('payment-method-modal').classList.remove('hidden');
     },
 
     async confirmCheckout() {
@@ -1078,24 +1092,38 @@ window.appLogic = {
         const _waBtnEl = document.getElementById('btn-whatsapp-share');
         if (_waBtnEl) _waBtnEl.style.display = 'block';
 
-        // Reset POS background
+        // Fix 4: Strict Post-Checkout Cart Reset
         this.cart = [];
+        this.deliveryFee = 0; // Fix 2: Reset delivery fee for next customer
+        this.editingInvoiceId = null;
         this.customer = { phone: '', name: '' };
+        
+        // UI Cleanup
         const _phoneEl = document.getElementById('customer-phone');
         const _errEl   = document.getElementById('phone-error');
         if (_phoneEl) { _phoneEl.value = ''; _phoneEl.style.borderColor = ''; }
         if (_errEl)   { _errEl.style.display = 'none'; _errEl.textContent = ''; }
-        document.getElementById('customer-name').value = '';
+        
+        const _sidebarName = document.getElementById('customer-name');
+        if (_sidebarName) _sidebarName.value = '';
+        
+        const _checkName = document.getElementById('checkout-customer-name');
+        if (_checkName) _checkName.value = '';
+        
+        const _checkPhone = document.getElementById('checkout-customer-phone');
+        if (_checkPhone) _checkPhone.value = '';
 
         if (document.getElementById('pos-laundry-name')) document.getElementById('pos-laundry-name').value = '';
         if (document.getElementById('pos-laundry-cost')) document.getElementById('pos-laundry-cost').value = '';
         if (document.getElementById('pos-laundry-paid')) document.getElementById('pos-laundry-paid').value = 'false';
+        
         this.updateCartUI();
-
         await this.updateLaundryDatalist();
 
-        // Auto Download PDF
-        await this.downloadDigitalPDF(null);
+        // Fix 8: Automatic Invoice PDF Download
+        setTimeout(() => {
+            this.downloadDigitalPDF(null);
+        }, 800);
     },
     closeInvoicePreview() {
         document.getElementById('invoice-preview-modal').classList.add('hidden');
@@ -1554,7 +1582,7 @@ window.appLogic = {
                     let customerPhone = (i.customer && i.customer.phone) ? i.customer.phone : '0000000000';
                     let cellPhone = (customerPhone !== '0000000000') ? `<br><small style="color:var(--text-muted); direction:ltr; display:inline-block">${customerPhone}</small>` : '';
                     let total = i.grandTotal || 0;
-                    let dateStr = i.timestamp ? new Date(i.timestamp).toLocaleString('ar-SA') : '-';
+                    let dateStr = i.timestamp ? new Date(i.timestamp).toLocaleString('en-US') : '-';
                     let partnerBadge = i.partnerLaundryName ? `<br><span onclick="appLogic.toggleLaundryPaid('${i.id}')" style="cursor:pointer; display:inline-block; margin-top:5px; font-size:11px; padding:3px 8px; border-radius:12px; background:${i.laundryPaid ? '#4CAF50' : '#f44336'}; color:#fff;"><i class="fa-solid ${i.laundryPaid ? 'fa-check' : 'fa-times'}"></i> مغسلة: ${i.partnerLaundryName} (${i.laundryPaid ? 'مدفوع' : 'غير مدفوع'})</span>` : '';
 
                     // Cancelled invoice visuals
@@ -2435,7 +2463,7 @@ window.appLogic = {
             const mIdx = d.getMonth();
             const year = d.getFullYear();
             const key = `${year}-${String(mIdx + 1).padStart(2, '0')}`;
-            const label = `${monthsAr[mIdx]} ${year}`;
+            const label = `${monthsAr[mIdx]} ${year.toString()}`; // Force English year numerals
             if (!monthlyMap[key]) monthlyMap[key] = { label, total: 0, sortKey: key };
             monthlyMap[key].total += amt;
 
@@ -2732,7 +2760,7 @@ window.appLogic = {
             } else {
                 sortedPins.forEach(pin => {
                     const s = stores[pin];
-                    const date = s.timestamp ? new Date(s.timestamp).toLocaleDateString('ar-SA') : '-';
+                    const date = s.timestamp ? new Date(s.timestamp).toLocaleDateString('en-US') : '-';
                     html += `
                         <tr style="border-bottom:1px solid var(--border);">
                             <td style="padding:14px; font-size:12px; color:var(--text-muted);">${date}</td>
@@ -3284,7 +3312,8 @@ window.appLogic = {
         netProfit = netRev - (opExps + lCosts);
 
         // 2. Generate PDF Report
-        const reportDate = new Date().toLocaleDateString('ar-SA');
+        // Fix 9: Date Standardization (English Numerals)
+        const reportDate = new Date().toLocaleDateString('en-US');
         const bizName = window.tenantSettings?.name || 'Redix';
 
         const reportContent = `

@@ -184,13 +184,25 @@
             <div id="view-history" class="view-section" style="padding: 30px; overflow-y: auto; background: var(--bg-body);">
                 <div style="max-width:900px; margin:0 auto;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                        <h2>سجل الفواتير</h2>
+                        <h2 style="font-size: 24px; font-weight: 800; color: var(--primary);"><i class="fa-solid fa-clock-rotate-left"></i> سجل الفواتير السابقة</h2>
                         <div class="search-bar" style="width: 300px;">
                             <i class="fa-solid fa-search"></i>
                             <input type="text" placeholder="بحث بالرقم، العميل أو الجوال..." id="history-search" oninput="appLogic.filterHistory()">
                         </div>
                     </div>
                     <div id="history-content"></div>
+
+                    <!-- Sleek Delivery Fee Management Card -->
+                    <div class="delivery-action-card" style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 25px; margin-top: 50px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; box-shadow: var(--shadow-md);">
+                        <div>
+                            <h2 style="font-size: 20px; font-weight: 800; color: var(--primary); margin:0;"><i class="fa-solid fa-truck-fast"></i> إدارة رسوم التوصيل</h2>
+                            <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px; margin-bottom:0;">تحكم في أسعار التوصيل المتاحة لموظفي الكاشير</p>
+                        </div>
+                        <div style="display:flex; gap:10px;">
+                            <button class="btn btn-primary" style="padding: 12px 24px; font-size: 15px;" onclick="appLogic.openAddDeliveryModal()"><i class="fa-solid fa-plus"></i> إضافة خيار توصيل</button>
+                        </div>
+                    </div>
+                    <div id="delivery-manager-content" style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 5px; overflow: hidden; box-shadow: var(--shadow-sm);"></div>
                 </div>
             </div>
 
@@ -226,24 +238,22 @@
                         </div>
                     </div>
 
-                    <!-- Delivery Fee Management -->
-                    <div class="delivery-manager-card">
-                        <div class="delivery-manager-header">
-                            <h2 class="delivery-manager-title"><i class="fa-solid fa-truck"></i> إدارة رسوم التوصيل</h2>
-                            <button class="btn btn-primary" onclick="appLogic.openAddDeliveryModal()"><i class="fa-solid fa-plus"></i> إضافة خيار توصيل</button>
-                        </div>
-                        <div id="delivery-manager-content"></div>
-                    </div>
+        <!-- Delivery Management relocated to History -->
                 </div>
             </div>
 
             <!-- Expenses View -->
             <div id="view-expenses" class="view-section" style="padding: 30px; overflow-y: auto; background: var(--bg-body);">
                 <div style="max-width:900px; margin:0 auto;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                        <h2>المصروفات التشغيلية</h2>
-                        <button class="btn btn-primary" onclick="appLogic.openAddExpenseModal()"><i class="fa-solid fa-plus"></i> تقييد مصروف جديد</button>
-                        <button class="btn btn-danger" onclick="appLogic.clearExpenses()" style="background-color: #dc3545; border-color: #dc3545;"><i class="fa-solid fa-trash-can"></i> تصفير المصروفات</button>
+                    <div class="expense-action-card" style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 25px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; box-shadow: var(--shadow-md);">
+                        <div>
+                            <h2 style="font-size: 20px; font-weight: 800; color: var(--primary); margin:0;">إدارة المصروفات التشغيلية</h2>
+                            <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px; margin-bottom:0;">سجل وراجع جميع المصروفات اليومية للمغسلة</p>
+                        </div>
+                        <div style="display:flex; gap:10px;">
+                            <button class="btn btn-primary" style="padding: 12px 24px; font-size: 15px;" onclick="appLogic.openAddExpenseModal()"><i class="fa-solid fa-plus"></i> تقييد مصروف جديد</button>
+                            <button class="btn btn-danger" onclick="appLogic.clearExpenses()" style="background-color: transparent; border: 1px solid var(--danger); color: var(--danger); font-size: 14px; padding: 10px 18px;"><i class="fa-solid fa-trash-can"></i> تصفير</button>
+                        </div>
                     </div>
                     <div id="expenses-content"></div>
                 </div>
@@ -413,13 +423,7 @@
                         </div>
                     </div>
 
-                    <div class="payment-info-checkout" style="margin-bottom: 24px; padding-top: 20px; border-top: 1px solid var(--border);">
-                        <h4 style="color:var(--text-muted); font-size:13px; margin-bottom:12px; text-transform:uppercase; font-weight:800;">طريقة الدفع</h4>
-                        <div class="payment-toggle-group">
-                            <button class="btn-toggle active" id="pay-cash" onclick="appLogic.setPaymentMethod('cash')">كـاش</button>
-                            <button class="btn-toggle" id="pay-network" onclick="appLogic.setPaymentMethod('network')">شبكـة</button>
-                        </div>
-                    </div>
+                    <!-- Payment Toggle removed from here - moved to Step 2 Modal -->
 
                     <div class="final-total-checkout" style="background:var(--bg-elevated); padding:20px; border-radius:var(--radius-md); text-align:center; border:1px solid var(--primary); margin-bottom: 24px;">
                         <span style="display:block; font-size:14px; color:var(--text-muted); margin-bottom:5px;">الإجمالي النهائي المستحق:</span>
@@ -429,6 +433,39 @@
                     <button class="btn btn-primary w-100" onclick="appLogic.previewCheckout()" style="padding:18px; font-size:18px;">
                         تأكيد إنشاء الفاتورة <i class="fa-solid fa-check-double"></i>
                     </button>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Payment Method Modal (New Step 2) -->
+        <div class="modal-overlay hidden" id="payment-method-modal">
+            <div class="modal" style="width: 420px; border: 1px solid var(--primary); box-shadow: var(--shadow-xl);">
+                <div class="modal-header" style="background: var(--bg-surface); padding: 20px; border-bottom: 1px solid var(--border);">
+                    <h3 style="color: var(--primary); font-size: 18px;"><i class="fa-solid fa-credit-card"></i> اختر طريقة الدفع</h3>
+                    <button class="close-modal" onclick="appLogic.closePaymentModal()"><i class="fa-solid fa-times"></i></button>
+                </div>
+                <div class="modal-body" style="padding: 30px;">
+                    <div style="display: grid; grid-template-columns: 1fr; gap: 12px;">
+                        <button class="btn w-100" id="method-mada" onclick="appLogic.finalizeWithPayment('mada')" style="background: #1e1e1e; color: #fff; padding: 20px; border: 1px solid var(--border); font-size: 18px; display: flex; justify-content: space-between; align-items: center;">
+                            <span><i class="fa-solid fa-wallet" style="margin-left:10px;"></i> مدى (Mada)</span>
+                            <i class="fa-solid fa-chevron-left" style="font-size:12px; opacity:0.5;"></i>
+                        </button>
+                        <button class="btn w-100" id="method-cash" onclick="appLogic.finalizeWithPayment('cash')" style="background: #1e1e1e; color: var(--primary); padding: 20px; border: 1px solid var(--primary); font-size: 18px; display: flex; justify-content: space-between; align-items: center;">
+                            <span><i class="fa-solid fa-money-bill-1-wave" style="margin-left:10px;"></i> كاش (Cash)</span>
+                            <i class="fa-solid fa-chevron-left" style="font-size:12px; opacity:0.5;"></i>
+                        </button>
+                        <button class="btn w-100" id="method-visa" onclick="appLogic.finalizeWithPayment('visa')" style="background: #1e1e1e; color: #fff; padding: 20px; border: 1px solid var(--border); font-size: 18px; display: flex; justify-content: space-between; align-items: center;">
+                            <span><i class="fa-solid fa-credit-card" style="margin-left:10px;"></i> فيزا / ماستركارد</span>
+                            <i class="fa-solid fa-chevron-left" style="font-size:12px; opacity:0.5;"></i>
+                        </button>
+                    </div>
+                    
+                    <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid var(--border); text-align: center;">
+                        <button class="btn" onclick="appLogic.closePaymentModal(); appLogic.openCheckoutModal();" style="background: transparent; color: var(--text-muted); font-size: 14px;">
+                            <i class="fa-solid fa-arrow-right"></i> الرجوع لبيانات العميل
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -577,7 +614,7 @@
                 </div>
                 <div class="selector-group">
                     <label style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:13px; font-weight:700;">الرقم الضريبي (اختياري)</label>
-                    <input type="text" id="setting-tax" placeholder="300xxxxxxxxx" dir="ltr" style="width:100%; padding:12px; background:var(--bg-body); border:1px solid var(--border); color:var(--text-main); border-radius:var(--radius-sm); font-family:inherit; font-size:15px;">
+                    <input type="text" id="setting-tax" placeholder="300xxxxxxxxx" dir="ltr" maxlength="15" style="width:100%; padding:12px; background:var(--bg-body); border:1px solid var(--border); color:var(--text-main); border-radius:var(--radius-sm); font-family:inherit; font-size:15px;">
                 </div>
                 <!-- Theme Toggle -->
                 <div class="selector-group" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border);">
