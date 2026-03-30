@@ -1004,17 +1004,6 @@ window.appLogic = {
         const dObj = new Date(data.timestamp);
         const dStr = dObj.toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
 
-        // WhatsApp link helper — formats Saudi numbers to wa.me/966xxxxxxxxx
-        const _waLink = (phone, display) => {
-            if (!phone || phone === '0000000000') return '-';
-            let digits = phone.replace(/\D/g, '');
-            if (digits.startsWith('966')) { /* already international */ }
-            else if (digits.startsWith('0')) digits = '966' + digits.slice(1);
-            else digits = '966' + digits;
-            const shown = display || phone;
-            return `<a href="https://wa.me/${digits}" target="_blank" style="color:#25D366; text-decoration:none; font-weight:bold;">&#x1F4AC; ${shown}</a>`;
-        };
-
         const _vatAmt   = parseFloat(data.vatAmount || 0);
         const _delivery = parseFloat(data.deliveryFee || 0);
         const _grand    = parseFloat(data.grandTotal || data.total || 0);
@@ -1085,7 +1074,7 @@ window.appLogic = {
                     <td style="padding:5px 0; color:#555; unicode-bidi:plaintext; direction:rtl;">&#x202B;العميل:&#x200F;</td>
                     <td style="padding:5px 10px; font-weight:bold; color:#000;">${_custName}</td>
                     <td style="padding:5px 0; color:#555; unicode-bidi:plaintext; direction:rtl;">&#x202B;رقم الجوال:&#x200F;</td>
-                    <td style="padding:5px 10px; font-weight:bold; color:#000; direction:ltr; text-align:right;">${_waLink(data.customer.phone, data.customer.phone)}</td>
+                    <td style="padding:5px 10px; font-weight:bold; color:#000; direction:ltr; text-align:right;">${data.customer.phone || '-'}</td>
                 </tr>
             </table>
 
@@ -1216,18 +1205,6 @@ window.appLogic = {
         const grandTotal  = parseFloat(data.grandTotal  || data.total || 0);
         const combinedSum = grandTotal - vatAmount; // subtotal before VAT
 
-        // WhatsApp link helper — formats Saudi numbers to wa.me/966xxxxxxxxx
-        const _waLink = (phone, display) => {
-            if (!phone || phone === '0000000000') return '-';
-            let digits = phone.replace(/\D/g, '');
-            if (digits.startsWith('966')) { /* already international */ }
-            else if (digits.startsWith('0')) digits = '966' + digits.slice(1);
-            else digits = '966' + digits;
-            const shown = display || phone;
-            return `<a href="https://wa.me/${digits}" target="_blank" style="color:#25D366; text-decoration:none; font-weight:bold;">&#x1F4AC; ${shown}</a>`;
-        };
-
-
         // Build item rows
         let itemsHtml = '';
         data.items.forEach(item => {
@@ -1290,7 +1267,7 @@ window.appLogic = {
                     <td style="color:#555; unicode-bidi:plaintext; direction:rtl;">&#x202B;العميل:&#x200F;</td>
                     <td style="font-weight:bold;">${_custName}</td>
                 </tr>
-                ${data.customer.phone && data.customer.phone !== '0000000000' ? `<tr><td style="color:#555; unicode-bidi:plaintext; direction:rtl;">&#x202B;&#x1585;&#x1602;&#x1605; &#x1575;&#x1604;&#x1580;&#x1608;&#x1575;&#x1604;:&#x200F;</td><td style="direction:ltr; text-align:left;">${_waLink(data.customer.phone, data.customer.phone)}</td></tr>` : ''}
+                ${data.customer.phone && data.customer.phone !== '0000000000' ? `<tr><td style="color:#555; unicode-bidi:plaintext; direction:rtl;">&#x202B;&#x1585;&#x1602;&#x1605; &#x1575;&#x1604;&#x1580;&#x1608;&#x1575;&#x1604;:&#x200F;</td><td style="direction:ltr; text-align:left; font-weight:bold;">${data.customer.phone}</td></tr>` : ''}
             </table>
 
             <!-- Items Table -->
