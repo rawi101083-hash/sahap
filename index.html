@@ -56,6 +56,24 @@
             </div>
         </div>
     </div>
+    
+    <!-- ===== TRIAL EXPIRED OVERLAY (HARD LOCK) ===== -->
+    <div id="trial-expired-overlay" class="hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:10000; display:flex; justify-content:center; align-items:center; flex-direction:column; text-align:center; padding:20px; backdrop-filter:blur(10px);">
+        <div style="background:#1a1a1a; padding:40px; border-radius:20px; border:1px solid #f59e0b; box-shadow:0 0 50px rgba(245,158,11,0.2); max-width:500px; width:100%;">
+            <i class="fa-solid fa-hourglass-end" style="font-size:60px; color:#f59e0b; margin-bottom:20px;"></i>
+            <h2 style="color:#fff; font-size:24px; margin-bottom:15px; font-weight:900;">انتهت الفترة التجريبية</h2>
+            <p style="color:#9ca3af; font-size:16px; line-height:1.6; margin-bottom:30px;">
+                نشكركم على تجربة نظام Redix. لقد انتهت الفترة المخصصة للتجربة، يرجى التواصل مع الإدارة لتفعيل الاشتراك الدائم أو تمديد الفترة.
+            </p>
+            <div style="background:rgba(245,158,11,0.1); padding:15px; border-radius:12px; border:1px solid rgba(245,158,11,0.3); margin-bottom:30px;">
+                <p style="color:#f59e0b; font-weight:bold; font-size:14px; margin:0;">للتواصل والدعم الفني:</p>
+                <p style="color:#fff; font-size:18px; font-weight:bold; margin-top:5px; direction:ltr;">RADIX-ADMIN-SUPPORT</p>
+            </div>
+            <button onclick="appLogic.logoutUser()" style="background:#ef4444; color:#fff; border:none; padding:12px 30px; border-radius:10px; font-weight:bold; cursor:pointer; width:100%;">
+                <i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج
+            </button>
+        </div>
+    </div>
 
     <div id="app">
         <!-- Trial Banner -->
@@ -103,6 +121,19 @@
                         <button class="btn-cat" onclick="appLogic.setCategory('men', this)">رجالي</button>
                         <button class="btn-cat" onclick="appLogic.setCategory('women', this)">نسائي</button>
                         <button class="btn-cat" onclick="appLogic.setCategory('misc', this)">أخرى</button>
+                    </div>
+
+                    <!-- Fast Batch Controls (Bypass Popup) -->
+                    <div id="fast-batch-controls" class="no-print" style="display: flex; justify-content: space-between; gap: 10px; background: #141414; padding: 15px; border-radius: 12px; border: 1px solid #27272a; margin-bottom: 20px;">
+                        <div style="display: flex; gap: 10px; flex: 2;">
+                            <button class="btn-toggle active" id="fb-type-wash_iron" onclick="appLogic.setFastBatchType('wash_iron', this)" style="flex: 1;">غسيل وكوي</button>
+                            <button class="btn-toggle" id="fb-type-iron" onclick="appLogic.setFastBatchType('iron', this)" style="flex: 1;">كوي فقط</button>
+                            <button class="btn-toggle" id="fb-type-wash" onclick="appLogic.setFastBatchType('wash', this)" style="flex: 1;">غسيل فقط</button>
+                        </div>
+                        <div style="display: flex; gap: 10px; flex: 1.5;">
+                            <button class="btn-toggle active" id="fb-speed-normal" onclick="appLogic.setFastBatchSpeed('normal', this)" style="flex: 1;">عادي</button>
+                            <button class="btn-toggle" id="fb-speed-express" onclick="appLogic.setFastBatchSpeed('express', this)" style="flex: 1; border-color: rgba(245, 158, 11, 0.4); color: #f59e0b;">مستعجل</button>
+                        </div>
                     </div>
 
                     <div class="items-grid" id="items-grid">
@@ -499,7 +530,7 @@
     <div class="modal-overlay hidden" id="settings-modal">
         <div class="modal" style="width: 480px;">
             <div class="modal-header" style="background: linear-gradient(135deg, #1a1a1a, #2a2a2a); border-bottom: 2px solid var(--primary);">
-                <h3 style="color: var(--primary);"><i class="fa-solid fa-gear"></i> إعدادات المغسلة</h3>
+                <h3 style="color: var(--primary);"><i class="fa-solid fa-gear"></i> الإعدادات</h3>
                 <button class="close-modal" onclick="appLogic.closeSettingsModal()"><i class="fa-solid fa-times"></i></button>
             </div>
             <div class="modal-body" style="padding: 24px;">
@@ -523,10 +554,19 @@
                         <span id="theme-status-icon"><i class="fa-solid fa-sun"></i></span>
                     </button>
                 </div>
-                <button class="btn btn-primary w-100" onclick="appLogic.saveTenantSettings()" style="margin-top:8px; font-size:16px;">
+                <!-- Language Toggle -->
+                <div class="selector-group" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border); margin-bottom: 25px;">
+                    <label style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:13px; font-weight:700;">اللغة / Language</label>
+                    <select id="ui-language" onchange="appLogic.changeLanguage(this.value)" class="w-100" style="padding:12px 18px; background:var(--bg-elevated); border:1px solid var(--border); color:var(--text-main); border-radius:var(--radius-sm); font-family:inherit;">
+                        <option value="ar">العربية (Arabic)</option>
+                        <option value="en">English</option>
+                    </select>
+                </div>
+                
+                <button id="settings-save-btn" class="btn btn-primary w-100" onclick="appLogic.saveTenantSettings()" style="margin-top:8px; font-size:16px;">
                     <i class="fa-solid fa-floppy-disk"></i> حفظ الإعدادات
                 </button>
-                <button class="btn w-100" onclick="appLogic.logoutUser()" style="margin-top:10px; background:rgba(255,69,58,0.1); color:var(--danger); border:1px solid rgba(255,69,58,0.3);">
+                <button id="settings-logout-btn" class="btn w-100" onclick="appLogic.logoutUser()" style="margin-top:10px; background:rgba(255,69,58,0.1); color:var(--danger); border:1px solid rgba(255,69,58,0.3);">
                     <i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج
                 </button>
             </div>

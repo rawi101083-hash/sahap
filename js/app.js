@@ -352,6 +352,8 @@ window.appLogic = {
     },
     
     _version: '1.0.3',
+    currentLang: 'ar',
+    fastBatchState: { type: 'wash_iron', speed: 'normal' },
     cart: [],
     deliveryFee: 0,
     customer: { phone: '', name: '' },
@@ -397,6 +399,12 @@ window.appLogic = {
 
     async init() {
         await this.initTheme();
+        
+        const savedLang = localStorage.getItem('redix-lang') || 'ar';
+        this.currentLang = savedLang;
+        const langEl = document.getElementById('ui-language');
+        if (langEl) langEl.value = savedLang;
+        
         console.log("[App] !!! STARTING CRITICAL INITIALIZATION !!!");
         console.log("[App] Environment:", window.location.protocol);
         
@@ -437,6 +445,9 @@ window.appLogic = {
         
         await this.updateLaundryDatalist();
         this.renderItems();
+        
+        // i18n auto-apply on load
+        this.applyLanguage();
         this.updateCartUI();
     },
 
@@ -564,9 +575,72 @@ window.appLogic = {
             const card = document.createElement('div');
             card.className = 'item-card';
             card.innerHTML = `<div class="item-icon"><i class="fa-solid ${item.icon}"></i></div><div class="item-name">${item.name}</div>`;
-            card.onclick = () => this.openModal(item);
+            card.onclick = () => this.fastAddToCart(item);
             grid.appendChild(card);
         });
+    },
+
+    // --- FAST BATCH ENTRY OPERATIONS ---
+    setFastBatchType(type, btn) {
+        document.querySelectorAll('#fb-type-wash_iron, #fb-type-iron, #fb-type-wash').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        this.fastBatchState.type = type;
+    },
+
+    setFastBatchSpeed(speed, btn) {
+        document.querySelectorAll('#fb-speed-normal, #fb-speed-express').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        this.fastBatchState.speed = speed;
+    },
+
+    fastAddToCart(item) {
+        const { type, speed } = this.fastBatchState;
+        let basePrice = 0;
+
+        if (item.prices) {
+            basePrice = parseFloat(item.prices[type]) || 0;
+            if (speed === 'express') {
+                const fee = item.expressFee;
+                if (typeof fee === 'object') {
+                    basePrice += (parseFloat(fee[type]) || 0);
+                } else {
+                    basePrice += (parseFloat(fee) || 0);
+                }
+            }
+        }
+
+        if (basePrice <= 0) {
+            if (this.showToast) {
+                this.showToast('هذه الخدمة غير متوفرة بهذا الخيار');
+            } else {
+                alert('هذه الخدمة غير متوفرة بهذا الخيار');
+            }
+            return;
+        }
+
+        // Check for exact duplicate in cart
+        let existing = this.cart.find(i => i.id === item.id && i.type === type && i.speed === speed);
+        if (existing) {
+            existing.qty += 1;
+        } else {
+            this.cart.unshift({
+                id: item.id,
+                name: item.name,
+                type: type,
+                speed: speed,
+                qty: 1,
+                unitPrice: basePrice
+            });
+        }
+
+        this.updateCartUI();
+        
+        // Optional quick tap feedback:
+        if (this.showToast) {
+            let tLbl = type === 'iron' ? 'كوي' : (type === 'wash_iron' ? 'غسيل وكوي' : 'غسيل');
+            let sLbl = speed === 'normal' ? 'عادي' : 'مستعجل';
+            this.showToast(`تمت إضافة: ${item.name} (${tLbl} - ${sLbl})`);
+        }
     },
 
     // Modal Operations
@@ -698,11 +772,16 @@ window.appLogic = {
         container.innerHTML = '';
 
         if (this.cart.length === 0) {
-            container.innerHTML = '<div class="empty-cart-msg">السلة فارغة، يرجى اختيار أصناف.</div>';
+            container.innerHTML = `<div class="empty-cart-msg">${this.currentLang === 'en' ? 'Cart is empty, please select items.' : 'السلة فارغة، يرجى اختيار أصناف.'}</div>`;
         } else {
             this.cart.forEach((item, index) => {
-                let tLbl = item.type === 'iron' ? 'كوي فقط' : (item.type === 'wash_iron' ? 'غسيل وكوي' : 'غسيل فقط');
-                let sLbl = item.speed === 'normal' ? 'عادي' : 'مستعجل';
+                let tLbl = this.currentLang === 'en' 
+                    ? (item.type === 'iron' ? 'Iron Only' : (item.type === 'wash_iron' ? 'Wash & Iron' : 'Wash Only'))
+                    : (item.type === 'iron' ? 'كوي فقط' : (item.type === 'wash_iron' ? 'غسيل وكوي' : 'غسيل فقط'));
+                let sLbl = this.currentLang === 'en' 
+                    ? (item.speed === 'normal' ? 'Normal' : 'Express')
+                    : (item.speed === 'normal' ? 'عادي' : 'مستعجل');
+                
                 container.innerHTML += `
                     <div class="cart-item">
                         <div style="flex:1">
@@ -2838,30 +2917,40 @@ window.appLogic = {
                 return;
             }
 
-            // 2. TRIAL BANNER UI Injection
+            // 2. TRIAL BANNER & LOCK
             const banner = document.getElementById('trial-banner');
             const trialDays = document.getElementById('trial-days');
-            if (banner && trialDays) {
-                if (data.isTrial === true && data.trialEndDate) {
-                    const daysLeft = Math.ceil((data.trialEndDate - Date.now()) / (1000 * 60 * 60 * 24));
-                    if (daysLeft <= 0) {
-                        // Trial expired mid-session
-                        console.warn("[SECURITY] Trial expired during active session!");
-                        alert("انتهت الفترة التجريبية. سيتم تسجيل خروجك الآن.");
-                        localStorage.clear();
-                        sessionStorage.clear();
-                        await localforage.clear();
-                        firebase.auth().signOut().then(() => {
-                            window.location.reload();
-                        });
-                        return;
+            const expiredOverlay = document.getElementById('trial-expired-overlay');
+
+            if (data.isTrial === true && data.trialEndDate) {
+                const daysLeft = Math.ceil((data.trialEndDate - Date.now()) / (1000 * 60 * 60 * 24));
+                
+                if (daysLeft <= 0) {
+                    // Trial expired - HARD LOCK
+                    console.warn("[SECURITY] Trial Expired! Locking POS.");
+                    if (expiredOverlay) {
+                        expiredOverlay.classList.remove('hidden');
+                        expiredOverlay.style.display = 'flex'; // Ensure flex display for centering
                     }
-                    trialDays.innerText = daysLeft;
-                    banner.classList.remove('hidden');
+                    if (banner) banner.classList.add('hidden');
                 } else {
-                    // Unlimited account - hide banner
-                    banner.classList.add('hidden');
+                    // Trial Active - Show Banner & Unlock
+                    if (expiredOverlay) {
+                        expiredOverlay.classList.add('hidden');
+                        expiredOverlay.style.display = 'none';
+                    }
+                    if (banner && trialDays) {
+                        trialDays.innerText = daysLeft;
+                        banner.classList.remove('hidden');
+                    }
                 }
+            } else {
+                // Unlimited account - Unlock & Hide Everything
+                if (expiredOverlay) {
+                    expiredOverlay.classList.add('hidden');
+                    expiredOverlay.style.display = 'none';
+                }
+                if (banner) banner.classList.add('hidden');
             }
         });
     },
@@ -2883,6 +2972,100 @@ window.appLogic = {
         document.getElementById('setting-phone').value = s.phone || '';
         document.getElementById('setting-tax').value   = s.taxNumber || '';
         document.getElementById('settings-modal').classList.remove('hidden');
+    },
+
+    changeLanguage(lang) {
+        this.currentLang = lang;
+        localStorage.setItem('redix-lang', lang);
+        this.applyLanguage();
+        this.updateCartUI(); // Repaint Cart labels for english UI
+        if (this.showToast) {
+            this.showToast(lang === 'en' ? 'Language switched to English' : 'تم تغيير اللغة إلى العربية');
+        }
+    },
+
+    applyLanguage() {
+        const lang = this.currentLang;
+        const dict = {
+            '#header-brand-name': { ar: 'Redix POS', en: 'Redix POS' },
+            '.main-nav .nav-btn:nth-child(1)': { ar: '<i class="fa-solid fa-cash-register"></i> الكاشير', en: '<i class="fa-solid fa-cash-register"></i> Cashier' },
+            '.main-nav .nav-btn:nth-child(2)': { ar: '<i class="fa-solid fa-clock-rotate-left"></i> الفواتير', en: '<i class="fa-solid fa-clock-rotate-left"></i> Invoices' },
+            '.main-nav .nav-btn:nth-child(3)': { ar: '<i class="fa-solid fa-users"></i> العملاء', en: '<i class="fa-solid fa-users"></i> Customers' },
+            '.main-nav .nav-btn:nth-child(4)': { ar: '<i class="fa-solid fa-boxes-stacked"></i> المخزون', en: '<i class="fa-solid fa-boxes-stacked"></i> Inventory' },
+            '.main-nav .nav-btn:nth-child(5)': { ar: '<i class="fa-solid fa-money-bill-transfer"></i> المصروفات', en: '<i class="fa-solid fa-money-bill-transfer"></i> Expenses' },
+            '.main-nav .nav-btn:nth-child(6)': { ar: '<i class="fa-solid fa-chart-line"></i> القوائم المالية', en: '<i class="fa-solid fa-chart-line"></i> Reports' },
+            '#settings-nav-btn': { ar: '<i class="fa-solid fa-gear"></i> الإعدادات', en: '<i class="fa-solid fa-gear"></i> Settings' },
+            
+            // Fast Batch Toggles
+            '#fb-type-wash_iron': { ar: 'غسيل وكوي', en: 'Wash & Iron' },
+            '#fb-type-iron': { ar: 'كوي فقط', en: 'Iron Only' },
+            '#fb-type-wash': { ar: 'غسيل فقط', en: 'Wash Only' },
+            '#fb-speed-normal': { ar: 'عادي', en: 'Normal' },
+            '#fb-speed-express': { ar: 'مستعجل', en: 'Express' },
+            
+            // POS Header
+            '.items-header h2': { ar: 'الخدمات', en: 'Services' },
+            '.cart-header h2': { ar: 'تفاصيل الطلب', en: 'Order Details' },
+            
+            // Categories
+            '#category-filter button:nth-child(1)': { ar: 'الكل', en: 'All' },
+            '#category-filter button:nth-child(2)': { ar: 'رجالي', en: 'Men' },
+            '#category-filter button:nth-child(3)': { ar: 'نسائي', en: 'Women' },
+            '#category-filter button:nth-child(4)': { ar: 'أخرى', en: 'Misc' },
+            
+            // Cart elements
+            '.delivery-options h4': { ar: 'رسوم التوصيل:', en: 'Delivery Fee:' },
+            '.grand-total span:nth-child(1)': { ar: 'الإجمالي النهائي:', en: 'Grand Total:' },
+            '.totals .total-row:nth-child(2) span': { ar: '* الأسعار لا تشمل ضريبة القيمة المضافة', en: '* Prices exclude VAT' },
+            '.cart-actions .btn-primary': { ar: '<i class="fa-solid fa-file-invoice"></i> إنشاء فاتورة', en: '<i class="fa-solid fa-file-invoice"></i> Checkout' },
+            
+            // Settings Modal
+            '#settings-modal h3': { ar: '<i class="fa-solid fa-gear"></i> الإعدادات', en: '<i class="fa-solid fa-gear"></i> Settings' },
+            '#theme-toggle-btn span:first-child': { ar: 'تبديل المظهر', en: 'Toggle Theme' },
+            
+            // View Titles
+            '#view-history h2': { ar: 'سجل الفواتير', en: 'Invoice History' },
+            '#view-customers h2': { ar: 'سجل العملاء', en: 'Customers Directory' },
+            '#view-inventory h2': { ar: 'إدارة المخزون', en: 'Inventory Management' },
+            '#view-expenses h2': { ar: 'المصروفات التشغيلية', en: 'Operational Expenses' },
+            '#view-reports h2': { ar: 'القوائم المالية وإقرارات الزكاة', en: 'Financial Reports & ZATCA' }
+        };
+
+        for (const [selector, textObj] of Object.entries(dict)) {
+            const els = document.querySelectorAll(selector);
+            els.forEach(el => {
+                if (textObj.attr) el.setAttribute(textObj.attr, textObj[lang] || textObj['ar']);
+                else el.innerHTML = textObj[lang] || textObj['ar'];
+            });
+        }
+        
+        // Advanced placeholders & adjacent labels
+        const nameInput = document.getElementById('setting-name');
+        if (nameInput && nameInput.previousElementSibling) nameInput.previousElementSibling.innerText = lang === 'en' ? 'Business Name' : 'اسم النشاط التجاري';
+        
+        const phoneInput = document.getElementById('setting-phone');
+        if (phoneInput && phoneInput.previousElementSibling) phoneInput.previousElementSibling.innerText = lang === 'en' ? 'Phone Number' : 'رقم الجوال';
+
+        const taxInput = document.getElementById('setting-tax');
+        if (taxInput && taxInput.previousElementSibling) taxInput.previousElementSibling.innerText = lang === 'en' ? 'VAT Number (Optional)' : 'الرقم الضريبي (اختياري)';
+        
+        const itemSearch = document.getElementById('item-search');
+        if (itemSearch) itemSearch.placeholder = lang === 'en' ? 'Search items...' : 'ابحث عن صنف...';
+        
+        const custName = document.getElementById('customer-name');
+        if (custName) custName.placeholder = lang === 'en' ? 'Customer Name (Optional)' : 'اسم العميل (اختياري)';
+
+        const custPhone = document.getElementById('customer-phone');
+        if (custPhone) custPhone.placeholder = lang === 'en' ? 'Phone Number (Optional)' : 'رقم الجوال (اختياري)';
+
+        const invSearch = document.getElementById('history-search');
+        if (invSearch) invSearch.placeholder = lang === 'en' ? 'Search by ID, Customer...' : 'بحث بالرقم، العميل أو الجوال...';
+        
+        const saveSettingsBtn = document.getElementById('settings-save-btn');
+        if (saveSettingsBtn) saveSettingsBtn.innerHTML = lang === 'en' ? '<i class="fa-solid fa-floppy-disk"></i> Save Settings' : '<i class="fa-solid fa-floppy-disk"></i> حفظ الإعدادات';
+
+        const logoutBtn = document.getElementById('settings-logout-btn');
+        if (logoutBtn) logoutBtn.innerHTML = lang === 'en' ? '<i class="fa-solid fa-right-from-bracket"></i> Logout' : '<i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج';
     },
 
     closeSettingsModal() {
