@@ -124,15 +124,22 @@
                     </div>
 
                     <!-- Fast Batch Controls (Bypass Popup) -->
-                    <div id="fast-batch-controls" class="no-print" style="display: flex; justify-content: space-between; gap: 10px; background: #141414; padding: 15px; border-radius: 12px; border: 1px solid #27272a; margin-bottom: 20px;">
-                        <div style="display: flex; gap: 10px; flex: 2;">
-                            <button class="btn-toggle active" id="fb-type-wash_iron" onclick="appLogic.setFastBatchType('wash_iron', this)" style="flex: 1;">غسيل وكوي</button>
-                            <button class="btn-toggle" id="fb-type-iron" onclick="appLogic.setFastBatchType('iron', this)" style="flex: 1;">كوي فقط</button>
-                            <button class="btn-toggle" id="fb-type-wash" onclick="appLogic.setFastBatchType('wash', this)" style="flex: 1;">غسيل فقط</button>
+                    <style>
+                        #fb-speed-normal { border: 1px solid rgba(0, 255, 0, 0.4) !important; color: #00ff00 !important; font-weight: normal !important; }
+                        #fb-speed-normal.active { background: #00ff00 !important; color: #000 !important; border-color: #00ff00 !important; font-weight: bold !important; }
+                        
+                        #fb-speed-express { border: 1px solid rgba(255, 69, 0, 0.4) !important; color: #ff4500 !important; font-weight: bold !important; }
+                        #fb-speed-express.active { background: #ff4500 !important; color: #fff !important; border-color: #ff4500 !important; font-weight: bold !important; }
+                    </style>
+                    <div id="fast-batch-controls" class="no-print fb-container">
+                        <div class="fb-group group-types">
+                            <button class="btn-toggle active" id="fb-type-wash_iron" onclick="appLogic.setFastBatchType('wash_iron', this)">غسيل وكوي</button>
+                            <button class="btn-toggle" id="fb-type-iron" onclick="appLogic.setFastBatchType('iron', this)">كوي فقط</button>
+                            <button class="btn-toggle" id="fb-type-wash" onclick="appLogic.setFastBatchType('wash', this)">غسيل فقط</button>
                         </div>
-                        <div style="display: flex; gap: 10px; flex: 1.5;">
-                            <button class="btn-toggle active" id="fb-speed-normal" onclick="appLogic.setFastBatchSpeed('normal', this)" style="flex: 1;">عادي</button>
-                            <button class="btn-toggle" id="fb-speed-express" onclick="appLogic.setFastBatchSpeed('express', this)" style="flex: 1; border-color: rgba(245, 158, 11, 0.4); color: #f59e0b;">مستعجل</button>
+                        <div class="fb-group group-speeds">
+                            <button class="btn-toggle btn-speed-normal active" id="fb-speed-normal" onclick="appLogic.setFastBatchSpeed('normal', this)">عادي</button>
+                            <button class="btn-toggle btn-speed-express" id="fb-speed-express" onclick="appLogic.setFastBatchSpeed('express', this)">مستعجل</button>
                         </div>
                     </div>
 

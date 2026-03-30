@@ -1564,3 +1564,28 @@ button:active {
     background: rgba(253, 184, 19, 0.18);
     border-color: var(--primary);
 }
+
+/* --- FAST BATCH ENTRY CUSTOM VISUALS --- */
+.fb-container { display: flex; justify-content: space-between; gap: 10px; background: #141414; padding: 15px; border-radius: 12px; border: 1px solid #27272a; margin-bottom: 20px; }
+.fb-group { display: flex; gap: 10px; }
+.group-types { flex: 2; }
+.group-speeds { flex: 1.5; }
+.fb-group .btn-toggle { flex: 1; transition: all 0.2s ease-in-out; }
+
+/* Enforce Service Type Active State as Gold/Black */
+#fast-batch-controls .group-types .btn-toggle.active { background-color: #f59e0b !important; color: #000 !important; border-color: #f59e0b !important; }
+
+/* Normal Speed Button (Green) */
+#fb-speed-normal { border-color: rgba(0, 255, 0, 0.4) !important; color: #00ff00 !important; font-weight: normal !important; }
+#fb-speed-normal.active { background-color: #00ff00 !important; color: #000 !important; border-color: #00ff00 !important; font-weight: bold !important; }
+
+/* Express Speed Button (Orange/Red) */
+#fb-speed-express { border-color: rgba(255, 69, 0, 0.4) !important; color: #ff4500 !important; font-weight: bold !important; }
+#fb-speed-express.active { background-color: #ff4500 !important; color: #fff !important; border-color: #ff4500 !important; font-weight: bold !important; }
+
+@media (max-width: 768px) { 
+    .fb-container { flex-direction: column; padding: 12px; margin-bottom: 12px; } 
+    .fb-group { flex-direction: column; width: 100%; margin-bottom: 10px; } 
+    .group-speeds { margin-bottom: 0; } 
+    .fb-group .btn-toggle { width: 100%; padding: 14px 10px; font-size: 16px; margin-bottom: 0; } 
+}
