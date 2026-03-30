@@ -152,44 +152,28 @@
                 <section class="cart-section" id="cart-section">
                     <!-- Mobile Toggle Handle (THE GOLDEN TRIGGER) -->
                     <div class="cart-mobile-handle no-print golden-bar" onclick="appLogic.toggleMobileCart()">
-                        <span class="trigger-text">تفاصيل الطلب <i class="fa-solid fa-chevron-up" id="mobile-cart-icon"></i></span>
+                        <span class="trigger-text">الفاتورة <i class="fa-solid fa-chevron-up" id="mobile-cart-icon"></i></span>
                         <span class="trigger-total" id="mobile-grand-total">0.00 ر.س</span>
                     </div>
 
-                    <div class="cart-header">
-                        <h2>تفاصيل الطلب</h2>
-                        <div class="customer-select">
-                            <input type="text" placeholder="اسم العميل (اختياري)" id="customer-name" autocomplete="off" oninput="appLogic.updateCustomerName(this.value)">
-                            <input type="tel" placeholder="رقم الجوال (اختياري)" id="customer-phone" class="mt-2" inputmode="numeric" maxlength="10" oninput="appLogic.validateSaudiPhone(this)" onblur="appLogic.handleCustomerPhoneBlur(this.value)" autocomplete="off">
-                            <span id="phone-error" style="display:none; color:#ef4444; font-size:12px; margin-top:4px; display:block;"></span>
-                        </div>
+                    <div class="cart-header" style="border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+                        <h2 style="font-size: 16px; margin: 0; color: var(--text-muted); opacity: 0.8;">الفاتورة</h2>
                     </div>
                     
                     <div class="cart-items" id="cart-items">
                         <div class="empty-cart-msg">السلة فارغة، يرجى اختيار أصناف.</div>
                     </div>
                     
-                    <div class="cart-footer" id="cart-footer">
-                        <div class="delivery-options">
-                            <h4>رسوم التوصيل:</h4>
-                            <div class="delivery-buttons">
-                                <!-- Dynamic Delivery Buttons Injected Here -->
-                            </div>
-                        </div>
-
-                        <div class="totals">
-                            <div class="total-row grand-total">
-                                <span>الإجمالي النهائي:</span>
-                                <span id="grand-total">0.00 ر.س</span>
-                            </div>
-                            <div class="total-row" style="font-size: 12px; justify-content: center; margin-top: 5px;">
-                                <span>* الأسعار لا تشمل ضريبة القيمة المضافة</span>
-                            </div>
-                        </div>
-
-                        <div class="cart-actions">
-                            <button class="btn btn-danger" onclick="appLogic.clearCart()" style="flex:0.3;"><i class="fa-solid fa-trash"></i></button>
-                            <button class="btn btn-primary" onclick="appLogic.previewCheckout()" style="flex:1;"><i class="fa-solid fa-file-invoice"></i> إنشاء فاتورة</button>
+                    <div class="cart-footer" id="cart-footer" style="padding: 10px 16px;">
+                        <div class="cart-modern-actions">
+                            <!-- Trash Button -->
+                            <button class="btn-trash" onclick="appLogic.clearCart()" title="مسح السلة">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                            <!-- Yellow Total Button (Checkout Trigger) -->
+                            <button class="btn-total-trigger" onclick="appLogic.openCheckoutModal()">
+                                الإجمالي: <span id="grand-total">0.00</span> ر.س
+                            </button>
                         </div>
                     </div>
                 </section>
@@ -403,6 +387,48 @@
                         <input type="number" id="inv-cost" value="0.00" step="0.5" style="width:100%; padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm);" dir="ltr">
                     </div>
                     <button class="btn btn-primary w-100" onclick="appLogic.saveInventoryItem()"><i class="fa-solid fa-save"></i> حفظ في المخزون</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Checkout Step Modal (Step 2) -->
+        <div class="modal-overlay hidden" id="checkout-modal">
+            <div class="modal" style="width: 500px; max-width: 95%;">
+                <div class="modal-header" style="background: linear-gradient(135deg, var(--bg-surface), var(--bg-elevated)); border-bottom: 2px solid var(--primary); padding: 15px 24px; display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0; font-size: 18px; color: var(--primary);"><i class="fa-solid fa-cart-check"></i> إكمال الطلب</h3>
+                    <button class="close-modal" onclick="appLogic.closeCheckoutModal()" style="color: var(--text-muted); font-size: 18px; padding: 5px;"><i class="fa-solid fa-arrow-left"></i></button>
+                </div>
+                <div class="modal-body" style="padding: 24px;">
+                    <div class="customer-info-checkout" style="margin-bottom: 24px;">
+                        <h4 style="color:var(--text-muted); font-size:13px; margin-bottom:12px; text-transform:uppercase; font-weight:800;">بيانات العميل</h4>
+                        <input type="text" placeholder="اسم العميل (اختياري)" id="checkout-customer-name" style="width:100%; padding:14px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-md); font-size:15px; margin-bottom:12px; text-align: right; direction: rtl;">
+                        <input type="tel" placeholder="رقم الجوال (اختياري)" id="checkout-customer-phone" style="width:100%; padding:14px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-md); font-size:15px; text-align: right; direction: rtl;" maxlength="10">
+                        <span id="checkout-phone-error" style="display:none; color:var(--danger); font-size:12px; margin-top:6px; font-weight:600;"></span>
+                    </div>
+
+                    <div class="delivery-info-checkout" style="margin-bottom: 24px; padding-top: 20px; border-top: 1px solid var(--border);">
+                        <h4 style="color:var(--text-muted); font-size:13px; margin-bottom:12px; text-transform:uppercase; font-weight:800;">خيارات التوصيل</h4>
+                        <div class="delivery-buttons" id="checkout-delivery-buttons">
+                            <!-- Injected by JS -->
+                        </div>
+                    </div>
+
+                    <div class="payment-info-checkout" style="margin-bottom: 24px; padding-top: 20px; border-top: 1px solid var(--border);">
+                        <h4 style="color:var(--text-muted); font-size:13px; margin-bottom:12px; text-transform:uppercase; font-weight:800;">طريقة الدفع</h4>
+                        <div class="payment-toggle-group">
+                            <button class="btn-toggle active" id="pay-cash" onclick="appLogic.setPaymentMethod('cash')">كـاش</button>
+                            <button class="btn-toggle" id="pay-network" onclick="appLogic.setPaymentMethod('network')">شبكـة</button>
+                        </div>
+                    </div>
+
+                    <div class="final-total-checkout" style="background:var(--bg-elevated); padding:20px; border-radius:var(--radius-md); text-align:center; border:1px solid var(--primary); margin-bottom: 24px;">
+                        <span style="display:block; font-size:14px; color:var(--text-muted); margin-bottom:5px;">الإجمالي النهائي المستحق:</span>
+                        <h2 id="checkout-grand-total" style="font-size:32px; font-weight:900; color:var(--primary);">0.00 ر.س</h2>
+                    </div>
+
+                    <button class="btn btn-primary w-100" onclick="appLogic.previewCheckout()" style="padding:18px; font-size:18px;">
+                        تأكيد إنشاء الفاتورة <i class="fa-solid fa-check-double"></i>
+                    </button>
                 </div>
             </div>
         </div>

@@ -352,6 +352,7 @@ window.appLogic = {
     },
     
     _version: '1.0.3',
+    paymentMethod: 'cash',
     currentLang: 'ar',
     fastBatchState: { type: 'wash_iron', speed: 'normal' },
     cart: [],
@@ -784,27 +785,117 @@ window.appLogic = {
                 
                 container.innerHTML += `
                     <div class="cart-item">
-                        <div style="flex:1">
-                            <div class="cart-item-title">${item.name} <span class="cart-item-qty">x${item.qty}</span></div>
-                            <div class="cart-item-meta">${tLbl} - ${sLbl}</div>
+                        <div class="cart-item-header">
+                            <div class="cart-item-main-info">
+                                <span class="cart-item-title">${item.name}</span>
+                                <span class="cart-item-qty">x${item.qty}</span>
+                            </div>
+                            <div class="cart-item-price-block">
+                                <div class="cart-item-price">${(item.unitPrice * item.qty).toFixed(2)}</div>
+                                <button class="btn-remove" onclick="appLogic.removeFromCart(${index})">
+                                    <i class="fa-solid fa-times"></i>
+                                </button>
+                            </div>
                         </div>
-                        <div class="cart-item-price">${(item.unitPrice * item.qty).toFixed(2)}</div>
-                        <button class="btn-remove" onclick="appLogic.removeFromCart(${index})"><i class="fa-solid fa-times"></i></button>
+                        <div class="cart-item-meta">${tLbl} - ${sLbl}</div>
                     </div>
                 `;
             });
         }
 
         const subt = this.cart.reduce((s, i) => s + (i.unitPrice * i.qty), 0);
-        let finalTotal = (subt + this.deliveryFee).toFixed(2) + ' ر.س';
+        let finalTotal = (subt + this.deliveryFee).toFixed(2);
         document.getElementById('grand-total').innerText = finalTotal;
         const mobileTotal = document.getElementById('mobile-grand-total');
         if (mobileTotal) mobileTotal.innerText = finalTotal;
         const goldenTotal = document.getElementById('golden-trigger-total');
         if (goldenTotal) goldenTotal.innerText = finalTotal;
 
-        // Dynamic Delivery Buttons
-        this.renderDeliveryButtons();
+        this.updateCheckoutTotal();
+    },
+
+    syncCustomerData(source) {
+        let name, phone;
+        if (source === 'sidebar') {
+            name = document.getElementById('sidebar-customer-name')?.value || '';
+            phone = document.getElementById('sidebar-customer-phone')?.value || '';
+            
+            // Sync to modal
+            const modalName = document.getElementById('checkout-customer-name');
+            const modalPhone = document.getElementById('checkout-customer-phone');
+            if (modalName) modalName.value = name;
+            if (modalPhone) modalPhone.value = phone;
+        } else {
+            name = document.getElementById('checkout-customer-name')?.value || '';
+            phone = document.getElementById('checkout-customer-phone')?.value || '';
+            
+            // Sync back to sidebar
+            const sideName = document.getElementById('sidebar-customer-name');
+            const sidePhone = document.getElementById('sidebar-customer-phone');
+            if (sideName) sideName.value = name;
+            if (sidePhone) sidePhone.value = phone;
+        }
+        this.customer.name = name;
+        this.customer.phone = phone;
+    },
+
+    openCheckoutModal() {
+        if (this.cart.length === 0) return alert('السلة فارغة!');
+        
+        // Final sync check before opening modal
+        const sideName = document.getElementById('sidebar-customer-name')?.value || '';
+        const sidePhone = document.getElementById('sidebar-customer-phone')?.value || '';
+        document.getElementById('checkout-customer-name').value = sideName || this.customer.name || '';
+        document.getElementById('checkout-customer-phone').value = sidePhone || this.customer.phone || '';
+
+        const errEl = document.getElementById('checkout-phone-error');
+        if (errEl) errEl.style.display = 'none';
+
+        this.renderCheckoutDeliveryButtons();
+        this.setPaymentMethod('cash');
+        this.updateCheckoutTotal();
+        
+        document.getElementById('checkout-modal').classList.remove('hidden');
+    },
+
+    closeCheckoutModal() {
+        document.getElementById('checkout-modal').classList.add('hidden');
+    },
+
+    setPaymentMethod(method) {
+        this.paymentMethod = method;
+        const cashBtn = document.getElementById('pay-cash');
+        const netBtn = document.getElementById('pay-network');
+        if (cashBtn) cashBtn.classList.toggle('active', method === 'cash');
+        if (netBtn) netBtn.classList.toggle('active', method === 'network');
+    },
+
+    renderCheckoutDeliveryButtons() {
+        const container = document.getElementById('checkout-delivery-buttons');
+        if (!container) return;
+        container.innerHTML = '';
+        this.deliveryOptions.forEach(opt => {
+            const isActive = this.deliveryFee === opt.amount;
+            container.innerHTML += `
+                <button class="btn-delivery ${isActive ? 'active' : ''}" 
+                        onclick="appLogic.setDelivery(${opt.amount}, this); appLogic.updateCheckoutTotal(); appLogic.renderCheckoutDeliveryButtons();">
+                    ${opt.name}${opt.amount > 0 ? ': ' + opt.amount + ' ر.س' : ''}
+                </button>
+            `;
+        });
+    },
+
+    updateCheckoutTotal() {
+        const subt = this.cart.reduce((s, i) => s + (i.unitPrice * i.qty), 0);
+        let totalVal = subt + this.deliveryFee;
+        let totalStr = totalVal.toFixed(2);
+        
+        const modalTotal = document.getElementById('checkout-grand-total');
+        if (modalTotal) modalTotal.innerText = totalStr;
+
+        // Keep sidebar total in sync if needed
+        const sidebarTotal = document.getElementById('grand-total');
+        if (sidebarTotal) sidebarTotal.innerText = totalStr;
     },
 
     renderDeliveryButtons() {
@@ -843,20 +934,22 @@ window.appLogic = {
         console.log('Button Clicked: previewCheckout - Start processing checkout preview');
         if (this.cart.length === 0) return alert('السلة فارغة!');
 
-        const custNameInput  = document.getElementById('customer-name')  ? document.getElementById('customer-name').value.trim()  : (this.customer.name  || '').trim();
-        const custPhoneInput = document.getElementById('customer-phone') ? document.getElementById('customer-phone').value.trim() : (this.customer.phone || '').trim();
+        const custNameInput  = document.getElementById('checkout-customer-name')  ? document.getElementById('checkout-customer-name').value.trim()  : '';
+        const custPhoneInput = document.getElementById('checkout-customer-phone') ? document.getElementById('checkout-customer-phone').value.trim() : '';
 
         // Phone is optional — but if entered it MUST be a valid Saudi number (10 digits, starts with 05)
         if (custPhoneInput && !/^05\d{8}$/.test(custPhoneInput)) {
-            const errEl = document.getElementById('phone-error');
+            const errEl = document.getElementById('checkout-phone-error');
             if (errEl) { errEl.textContent = 'رقم الجوال يجب أن يكون 10 أرقام ويبدأ بـ 05'; errEl.style.display = 'block'; }
-            document.getElementById('customer-phone').focus();
+            document.getElementById('checkout-customer-phone').focus();
             return;
         }
 
-        let cName  = custNameInput  || '';
+        let cName  = custNameInput  || 'عميل نقدي';
         let cPhone = custPhoneInput || '0000000000';
 
+        // Update current customer object for saving later
+        this.customer = { name: cName, phone: cPhone };
 
         // Generate Invoice Num
         let invoices = await localforage.getItem('invoices') || [];
@@ -896,15 +989,15 @@ window.appLogic = {
             id: newInvId, timestamp: Date.now(), customer: { phone: cPhone, name: cName },
             items: [...this.cart], 
             deliveryFee: parseFloat(this.deliveryFee) || 0, 
-            total: parseFloat(grT) || 0, // AUTHORITATIVE REVENUE FIELD
+            total: parseFloat(grT) || 0, 
             grandTotal: parseFloat(grT) || 0, 
-            laundryCost: pCost, // AUTHORITATIVE PARTNER COST FIELD
+            laundryCost: pCost, 
             partnerLaundryCost: pCost,
             partnerLaundryName: pName,
             partnerLaundryNeighborhood: pHood,
             laundryPaid: pPaid,
             status: 'completed',
-            paymentMethod: 'cash'
+            paymentMethod: this.paymentMethod || 'cash'
         };
 
         // Calculate 15% Inclusive VAT: Subtotal = Total / 1.15, VAT = Total - Subtotal
@@ -935,6 +1028,9 @@ window.appLogic = {
         document.getElementById('modal-actions-success').classList.add('hidden');
 
         document.getElementById('preview-invoice-id').innerText = (invoiceData.id || '').toString().replace(/^INV-/, '');
+        
+        // Finalize 2-Step Handshake
+        this.closeCheckoutModal();
         document.getElementById('invoice-preview-modal').classList.remove('hidden');
     },
 
@@ -1182,6 +1278,10 @@ window.appLogic = {
                         <td style="padding:6px 0; color:#555;">ضريبة القيمة المضافة 15٪</td>
                         <td style="padding:6px 0; padding-right:20px; font-weight:bold; direction:ltr; text-align:left;">${_vatAmt.toFixed(2)} ر.س</td>
                     </tr>` : ''}
+                    <tr>
+                        <td style="padding:6px 0; color:#555;">طريقة الدفع</td>
+                        <td style="padding:6px 0; padding-right:20px; font-weight:bold; direction:ltr; text-align:left;">${data.paymentMethod === 'network' ? 'شبكة' : 'كاش'}</td>
+                    </tr>
                     <tr style="border-top:1px solid #000;">
                         <td style="padding:10px 0; font-size:16px; font-weight:900; color:#000;">الإجمالي النهائي</td>
                         <td style="padding:10px 0; padding-right:20px; font-size:18px; font-weight:900; color:#000; direction:ltr; text-align:left;">${_grand.toFixed(2)} ر.س</td>
@@ -1371,6 +1471,10 @@ window.appLogic = {
                     <td style="padding:3px 0; color:#555;">ضريبة القيمة المضافة 15٪</td>
                     <td style="text-align:left; font-weight:bold; direction:ltr;">${vatAmount.toFixed(2)} ر.س</td>
                 </tr>` : ''}
+                <tr>
+                    <td style="padding:3px 0; color:#555;">طريقة الدفع</td>
+                    <td style="text-align:left; font-weight:bold;">${data.paymentMethod === 'network' ? 'شبكة' : 'كاش'}</td>
+                </tr>
                 <tr style="border-top:1px solid #000;">
                     <td style="padding:5px 0; font-size:14px; font-weight:900;">الإجمالي النهائي</td>
                     <td style="text-align:left; font-size:14px; font-weight:900; direction:ltr;">${grandTotal.toFixed(2)} ر.س</td>
@@ -3005,7 +3109,8 @@ window.appLogic = {
             
             // POS Header
             '.items-header h2': { ar: 'الخدمات', en: 'Services' },
-            '.cart-header h2': { ar: 'تفاصيل الطلب', en: 'Order Details' },
+            '.cart-header h2': { ar: 'الفاتورة', en: 'Invoice' },
+            '.trigger-text': { ar: 'الفاتورة <i class="fa-solid fa-chevron-up" id="mobile-cart-icon"></i>', en: 'Invoice <i class="fa-solid fa-chevron-up" id="mobile-cart-icon"></i>' },
             
             // Categories
             '#category-filter button:nth-child(1)': { ar: 'الكل', en: 'All' },
