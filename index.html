@@ -276,7 +276,7 @@
                 </div>
             </div>
 
-            <!-- Admin View Removed: All management now happens in radix-master.html -->
+            <!-- Admin View Removed: All management now happens in sahab-master.html -->
         </main>
 
         <!-- Modals -->
@@ -459,7 +459,11 @@
                             <i class="fa-solid fa-chevron-left" style="font-size:12px; opacity:0.5;"></i>
                         </button>
                         <button class="btn w-100" id="method-visa" onclick="appLogic.finalizeWithPayment('visa')" style="background: #1e1e1e; color: #fff; padding: 20px; border: 1px solid var(--border); font-size: 18px; display: flex; justify-content: space-between; align-items: center;">
-                            <span><i class="fa-solid fa-credit-card" style="margin-left:10px;"></i> فيزا / ماستركارد</span>
+                            <span><i class="fa-brands fa-cc-visa" style="margin-left:10px; color: #1A1F71;"></i> فيزا (Visa)</span>
+                            <i class="fa-solid fa-chevron-left" style="font-size:12px; opacity:0.5;"></i>
+                        </button>
+                        <button class="btn w-100" id="method-mastercard" onclick="appLogic.finalizeWithPayment('mastercard')" style="background: #1e1e1e; color: #fff; padding: 20px; border: 1px solid var(--border); font-size: 18px; display: flex; justify-content: space-between; align-items: center;">
+                            <span><i class="fa-brands fa-cc-mastercard" style="margin-left:10px; color: #EB001B;"></i> ماستركارد (Mastercard)</span>
                             <i class="fa-solid fa-chevron-left" style="font-size:12px; opacity:0.5;"></i>
                         </button>
                     </div>

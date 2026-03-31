@@ -1298,7 +1298,7 @@ window.appLogic = {
                     </tr>` : ''}
                     <tr>
                         <td style="padding:6px 0; color:#555;">طريقة الدفع</td>
-                        <td style="padding:6px 0; padding-right:20px; font-weight:bold; direction:ltr; text-align:left;">${data.paymentMethod === 'network' ? 'شبكة' : 'كاش'}</td>
+                        <td style="padding:6px 0; padding-right:20px; font-weight:bold; direction:ltr; text-align:left;">${{ 'cash': 'نقدي', 'mada': 'مدى', 'visa': 'فيزا', 'mastercard': 'ماستركارد', 'network': 'شبكة' }[data.paymentMethod] || data.paymentMethod}</td>
                     </tr>
                     <tr style="border-top:1px solid #000;">
                         <td style="padding:10px 0; font-size:16px; font-weight:900; color:#000;">الإجمالي النهائي</td>
@@ -1494,7 +1494,7 @@ window.appLogic = {
                 </tr>` : ''}
                 <tr>
                     <td style="padding:3px 0; color:#555;">طريقة الدفع</td>
-                    <td style="text-align:left; font-weight:bold;">${data.paymentMethod === 'network' ? 'شبكة' : 'كاش'}</td>
+                    <td style="text-align:left; font-weight:bold;">${{ 'cash': 'نقدي', 'mada': 'مدى', 'visa': 'فيزا', 'mastercard': 'ماستركارد', 'network': 'شبكة' }[data.paymentMethod] || data.paymentMethod}</td>
                 </tr>
                 <tr style="border-top:1px solid #000;">
                     <td style="padding:5px 0; font-size:14px; font-weight:900;">الإجمالي النهائي</td>
@@ -2949,8 +2949,8 @@ window.appLogic = {
             // 1. Secret Master Admin Check: Redirect to Command Center
             if (pin === ADMIN_PIN) {
                 console.log(`[Smart-Gate] AUTHORIZED: Persisting Master Auth and Redirecting...`);
-                localStorage.setItem('radix_master_authorized', 'true');
-                window.location.href = 'radix-master.html';
+                localStorage.setItem('sahab_master_authorized', 'true');
+                window.location.href = 'sahab-master.html';
                 return;
             }
 
@@ -3098,7 +3098,14 @@ window.appLogic = {
             const trialDays = document.getElementById('trial-days');
             const expiredOverlay = document.getElementById('trial-expired-overlay');
 
-            if (data.isTrial === true && data.trialEndDate) {
+            if (data.isSubscribed === true) {
+                // PAID SUBSCRIPTION: Hide trial visuals immediately & permanently
+                if (expiredOverlay) {
+                    expiredOverlay.classList.add('hidden');
+                    expiredOverlay.style.display = 'none';
+                }
+                if (banner) banner.classList.add('hidden');
+            } else if (data.isTrial === true && data.trialEndDate) {
                 const daysLeft = Math.ceil((data.trialEndDate - Date.now()) / (1000 * 60 * 60 * 24));
                 
                 if (daysLeft <= 0) {
@@ -3205,7 +3212,13 @@ window.appLogic = {
             '#view-customers h2': { ar: 'سجل العملاء', en: 'Customers Directory' },
             '#view-inventory h2': { ar: 'إدارة المخزون', en: 'Inventory Management' },
             '#view-expenses h2': { ar: 'المصروفات التشغيلية', en: 'Operational Expenses' },
-            '#view-reports h2': { ar: 'القوائم المالية وإقرارات الزكاة', en: 'Financial Reports & ZATCA' }
+            '#view-reports h2': { ar: 'القوائم المالية وإقرارات الزكاة', en: 'Financial Reports & ZATCA' },
+            
+            // Payment Methods
+            '#method-cash span': { ar: '<i class="fa-solid fa-money-bill-1-wave" style="margin-left:10px;"></i> كاش (Cash)', en: '<i class="fa-solid fa-money-bill-1-wave" style="margin-left:10px;"></i> Cash' },
+            '#method-mada span': { ar: '<i class="fa-solid fa-credit-card" style="margin-left:10px;"></i> مدى (Mada)', en: '<i class="fa-solid fa-credit-card" style="margin-left:10px;"></i> Mada' },
+            '#method-visa span': { ar: '<i class="fa-brands fa-cc-visa" style="margin-left:10px;"></i> فيزا (Visa)', en: '<i class="fa-brands fa-cc-visa" style="margin-left:10px;"></i> Visa' },
+            '#method-mastercard span': { ar: '<i class="fa-brands fa-cc-mastercard" style="margin-left:10px;"></i> ماستركارد (Mastercard)', en: '<i class="fa-brands fa-cc-mastercard" style="margin-left:10px;"></i> Mastercard' }
         };
 
         for (const [selector, textObj] of Object.entries(dict)) {
@@ -3319,7 +3332,7 @@ window.appLogic = {
         document.title = name ? `سحاب POS | ${name}` : 'سحاب POS';
     },
 
-    async closeDay() {
+    async confirmCloseDay() {
         if (!confirm('هل أنت متأكد من إغلاق اليومية وإصدار التقرير؟')) return;
 
         // 1. Calculate current active totals
@@ -3329,6 +3342,7 @@ window.appLogic = {
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
         let gross = 0, refunds = 0, lCosts = 0, netProfit = 0, opExps = 0;
+        let cashTotal = 0, madaTotal = 0, visaTotal = 0, mastercardTotal = 0;
         
         invoices.forEach(i => {
             const rTime = new Date(i.date || i.timestamp).getTime();
@@ -3339,6 +3353,13 @@ window.appLogic = {
                     refunds += amt;
                 } else {
                     lCosts += parseFloat(i.laundryCost || i.partnerLaundryCost || 0);
+                    // Calculate Breakdown for PDF
+                    const pMethod = i.paymentMethod || 'cash';
+                    if (pMethod === 'cash') cashTotal += amt;
+                    else if (pMethod === 'mada') madaTotal += amt;
+                    else if (pMethod === 'visa') visaTotal += amt;
+                    else if (pMethod === 'mastercard') mastercardTotal += amt;
+                    else if (pMethod === 'network') madaTotal += amt;
                 }
             }
         });
@@ -3365,6 +3386,29 @@ window.appLogic = {
                     <h1 style="margin:0; font-size:32px; color:#000;">تقرير إغلاق اليومية</h1>
                     <div style="font-size:22px; margin-top:15px; font-weight:bold; color:#555;">${bizName}</div>
                     <div style="font-size:16px; color:#888; margin-top:8px;">بتاريخ: ${reportDate}</div>
+                </div>
+
+                <!-- Payment Breakdown Section -->
+                <div style="margin-bottom: 30px; border: 1px solid #eee; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.02);">
+                    <div style="background: #f8f9fa; padding: 12px 20px; font-weight: bold; border-bottom: 1px solid #eee; color: #444; font-size: 16px;">تفاصيل الدفع (Payment Breakdown)</div>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 15px;">
+                        <tr style="border-bottom: 1px solid #f0f0f0;">
+                            <td style="padding: 12px 25px; color: #666;">نقدي (Cash)</td>
+                            <td style="padding: 12px 25px; text-align: left; font-weight: 900; direction: ltr;">${cashTotal.toFixed(2)} ر.س</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #f0f0f0;">
+                            <td style="padding: 12px 25px; color: #666;">مدى (Mada)</td>
+                            <td style="padding: 12px 25px; text-align: left; font-weight: 900; direction: ltr;">${madaTotal.toFixed(2)} ر.س</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #f0f0f0;">
+                            <td style="padding: 12px 25px; color: #666;">فيزا (Visa)</td>
+                            <td style="padding: 12px 25px; text-align: left; font-weight: 900; direction: ltr;">${visaTotal.toFixed(2)} ر.س</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #f0f0f0;">
+                            <td style="padding: 12px 25px; color: #666;">ماستركارد (Mastercard)</td>
+                            <td style="padding: 12px 25px; text-align: left; font-weight: 900; direction: ltr;">${mastercardTotal.toFixed(2)} ر.س</td>
+                        </tr>
+                    </table>
                 </div>
 
                 <!-- Financial Table -->
@@ -3413,7 +3457,7 @@ window.appLogic = {
             id: 'Z-' + Date.now(),
             timestamp: Date.now(),
             date: reportDate,
-            totals: { gross, refunds, netRev, opExps, lCosts, netProfit }
+            totals: { gross, refunds, netRev, opExps, lCosts, netProfit, paymentBreakdown: { cashTotal, madaTotal, visaTotal, mastercardTotal } }
         };
         let archived = await localforage.getItem('archived_z_reports') || [];
         archived.push(archiveEntry);
@@ -3455,11 +3499,8 @@ window.appLogic = {
         const now = new Date();
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
-        let gross = 0;
-        let refunds = 0;
-        let lCosts = 0;
-        let opExps = 0;
-        
+        let gross = 0, refunds = 0, lCosts = 0, opExps = 0;
+        let cashTotal = 0, madaTotal = 0, visaTotal = 0, mastercardTotal = 0;
         invoices.forEach(i => {
             const rTime = new Date(i.date || i.timestamp).getTime();
             if (rTime >= todayStart && !i.isZReported) {
@@ -3469,6 +3510,13 @@ window.appLogic = {
                     refunds += amt;
                 } else {
                     lCosts += parseFloat(i.laundryCost || i.partnerLaundryCost || 0);
+                    // Calculate Breakdown
+                    const pMethod = i.paymentMethod || 'cash';
+                    if (pMethod === 'cash') cashTotal += amt;
+                    else if (pMethod === 'mada') madaTotal += amt;
+                    else if (pMethod === 'visa') visaTotal += amt;
+                    else if (pMethod === 'mastercard') mastercardTotal += amt;
+                    else if (pMethod === 'network') madaTotal += amt; 
                 }
             }
         });
@@ -3486,6 +3534,31 @@ window.appLogic = {
         const format = (num) => num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
         const content = `
+            <!-- Payment Breakdown Section -->
+            <div style="background: rgba(253, 184, 19, 0.05); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 25px; box-shadow: inset 0 0 15px rgba(0,0,0,0.2);">
+                <h4 style="margin: 0 0 15px 0; color: var(--primary); font-size: 15px; border-bottom: 1px solid rgba(253,184,19,0.2); padding-bottom: 10px; display: flex; align-items: center;">
+                    <i class="fa-solid fa-receipt" style="margin-left: 10px;"></i> تفاصيل طرق الدفع (Payment Breakdown)
+                </h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-body); padding: 12px 15px; border-radius: 8px; border: 1px solid var(--border);">
+                        <span style="color: var(--text-muted); font-size: 13px;">نقدي (Cash)</span>
+                        <span style="font-weight: 800; color: #fff; direction: ltr; font-size: 15px;">${format(cashTotal)}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-body); padding: 12px 15px; border-radius: 8px; border: 1px solid var(--border);">
+                        <span style="color: var(--text-muted); font-size: 13px;">مدى (Mada)</span>
+                        <span style="font-weight: 800; color: #fff; direction: ltr; font-size: 15px;">${format(madaTotal)}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-body); padding: 12px 15px; border-radius: 8px; border: 1px solid var(--border);">
+                        <span style="color: var(--text-muted); font-size: 13px;">فيزا (Visa)</span>
+                        <span style="font-weight: 800; color: #fff; direction: ltr; font-size: 15px;">${format(visaTotal)}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-body); padding: 12px 15px; border-radius: 8px; border: 1px solid var(--border);">
+                        <span style="color: var(--text-muted); font-size: 13px;">ماستركارد</span>
+                        <span style="font-weight: 800; color: #fff; direction: ltr; font-size: 15px;">${format(mastercardTotal)}</span>
+                    </div>
+                </div>
+            </div>
+
             <div class="z-report-grid">
                 <div class="z-report-item">
                     <div class="info">
@@ -3542,13 +3615,6 @@ window.appLogic = {
         `;
         document.getElementById('z-report-preview-content').innerHTML = content;
         document.getElementById('z-report-preview-modal').classList.remove('hidden');
-    },
-
-    async confirmCloseDay() {
-        // Final confirmation prompt inside the luxury modal flow
-        if (confirm('هل أنت متأكد من صحة هذه الأرقام؟ سيتم إغلاق اليومية نهائياً.')) {
-            this.closeDay();
-        }
     },
 };
 
