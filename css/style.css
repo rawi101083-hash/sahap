@@ -68,6 +68,13 @@ h6 {
     box-sizing: border-box;
 }
 
+html, body {
+    height: auto !important;
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+}
+
 body {
     background-color: var(--bg-body);
     color: var(--text-main);
@@ -103,6 +110,7 @@ button:active {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
+    height: auto !important;
     overflow: visible;
     opacity: 0; /* Professional Rendering Guard: Hidden until ready */
     transition: opacity 0.4s ease;
@@ -190,6 +198,9 @@ button:active {
     flex: 1;
     display: none;
     background-color: var(--bg-body);
+    padding-bottom: 150px; /* Global Safe Zone - allows scrolling past last items */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 .view-section.active {
@@ -342,6 +353,11 @@ button:active {
 
 /* 1. PORTRAIT (768px - 1024px) */
 @media only screen and (min-width: 768px) and (max-width: 1024px) and (orientation: portrait) {
+    .view-section {
+        padding-bottom: 150px !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
     .items-grid {
         grid-template-columns: repeat(6, 1fr) !important; /* Perfect for portrait */
         gap: 12px !important;
@@ -357,6 +373,11 @@ button:active {
 
 /* 2. LANDSCAPE (768px - 1024px) - MAXIMUM COMPACT 9-COLUMN GRID */
 @media only screen and (min-device-width: 768px) and (max-device-width: 1024px) and (orientation: landscape) {
+    .view-section {
+        padding-bottom: 150px !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
     .items-grid {
         grid-template-columns: repeat(9, 1fr) !important;
         gap: 8px !important;
@@ -397,9 +418,10 @@ button:active {
     display: flex;
     flex-direction: column;
     z-index: 5;
-    height: 100%;
-    min-height: 500px; /* Maintain vertical structure during load */
-    overflow: hidden !important; /* Definitive fix for outer cart scrollbar */
+    position: sticky;
+    top: 70px;
+    height: calc(100vh - 70px);
+    overflow: hidden !important; 
 }
 
 .cart-mobile-handle {
@@ -428,6 +450,7 @@ button:active {
     overflow-x: hidden !important;
     padding: 15px 12px;
     background: var(--bg-body);
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling for iPad/Mobile */
     /* Firefox Support */
     scrollbar-width: thin;
     scrollbar-color: var(--primary) transparent;
@@ -550,9 +573,9 @@ button:active {
     padding: 12px 16px;
     border-top: 1px solid var(--border);
     background: var(--bg-surface);
-    position: sticky;
-    bottom: 0;
+    margin-top: auto; /* Push to bottom of flex container */
     z-index: 10;
+    box-shadow: 0 -4px 12px rgba(0,0,0,0.2);
 }
 
 .delivery-options {
@@ -1234,10 +1257,17 @@ button:active {
         font-size: 14px;
     }
 
-    /* App Shell */
+    html, body {
+        height: auto !important;
+        min-height: 100vh;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+    }
+
     #app {
-        height: 100vh;
-        overflow: hidden;
+        height: auto !important;
+        min-height: 100vh;
+        overflow: visible;
     }
 
     .main-header {
@@ -1272,13 +1302,13 @@ button:active {
         height: auto !important;
         min-height: 100%;
         overflow-y: visible;
-        padding-bottom: 120px; /* Clearance for the fixed mobile drawer handle */
+        padding-bottom: 160px; /* Clearance for fixed mobile drawer handle */
     }
 
     /* POS Section */
     .items-section {
         padding: 16px;
-        padding-bottom: 120px; /* Clearance for the fixed mobile drawer handle */
+        padding-bottom: 160px; /* Clearance for fixed mobile drawer handle */
         -webkit-overflow-scrolling: touch;
     }
 
