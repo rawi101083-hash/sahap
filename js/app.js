@@ -1,5 +1,5 @@
 // Sahab POS - Main Application Logic
-(function() {
+(function () {
     // ⚡ FAST GUARD: Prevent Login Flash
     // We check localStorage immediately (before any Firebase calls) to decide which UI to show.
     const sessionUID = localStorage.getItem('sahab_session_uid');
@@ -76,7 +76,7 @@ function generateZatcaBase64(sellerName, vatNumber, timestamp, totalAmount, vatA
         const vat = (vatNumber && vatNumber.trim() && vatNumber !== '000000000000000') ? vatNumber : '';
         const fTotal = parseFloat(totalAmount || 0).toFixed(2);
         const fVat = parseFloat(vatAmount || 0).toFixed(2);
-        
+
         let isoTime = timestamp;
         try {
             isoTime = new Date(timestamp).toISOString();
@@ -86,7 +86,7 @@ function generateZatcaBase64(sellerName, vatNumber, timestamp, totalAmount, vatA
 
         // Pure JS helpers to assemble strict ZATCA TLV buffers
         const toUTF8Bytes = (str) => new TextEncoder().encode(String(str));
-        
+
         const buildTLV = (tag, value) => {
             const valBytes = toUTF8Bytes(value || "");
             // Tag (1 byte) | Length (1 byte) | Unicode UTF-8 Bytes
@@ -105,9 +105,9 @@ function generateZatcaBase64(sellerName, vatNumber, timestamp, totalAmount, vatA
         const totalLen = parts.reduce((acc, curr) => acc + curr.length, 0);
         const binaryBuffer = new Uint8Array(totalLen);
         let offset = 0;
-        parts.forEach(p => { 
-            binaryBuffer.set(p, offset); 
-            offset += p.length; 
+        parts.forEach(p => {
+            binaryBuffer.set(p, offset);
+            offset += p.length;
         });
 
         // Convert byte sequences directly to native base64 without leaking memory
@@ -115,12 +115,12 @@ function generateZatcaBase64(sellerName, vatNumber, timestamp, totalAmount, vatA
         for (let i = 0; i < binaryBuffer.length; i++) {
             payloadStr += String.fromCharCode(binaryBuffer[i]);
         }
-        
+
         return btoa(payloadStr);
 
     } catch (err) {
         console.error('ZATCA Standalone Encoding err:', err);
-        return unescape(encodeURIComponent('فاتورة ضريبية مبسطة')); 
+        return unescape(encodeURIComponent('فاتورة ضريبية مبسطة'));
     }
 }
 
@@ -131,8 +131,8 @@ const accountingEngine = {
     async postTransaction(invoice) {
         const total = invoice.grandTotal;
         // Calculate 15% Inclusive VAT: Subtotal = Total / 1.15, VAT = Total - Subtotal
-        const subtotal = total / 1.15; 
-        const vat = total - subtotal; 
+        const subtotal = total / 1.15;
+        const vat = total - subtotal;
 
         invoice.vatAmount = vat;
         invoice.subtotalNet = subtotal;
@@ -210,7 +210,7 @@ async function manualSyncToCloud(key, value, recordId = null) {
         console.warn(`[Sync-Blocked] Cannot save ${key}. System is still initializing.`);
         return;
     }
-    
+
     if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "YOUR_API_KEY" && !!firebaseConfig.apiKey) {
         const path = recordId ? `${key}/${recordId}` : key;
         try {
@@ -234,7 +234,7 @@ function getDbPath(key) {
 // 3. RECOVERY LOGIC: Fetch-Only initialization (UID-scoped)
 async function initFirebaseSync() {
     console.log("[Recovery] --- STARTING CLOUD FETCH ---");
-    
+
     if (typeof firebase === 'undefined' || firebaseConfig.apiKey === "YOUR_API_KEY") {
         console.warn("[Recovery] Firebase disabled. Using local database.");
         window.isDataInitialized = true;
@@ -246,7 +246,7 @@ async function initFirebaseSync() {
     const fetchPromises = collectionsToSync.map(key => {
         return new Promise((resolve) => {
             let dbRef = firebase.database().ref(getDbPath(key));
-            
+
             // OPTIMIZATION: Only fetch last 400 days for heavy transactional collections
             if (key === 'invoices' || key === 'expenses') {
                 console.log(`[Recovery] Applying 400-day optimization for ${key}...`);
@@ -254,10 +254,10 @@ async function initFirebaseSync() {
             }
 
             console.log(`[Recovery] Requesting ${key} from cloud...`);
-            
+
             dbRef.once('value', async (snapshot) => {
                 let cloudData = snapshot.val();
-                
+
                 if (cloudData !== null) {
                     console.log(`[Recovery] Data found for ${key}. Overwriting local cache.`);
                     if (typeof cloudData === 'object' && !Array.isArray(cloudData)) cloudData = Object.values(cloudData);
@@ -269,7 +269,7 @@ async function initFirebaseSync() {
                     window.__syncingFromFirebase = false;
                 } else {
                     console.log(`[Multi-Tenant] Cloud is empty for ${key}. Checking local redundancy.`);
-                    
+
                     // REDUNDANCY CHECK: If local storage has data, don't zero it yet!
                     const localBackup = localStorage.getItem(key);
                     if (localBackup && (key === 'expenses' || key === 'invoices')) {
@@ -281,7 +281,7 @@ async function initFirebaseSync() {
                                 resolve();
                                 return;
                             }
-                        } catch(e) {}
+                        } catch (e) { }
                     }
 
                     window.__syncingFromFirebase = true;
@@ -291,12 +291,12 @@ async function initFirebaseSync() {
                 resolve();
             }, (err) => {
                 console.error(`[Recovery] Critical fetch error for ${key}:`, err);
-                resolve(); 
+                resolve();
             });
 
             dbRef.on('value', async (snapshot) => {
                 if (!window.isDataInitialized) return;
-                
+
                 let cloudData = snapshot.val();
                 let sanitized = [];
 
@@ -307,11 +307,11 @@ async function initFirebaseSync() {
                 }
 
                 console.log(`[Realtime-Sync] Update received for ${key}: ${sanitized.length} items.`);
-                
+
                 window.__syncingFromFirebase = true;
                 await originalSetItem.call(localforage, key, sanitized);
                 window.__syncingFromFirebase = false;
-                
+
                 if (window.appLogic) {
                     if (key === 'services') window.appLogic.services = sanitized;
                     if (key === 'delivery_options') {
@@ -345,7 +345,7 @@ const hideInitialLoader = () => {
 
 window.appLogic = {
     currentViewDate: new Date().toISOString().split('T')[0], // Defaults to Today (YYYY-MM-DD)
-    
+
     filterReportsByDate(val) {
         this.currentViewDate = val || new Date().toISOString().split('T')[0];
         this.renderReports();
@@ -364,7 +364,7 @@ window.appLogic = {
         if (!container || !btn) return;
 
         container.classList.toggle('expanded');
-        
+
         if (container.classList.contains('expanded')) {
             btn.innerHTML = 'إخفاء بيانات المغسلة ⬆️';
         } else {
@@ -378,7 +378,7 @@ window.appLogic = {
         if (!cartSection) return;
 
         cartSection.classList.toggle('cart-open');
-        
+
         if (cartSection.classList.contains('cart-open')) {
             if (icon) {
                 icon.classList.remove('fa-chevron-up');
@@ -398,7 +398,7 @@ window.appLogic = {
         if (!footer) return;
 
         footer.classList.toggle('drawer-open');
-        
+
         if (footer.classList.contains('drawer-open')) {
             if (icon) {
                 icon.classList.remove('fa-chevron-up');
@@ -411,7 +411,7 @@ window.appLogic = {
             }
         }
     },
-    
+
     _version: '1.0.3',
     paymentMethod: 'cash',
     currentLang: 'ar',
@@ -424,7 +424,7 @@ window.appLogic = {
     editingInvoiceId: null,
     services: [],
     deliveryOptions: [],
-    
+
     // THEME MANAGEMENT (Light/Dark)
     async initTheme() {
         const savedTheme = localStorage.getItem('sahab-theme') || 'dark';
@@ -434,14 +434,14 @@ window.appLogic = {
     setTheme(theme) {
         document.documentElement.setAttribute('data-theme', theme);
         localStorage.setItem('sahab-theme', theme);
-        
+
         // Update Toggle Icon
         const iconEl = document.getElementById('theme-status-icon');
         if (iconEl) {
             // Sun for light mode, Moon for dark mode
             iconEl.innerHTML = theme === 'light' ? '<i class="fa-solid fa-sun"></i>' : '<i class="fa-solid fa-moon"></i>';
         }
-        
+
         // Update Meta theme-color for mobile browsers
         const metaTheme = document.querySelector('meta[name="theme-color"]');
         if (metaTheme) metaTheme.setAttribute('content', theme === 'dark' ? '#0a0a0a' : '#FFFFFF');
@@ -453,7 +453,7 @@ window.appLogic = {
         const current = document.documentElement.getAttribute('data-theme') || 'light';
         const next = current === 'light' ? 'dark' : 'light';
         this.setTheme(next);
-        
+
         // Brief toast for feedback
         const msg = next === 'dark' ? 'تم تفعيل المظهر الداكن 🌙' : 'تم تفعيل المظهر الفاتح ☀️';
         this.showToast ? this.showToast(msg) : console.log(msg);
@@ -461,15 +461,15 @@ window.appLogic = {
 
     async init() {
         await this.initTheme();
-        
+
         const savedLang = localStorage.getItem('sahab-lang') || 'ar';
         this.currentLang = savedLang;
         const langEl = document.getElementById('ui-language');
         if (langEl) langEl.value = savedLang;
-        
+
         console.log("[App] !!! STARTING CRITICAL INITIALIZATION !!!");
         console.log("[App] Environment:", window.location.protocol);
-        
+
         localforage.config({ name: 'SahabPOS', storeName: 'pos_data' });
 
         // Required Log: Verify local storage is accessible
@@ -502,13 +502,13 @@ window.appLogic = {
             await localforage.setItem('delivery_options', DefaultDeliveryOptions);
             await manualSyncToCloud('delivery_options', DefaultDeliveryOptions);
         }
-        
+
         this.deliveryFee = 0; // Fix 2: Strict 0.00 SAR initialization on load
         console.log("[App] Initialization pulse complete. Data is now protected and loaded.");
-        
+
         await this.updateLaundryDatalist();
         this.renderItems();
-        
+
         // i18n auto-apply on load
         this.applyLanguage();
         this.updateCartUI();
@@ -557,7 +557,7 @@ window.appLogic = {
                     hoods.add(i.partnerLaundryNeighborhood.trim());
                 }
             });
-            
+
             const datalist = document.getElementById('saved-laundries');
             if (datalist) {
                 datalist.innerHTML = Array.from(laundries).sort().map(name => `<option value="${name}">`).join('');
@@ -567,13 +567,13 @@ window.appLogic = {
             if (hoodDatalist) {
                 hoodDatalist.innerHTML = Array.from(hoods).sort().map(hood => `<option value="${hood}">`).join('');
             }
-            
+
             // Sync back to history if unique discoveries were found
             localStorage.setItem('laundryHistory', JSON.stringify({
                 names: Array.from(laundries),
                 hoods: Array.from(hoods)
             }));
-        } catch(e) { console.error('Error updating datalists', e); }
+        } catch (e) { console.error('Error updating datalists', e); }
     },
 
     // UI Routing
@@ -612,7 +612,7 @@ window.appLogic = {
             // Trigger rendering
             console.log('Rendering content for:', viewId);
             localStorage.setItem('sahab_active_view', viewId); // Persistent state
-            
+
             if (viewId === 'history') this.renderHistory();
             else if (viewId === 'customers') this.renderCustomers();
             else if (viewId === 'inventory') this.renderInventory();
@@ -717,7 +717,7 @@ window.appLogic = {
         if (existing) {
             existing.qty += 1;
         } else {
-            this.cart.unshift({
+            this.cart.push({ // Added push() instead of unshift() for chronological order
                 id: item.id,
                 name: item.name,
                 type: type,
@@ -728,7 +728,7 @@ window.appLogic = {
         }
 
         this.updateCartUI();
-        
+
         // Optional quick tap feedback:
         if (this.showToast) {
             let tLbl = type === 'iron' ? 'كوي' : (type === 'wash_iron' ? 'غسيل وكوي' : 'غسيل');
@@ -827,7 +827,7 @@ window.appLogic = {
         if (existing) {
             existing.qty += this.modalState.qty;
         } else {
-            this.cart.unshift({ // Add to top for immediate visibility
+            this.cart.push({ // Added push() instead of unshift() for chronological order
                 id: this.modalState.item.id,
                 name: this.modalState.item.name,
                 type: this.modalState.type,
@@ -870,13 +870,13 @@ window.appLogic = {
             container.innerHTML = `<div class="empty-cart-msg">${this.currentLang === 'en' ? 'Cart is empty, please select items.' : 'السلة فارغة، يرجى اختيار أصناف.'}</div>`;
         } else {
             this.cart.forEach((item, index) => {
-                let tLbl = this.currentLang === 'en' 
+                let tLbl = this.currentLang === 'en'
                     ? (item.type === 'iron' ? 'Iron Only' : (item.type === 'wash_iron' ? 'Wash & Iron' : 'Wash Only'))
                     : (item.type === 'iron' ? 'كوي فقط' : (item.type === 'wash_iron' ? 'غسيل وكوي' : 'غسيل فقط'));
-                let sLbl = this.currentLang === 'en' 
+                let sLbl = this.currentLang === 'en'
                     ? (item.speed === 'normal' ? 'Normal' : 'Express')
                     : (item.speed === 'normal' ? 'عادي' : 'مستعجل');
-                
+
                 container.innerHTML += `
                     <div class="cart-item">
                         <div class="cart-item-header">
@@ -897,8 +897,11 @@ window.appLogic = {
             });
         }
 
+        // Auto-Scroll to Bottom for immediate visibility of new items
+        container.scrollTop = container.scrollHeight;
+
         const subt = this.cart.reduce((s, i) => s + (i.unitPrice * i.qty), 0);
-        
+
         // Fix 1: Strict Total Logic
         if (this.cart.length === 0) {
             this.deliveryFee = 0;
@@ -921,7 +924,7 @@ window.appLogic = {
         if (source === 'sidebar') {
             name = document.getElementById('sidebar-customer-name')?.value || '';
             phone = document.getElementById('sidebar-customer-phone')?.value || '';
-            
+
             // Sync to modal
             const modalName = document.getElementById('checkout-customer-name');
             const modalPhone = document.getElementById('checkout-customer-phone');
@@ -930,7 +933,7 @@ window.appLogic = {
         } else {
             name = document.getElementById('checkout-customer-name')?.value || '';
             phone = document.getElementById('checkout-customer-phone')?.value || '';
-            
+
             // Sync back to sidebar
             const sideName = document.getElementById('sidebar-customer-name');
             const sidePhone = document.getElementById('sidebar-customer-phone');
@@ -943,7 +946,7 @@ window.appLogic = {
 
     openCheckoutModal() {
         if (this.cart.length === 0) return alert('السلة فارغة!');
-        
+
         // Fix 6: Disable annoying auto-fill of Cash Customer if nothing was typed
         const sideName = document.getElementById('sidebar-customer-name')?.value || '';
         const sidePhone = document.getElementById('sidebar-customer-phone')?.value || '';
@@ -956,7 +959,7 @@ window.appLogic = {
         this.renderCheckoutDeliveryButtons();
         this.setPaymentMethod('cash');
         this.updateCheckoutTotal();
-        
+
         document.getElementById('checkout-modal').classList.remove('hidden');
     },
 
@@ -972,14 +975,14 @@ window.appLogic = {
         if (!this.pendingInvoice) return;
         this.paymentMethod = method;
         this.pendingInvoice.paymentMethod = method;
-        
+
         // Re-generate thermal HTML with the selected payment method
         document.getElementById('invoice-preview-container').innerHTML = this.generateThermalHTML(this.pendingInvoice, 'preview-qr-render');
 
         // Re-render QR for preview
         const bizNamePreview = window.tenantSettings?.name || 'سحاب';
         const zatcaQRBase64 = generateZatcaBase64(bizNamePreview, window.tenantSettings?.taxNumber || "000000000000000", this.pendingInvoice.timestamp, this.pendingInvoice.grandTotal, this.pendingInvoice.vatAmount);
-        
+
         const qrBox = document.getElementById('preview-qr-render');
         if (qrBox) {
             qrBox.innerHTML = '';
@@ -1021,7 +1024,7 @@ window.appLogic = {
         const subt = this.cart.reduce((s, i) => s + (i.unitPrice * i.qty), 0);
         let totalVal = subt + this.deliveryFee;
         let totalStr = totalVal.toFixed(2);
-        
+
         const modalTotal = document.getElementById('checkout-grand-total');
         if (modalTotal) modalTotal.innerText = totalStr;
 
@@ -1066,7 +1069,7 @@ window.appLogic = {
         console.log('Button Clicked: previewCheckout - Start processing checkout preview');
         if (this.cart.length === 0) return alert('السلة فارغة!');
 
-        const custNameInput  = document.getElementById('checkout-customer-name')  ? document.getElementById('checkout-customer-name').value.trim()  : '';
+        const custNameInput = document.getElementById('checkout-customer-name') ? document.getElementById('checkout-customer-name').value.trim() : '';
         const custPhoneInput = document.getElementById('checkout-customer-phone') ? document.getElementById('checkout-customer-phone').value.trim() : '';
 
         // Phone is optional — but if entered it MUST be a valid Saudi number (10 digits, starts with 05)
@@ -1077,7 +1080,7 @@ window.appLogic = {
             return;
         }
 
-        let cName  = custNameInput  || 'عميل نقدي';
+        let cName = custNameInput || 'عميل نقدي';
         let cPhone = custPhoneInput || '0000000000';
 
         // Update current customer object for saving later
@@ -1119,11 +1122,11 @@ window.appLogic = {
 
         let invoiceData = {
             id: newInvId, timestamp: Date.now(), customer: { phone: cPhone, name: cName },
-            items: [...this.cart], 
-            deliveryFee: parseFloat(this.deliveryFee) || 0, 
-            total: parseFloat(grT) || 0, 
-            grandTotal: parseFloat(grT) || 0, 
-            laundryCost: pCost, 
+            items: [...this.cart],
+            deliveryFee: parseFloat(this.deliveryFee) || 0,
+            total: parseFloat(grT) || 0,
+            grandTotal: parseFloat(grT) || 0,
+            laundryCost: pCost,
             partnerLaundryCost: pCost,
             partnerLaundryName: pName,
             partnerLaundryNeighborhood: pHood,
@@ -1166,7 +1169,7 @@ window.appLogic = {
 
         // Save Invoice to DB
         let invoices = await localforage.getItem('invoices') || [];
-        
+
         if (this.editingInvoiceId) {
             let idx = invoices.findIndex(i => i.id === this.editingInvoiceId);
             if (idx >= 0) invoices[idx] = this.pendingInvoice;
@@ -1266,9 +1269,9 @@ window.appLogic = {
         }
 
         // Build pre-filled message
-        const storeName  = window.tenantSettings?.name || 'المغسلة';
-        const invId      = inv.id || '';
-        const total      = (inv.grandTotal || inv.total || 0).toFixed(2);
+        const storeName = window.tenantSettings?.name || 'المغسلة';
+        const invId = inv.id || '';
+        const total = (inv.grandTotal || inv.total || 0).toFixed(2);
         const msg = encodeURIComponent(
             `مرحباً ${inv.customer.name || 'عزيزي العميل'}،\n` +
             `شكراً لتعاملكم مع ${storeName}.\n` +
@@ -1289,21 +1292,21 @@ window.appLogic = {
         const dObj = new Date(data.timestamp);
         const dStr = dObj.toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
 
-        const _vatAmt   = parseFloat(data.vatAmount || 0);
+        const _vatAmt = parseFloat(data.vatAmount || 0);
         const _delivery = parseFloat(data.deliveryFee || 0);
-        const _grand    = parseFloat(data.grandTotal || data.total || 0);
+        const _grand = parseFloat(data.grandTotal || data.total || 0);
         const _subtotal = _grand - _vatAmt;
-        const _invId    = (data.id || '').toString().replace(/^INV-/, '');
+        const _invId = (data.id || '').toString().replace(/^INV-/, '');
         const _custName = (!data.customer.name || data.customer.name === 'عميل نقدي' || data.customer.name === 'عميل دون اسم') ? '' : data.customer.name;
         const _storeTax = window.tenantSettings?.taxNumber
             ? `<p style="margin:2px 0; font-size:14px; color:#444;">الرقم الضريبي: &nbsp;&nbsp; <strong style="direction:ltr; display:inline-block;">${window.tenantSettings.taxNumber}</strong></p>` : '';
-        const _storeWA  = window.tenantSettings?.phone
+        const _storeWA = window.tenantSettings?.phone
             ? `<p style="margin:2px 0; font-size:14px; color:#444;">رقم جوال النشاط: &nbsp;&nbsp; <strong style="direction:ltr; display:inline-block;">${window.tenantSettings.phone}</strong></p>` : '';
         const _storeAddress = window.tenantSettings?.address
             ? `<p style="margin:2px 0; font-size:14px; color:#444;">العنوان: &nbsp;&nbsp; <strong style="direction:rtl; display:inline-block;">${window.tenantSettings.address}</strong></p>`
             : `<p style="margin:2px 0; font-size:14px; color:#444;">العنوان: &nbsp;&nbsp; <strong style="direction:rtl; display:inline-block;">المملكة العربية السعودية</strong></p>`;
         const _hasValTax = !!(window.tenantSettings && window.tenantSettings.taxNumber && window.tenantSettings.taxNumber.trim() !== '');
-        const _invType  = _hasValTax ? 'فاتورة ضريبية مبسطة' : 'فاتورة مبيعات';
+        const _invType = _hasValTax ? 'فاتورة ضريبية مبسطة' : 'فاتورة مبيعات';
 
         let _itemRows = '', _rn = 1;
         data.items.forEach(it => {
@@ -1489,9 +1492,9 @@ window.appLogic = {
         const dStr = dObj.toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
         const _invId = (data.id || '').toString().replace(/^INV-/, '');
         const _custName = (!data.customer.name || data.customer.name === 'عميل نقدي' || data.customer.name === 'عميل دون اسم') ? '' : data.customer.name;
-        const vatAmount  = parseFloat(data.vatAmount  || 0);
+        const vatAmount = parseFloat(data.vatAmount || 0);
         const deliveryFee = parseFloat(data.deliveryFee || 0);
-        const grandTotal  = parseFloat(data.grandTotal  || data.total || 0);
+        const grandTotal = parseFloat(data.grandTotal || data.total || 0);
         const combinedSum = grandTotal - vatAmount; // subtotal before VAT
 
         const displayLocale = 'en-US';
@@ -1629,7 +1632,7 @@ window.appLogic = {
         if (!historyContent) return;
 
         let invoices = await localforage.getItem('invoices') || [];
-        
+
         // 📅 GLOBAL DATE FILTER: Only show invoices for currentViewDate
         invoices = invoices.filter(inv => {
             if (!inv) return false;
@@ -1641,14 +1644,14 @@ window.appLogic = {
         // Search Filter (Secondary)
         if (searchTerm) {
             const term = searchTerm.toLowerCase();
-            invoices = invoices.filter(inv => 
+            invoices = invoices.filter(inv =>
                 (inv.id && inv.id.toString().toLowerCase().includes(term)) ||
                 (inv.customer && inv.customer.name && inv.customer.name.toLowerCase().includes(term)) ||
                 (inv.customer && inv.customer.phone && inv.customer.phone.includes(term))
             );
         }
 
-        invoices.sort((a,b) => b.timestamp - a.timestamp);
+        invoices.sort((a, b) => b.timestamp - a.timestamp);
 
         try {
             // STRICT VALIDATION: Filter out undefined/empty invoices to kill ghosts
@@ -1670,7 +1673,7 @@ window.appLogic = {
             } else {
                 // UNIFIED SORTING: Newest First based on timestamp
                 const displayInvoices = [...filtered].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-                
+
                 displayInvoices.forEach(i => {
                     if (!i) return;
                     const isCancelled = i.isCancelled === true;
@@ -1747,11 +1750,11 @@ window.appLogic = {
         let invs = await localforage.getItem('invoices') || [];
         const idx = invs.findIndex(i => i.id === id);
         if (idx === -1) return;
-        
+
         invs[idx].laundryPaid = !invs[idx].laundryPaid;
         await localforage.setItem('invoices', invs);
         await manualSyncToCloud('invoices', invs);
-        
+
         this.renderHistory();
         this.renderReports();
         this.showToast('تم تحديث حالة دفع المغسلة الشريكة');
@@ -1792,12 +1795,12 @@ window.appLogic = {
         if (!balances[key]) balances[key] = { balance: 0 };
         // We only add to the balance if it's not already paid (it's new/updated)
         // Note: For simplicity in this non-refactor fix, we assume this adds to the running total.
-        balances[key].balance += cost; 
+        balances[key].balance += cost;
         await localforage.setItem('laundry_balances', balances);
         localStorage.setItem('laundry_balances', JSON.stringify(balances));
-        
+
         this.showToast('تم حفظ بيانات المغسلة وتحديث الرصيد التراكمي');
-        
+
         // Update Persistent History (Smart Autocomplete Memory)
         const history = JSON.parse(localStorage.getItem('laundryHistory') || '{"names":[], "hoods":[]}');
         if (name && !history.names.includes(name)) history.names.push(name);
@@ -1900,7 +1903,7 @@ window.appLogic = {
             const isCancelled = inv.isCancelled === true || inv.status === 'cancelled';
             const name = (inv.customer && inv.customer.name) ? inv.customer.name.trim() : '';
             const phone = (inv.customer && inv.customer.phone) ? inv.customer.phone.trim() : '';
-            
+
             let key = '';
             let isWalkIn = false;
 
@@ -1955,13 +1958,13 @@ window.appLogic = {
         try {
             const input = document.getElementById('customer-search');
             let term = input ? input.value.toLowerCase() : '';
-            
+
             let aggregated = await this._getAggregatedCustomers();
 
             if (term) {
                 aggregated = aggregated.filter(c => {
-                    return (c.name && c.name.toLowerCase().includes(term)) || 
-                           (c.phone && c.phone.includes(term));
+                    return (c.name && c.name.toLowerCase().includes(term)) ||
+                        (c.phone && c.phone.includes(term));
                 });
             }
 
@@ -1988,7 +1991,7 @@ window.appLogic = {
             } else {
                 // Sort by latest activity (newest first)
                 const displayCustomers = [...customersArray].sort((a, b) => b.latestTimestamp - a.latestTimestamp);
-                
+
                 displayCustomers.forEach(c => {
                     if (!c) return;
                     let n = c.name || 'عميل دون اسم';
@@ -1996,7 +1999,7 @@ window.appLogic = {
                     let count = c.orderCount || 0;
                     let spent = c.totalSpent || 0;
                     let isWalkIn = c.isWalkIn;
-                    
+
                     // Passing invoiceId for walk-ins so logic can filter history by that specific ID
                     const actionParam = isWalkIn ? c.invoiceId : (c.phone || c.name);
 
@@ -2024,17 +2027,17 @@ window.appLogic = {
     viewCustomerOrders(identifier) {
         // Switch to the history view first
         this.switchView('history');
-        
+
         // Ensure the search input exists and is set to the correct customer info
         const searchInput = document.getElementById('history-search');
         if (searchInput) {
             // Remove any 'INV-' prefix if the identifier is an ID to help the history filter find it
             const displayValue = identifier.toString().replace(/^INV-/, '');
             searchInput.value = displayValue;
-            
+
             // Trigger the history filtering logic programmatically
             this.filterHistory();
-            
+
             // Scroll the history view to the top to ensure visibility
             const historyView = document.getElementById('view-history');
             if (historyView) historyView.scrollTop = 0;
@@ -2042,14 +2045,14 @@ window.appLogic = {
     },
 
     // Wafeq UI: Inventory
-    openAddInventoryModal() { 
+    openAddInventoryModal() {
         document.getElementById('inv-id').value = '';
         document.getElementById('inv-name').value = '';
         document.getElementById('inv-sku').value = '';
         document.getElementById('inv-qty').value = 0;
         document.getElementById('inv-cost').value = '0.00';
         document.querySelector('#add-inventory-modal h3').innerHTML = '<i class="fa-solid fa-box-open"></i> إضافة صنف استهلاكي';
-        document.getElementById('add-inventory-modal').classList.remove('hidden'); 
+        document.getElementById('add-inventory-modal').classList.remove('hidden');
     },
     closeInventoryModal() { document.getElementById('add-inventory-modal').classList.add('hidden'); },
     async editConsumable(id) {
@@ -2070,10 +2073,10 @@ window.appLogic = {
         if (!confirm("هل أنت متأكد من حذف هذه المادة؟")) return;
         let inv = await localforage.getItem('inventory') || [];
         inv = inv.filter(i => String(i.id) !== String(id));
-        
+
         await localforage.setItem('inventory', inv);
         await manualSyncToCloud('inventory', inv);
-        
+
         this.renderInventory();
         this.showToast('تم حذف المادة بنجاح');
     },
@@ -2086,7 +2089,7 @@ window.appLogic = {
         if (!name || !sku) { alert('يرجى تعبئة الحقول الأساسية!'); return; }
 
         let inv = await localforage.getItem('inventory') || [];
-        
+
         if (id) {
             // Edit Mode
             let idx = inv.findIndex(i => String(i.id) === String(id));
@@ -2104,7 +2107,7 @@ window.appLogic = {
                 inv.push({ id: Date.now(), name, sku, qty, cost });
             }
         }
-        
+
         await localforage.setItem('inventory', inv);
         await manualSyncToCloud('inventory', inv);
 
@@ -2116,13 +2119,13 @@ window.appLogic = {
     async renderInventory() {
         const container = document.getElementById('inventory-content');
         if (!container) return;
-        
+
         // Immediate Feedback
         container.innerHTML = '<div style="text-align:center; padding:20px; color:var(--primary);"><i class="fa-solid fa-spinner fa-spin"></i> جاري تحميل البيانات...</div>';
 
         try {
             console.log('[UI] Starting renderInventory...');
-            
+
             // Load tracked inventory (consumables)
             let trackedInv = [];
             try {
@@ -2197,7 +2200,7 @@ window.appLogic = {
                         </thead>
                         <tbody>
                 `;
-            
+
             const services = window.appLogic.services || [];
             if (Array.isArray(services)) {
                 services.forEach(item => {
@@ -2206,7 +2209,7 @@ window.appLogic = {
                     const iron = parseFloat(p.iron) || 0;
                     const washIron = parseFloat(p.wash_iron) || 0;
                     const wash = parseFloat(p.wash) || 0;
-                    
+
                     let expLbl = '0.00';
                     if (item.expressFee) {
                         if (typeof item.expressFee === 'object') expLbl = 'متغير';
@@ -2352,7 +2355,7 @@ window.appLogic = {
 
         // 3. UI Refresh
         this.renderInventory();
-        this.renderItems(); 
+        this.renderItems();
         this.showToast('تم حذف الخدمة بنجاح');
     },
 
@@ -2360,7 +2363,7 @@ window.appLogic = {
         try {
             const container = document.getElementById('delivery-manager-content');
             if (!container) return;
-            
+
             let html = `
                 <table class="inventory-table">
                     <thead>
@@ -2372,7 +2375,7 @@ window.appLogic = {
                     </thead>
                     <tbody>
             `;
-            
+
             const deliveryArray = Array.isArray(this.deliveryOptions) ? this.deliveryOptions : [];
             deliveryArray.forEach(opt => {
                 if (!opt) return;
@@ -2388,11 +2391,11 @@ window.appLogic = {
                     </tr>
                 `;
             });
-            
+
             if (deliveryArray.length === 0) {
                 html += '<tr><td colspan="3" style="text-align:center; padding:20px;">لا يوجد خيارات توصيل حالياً.</td></tr>';
             }
-            
+
             html += '</tbody></table>';
             container.innerHTML = html;
         } catch (err) {
@@ -2405,7 +2408,7 @@ window.appLogic = {
         const nameField = document.getElementById('delivery-name');
         const amountField = document.getElementById('delivery-amount');
         const title = document.getElementById('delivery-modal-title');
-        
+
         if (id) {
             const opt = this.deliveryOptions.find(o => o.id === id);
             idField.value = id;
@@ -2429,7 +2432,7 @@ window.appLogic = {
         const id = document.getElementById('delivery-id').value;
         const name = document.getElementById('delivery-name').value;
         const amt = parseFloat(document.getElementById('delivery-amount').value);
-        
+
         if (!name || isNaN(amt)) {
             alert('يرجى كتابة الاسم والمبلغ');
             return;
@@ -2450,7 +2453,7 @@ window.appLogic = {
 
         await localforage.setItem('delivery_options', this.deliveryOptions);
         await manualSyncToCloud('delivery_options', this.deliveryOptions);
-        
+
         this.closeDeliveryModal();
         this.renderInventory();
         this.updateCartUI();
@@ -2488,7 +2491,7 @@ window.appLogic = {
                             </tr>
                         </thead>
                         <tbody>
-                            ${exps.sort((a,b) => new Date(b.date) - new Date(a.date)).map(e => `
+                            ${exps.sort((a, b) => new Date(b.date) - new Date(a.date)).map(e => `
                                 <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
                                     <td style="padding:10px; color:#ccc; font-size:13px;">${e.date}</td>
                                     <td style="padding:10px;"><span style="background:rgba(130, 109, 234, 0.2); color:#826dea; padding:3px 8px; border-radius:4px; font-size:11px;">${e.category}</span></td>
@@ -2523,6 +2526,14 @@ window.appLogic = {
 
             const keys = Object.keys(laundryMap).sort();
             
+            // Calculate column totals
+            let totalDues = 0;
+            let totalPaid = 0;
+            keys.forEach(k => {
+                totalDues += (laundryMap[k].dues || 0);
+                totalPaid += (laundryMap[k].paid || 0);
+            });
+
             html += `
             <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:12px; margin-bottom:15px;">
@@ -2541,10 +2552,10 @@ window.appLogic = {
                         </thead>
                         <tbody>
                             ${keys.map(key => {
-                                const data = laundryMap[key];
-                                const displayName = data.hood ? `${data.name} <small style="color:#888;">(${data.hood})</small>` : data.name;
-                                const safeKey = key.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-                                return `
+                const data = laundryMap[key];
+                const displayName = data.hood ? `${data.name} <small style="color:#888;">(${data.hood})</small>` : data.name;
+                const safeKey = key.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+                return `
                                 <tr style="border-bottom:1px solid var(--border);">
                                     <td style="padding:15px; font-weight:bold; color:#fff;">${displayName}</td>
                                     <td style="padding:15px; font-weight:bold; color:${data.dues > 0 ? '#ff4538' : '#fff'}; direction:ltr; text-align:right;">${data.dues.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR</td>
@@ -2554,7 +2565,13 @@ window.appLogic = {
                                     </td>
                                 </tr>
                                 `;
-                            }).join('')}
+            }).join('')}
+                            <tr style="background:#111; border-top:2px solid var(--border); font-weight:900;">
+                                <td style="padding:15px; color:var(--primary);">المجموع الإجمالي</td>
+                                <td style="padding:15px; color:#ff4538; direction:ltr; text-align:right;">${totalDues.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR</td>
+                                <td style="padding:15px; color:#4CAF50; direction:ltr; text-align:right;">${totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR</td>
+                                <td style="padding:15px;">-</td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -2567,7 +2584,7 @@ window.appLogic = {
     },
 
     // Wafeq UI: Expenses
-    openAddExpenseModal() { 
+    openAddExpenseModal() {
         document.getElementById('add-expense-modal').classList.remove('hidden');
         document.getElementById('expense-date').value = new Date().toISOString().split('T')[0];
     },
@@ -2581,24 +2598,24 @@ window.appLogic = {
         if (!amount || !desc || !date) { alert('يرجى تعبئة كافة الحقول لحفظ التقييد المحاسبي!'); return; }
 
         let exps = await localforage.getItem('expenses') || [];
-        const newExpense = { 
-            id: Date.now(), 
-            timestamp: Date.now(), 
-            category: cat, 
-            amount: amount, 
-            desc: desc, 
-            date: date 
+        const newExpense = {
+            id: Date.now(),
+            timestamp: Date.now(),
+            category: cat,
+            amount: amount,
+            desc: desc,
+            date: date
         };
-        
+
         exps.push(newExpense);
-        
+
         await localforage.setItem('expenses', exps);
         localStorage.setItem('expenses', JSON.stringify(exps));
         await manualSyncToCloud('expenses', exps);
 
         this.closeExpenseModal();
         this.renderExpenses();
-        this.renderReports(); 
+        this.renderReports();
         this.showToast('تم تقييد المصروف بنجاح وتسجيله بالدفتر');
 
         // Reset fields
@@ -2609,11 +2626,11 @@ window.appLogic = {
 
     async clearExpenses() {
         if (!confirm('هل أنت متأكد من مسح جميع المصروفات التشغيلية نهائياً؟')) return;
-        
+
         await localforage.setItem('expenses', []);
         localStorage.removeItem('expenses'); // Clear redundant backup
         await manualSyncToCloud('expenses', []);
-        
+
         this.renderExpenses();
         this.renderReports();
         this.showToast('تم تصفير جميع المصروفات التشغيلية');
@@ -2624,59 +2641,27 @@ window.appLogic = {
         const exps = await localforage.getItem('expenses') || [];
         let taxRecords = await localforage.getItem('tax_records') || [];
 
-        // ZERO-STATE GUARD: If no invoices, force data to be empty
-        if (invoices.length === 0) {
-            taxRecords = [];
-            const staleTax = await localforage.getItem('tax_records') || [];
-            const staleJournals = await localforage.getItem('journal_entries') || [];
-            if (staleTax.length > 0 || staleJournals.length > 0) {
-                console.log('[Zero-State-Guard] Purging ghost collections because invoices is empty.');
-                await localforage.setItem('tax_records', []);
-                await manualSyncToCloud('tax_records', []);
-                await localforage.setItem('journal_entries', []);
-                await manualSyncToCloud('journal_entries', []);
-            }
-        } else {
-            // SELF-HEALING: Filter tax_records and journal_entries that don't have a matching VALID invoice anymore
-            // DATA UPLOAD (بص الرفع) FILTER: Exclude cancelled (refunded) invoices from these collections
-            const validInvoiceIds = new Set(invoices.filter(i => i && i.id && !i.isCancelled).map(i => i.id.toString()));
-            
-            // Purge Tax Records
-            const originalTaxCount = taxRecords.length;
-            taxRecords = taxRecords.filter(r => r && r.ref_invoice && validInvoiceIds.has(r.ref_invoice.toString()));
-            if (taxRecords.length !== originalTaxCount) {
-                console.log(`[Self-Healing] Purged ${originalTaxCount - taxRecords.length} orphan tax records.`);
-                await localforage.setItem('tax_records', taxRecords);
-                await manualSyncToCloud('tax_records', taxRecords);
-            }
-
-            // Purge Journal Entries
-            let journals = await localforage.getItem('journal_entries') || [];
-            const originalJournalCount = journals.length;
-            journals = journals.filter(j => j && j.ref_invoice && validInvoiceIds.has(j.ref_invoice.toString()));
-            if (journals.length !== originalJournalCount) {
-                console.log(`[Self-Healing] Purged ${originalJournalCount - journals.length} orphan journal entries.`);
-                await localforage.setItem('journal_entries', journals);
-                await manualSyncToCloud('journal_entries', journals);
-            }
-        }
-
         // ---------------------------------------------------------
-        // 🗓️ DATE FILTER LOGIC
+        // 🗓️ DATE FILTER LOGIC (Strict String Matching for Accuracy)
         // ---------------------------------------------------------
         let filterLabel = "اليوم (Live Shift)";
         let startBound, endBound;
+        const isLiveShift = !this.reportFilterDate;
+        
+        // Use a local variable to prevent infinite state update loops
+        const currentTargetDate = this.reportFilterDate || new Date().toISOString().split('T')[0];
 
         if (this.reportFilterDate) {
-            const dateObj = new Date(this.reportFilterDate);
             filterLabel = this.reportFilterDate;
-            const y = dateObj.getFullYear(), m = dateObj.getMonth(), d = dateObj.getDate();
-            startBound = new Date(y, m, d).getTime();
-            endBound = startBound + (24 * 60 * 60 * 1000) - 1;
+            const parts = this.reportFilterDate.split('-');
+            const y = parseInt(parts[0]), m = parseInt(parts[1]) - 1, d = parseInt(parts[2]);
+            startBound = new Date(y, m, d, 0, 0, 0, 0).getTime();
+            endBound = new Date(y, m, d, 23, 59, 59, 999).getTime();
         } else {
             const now = new Date();
-            startBound = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-            endBound = Infinity; // Live data (all current shift)
+            const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
+            startBound = new Date(y, m, d, 0, 0, 0, 0).getTime();
+            endBound = new Date(y, m, d, 23, 59, 59, 999).getTime();
         }
 
         const weekAgo = startBound - (7 * 24 * 60 * 60 * 1000);
@@ -2691,52 +2676,69 @@ window.appLogic = {
         let totalAllInvoices = 0;
         let totalRefunds = 0;
         let totalOperatingExpenses = 0;
-        let totalLaundryCosts = 0;
         let totalLaundryDebt = 0;
 
         // 1. Process Invoices
+        let cashTotal = 0, madaTotal = 0, visaTotal = 0, mastercardTotal = 0;
         invoices.forEach(i => {
             if (!i) return;
             const amt = parseFloat(i.total || i.grandTotal || 0);
             const rTime = new Date(i.date || i.timestamp).getTime();
             
+            // If Live Shift: only show what hasn't been closed.
+            // If History: show everything for that selected date.
+            const matchesShift = isLiveShift ? !i.isZReported : true;
+
             // DYNAMIC ROLLING TOTALS
             const isInRange = (rTime >= startBound && (endBound === Infinity || rTime <= endBound));
-            
-            if (isInRange && !i.isZReported) salesToday += amt;
-            if (rTime >= weekAgo) salesWeek += amt;
-            if (rTime >= monthAgo) salesMonth += amt;
-            if (rTime >= yearAgo) salesYear += amt;
 
-            // Monthly Map (Full history)
-            const d = new Date(i.date || i.timestamp);
-            const mIdx = d.getMonth();
-            const year = d.getFullYear();
-            const key = `${year}-${String(mIdx + 1).padStart(2, '0')}`;
-            const label = `${monthsAr[mIdx]} ${year.toString()}`; // Force English year numerals
-            if (!monthlyMap[key]) monthlyMap[key] = { label, total: 0, sortKey: key };
-            monthlyMap[key].total += amt;
+            if (isInRange && matchesShift) {
+                salesToday += amt;
+                if (rTime >= weekAgo) salesWeek += amt;
+                if (rTime >= monthAgo) salesMonth += amt;
+                if (rTime >= yearAgo) salesYear += amt;
+            }
+
+            // Monthly Map (Conditionally respect shift in Live view)
+            if (matchesShift) {
+                const d = new Date(i.date || i.timestamp);
+                const mIdx = d.getMonth();
+                const year = d.getFullYear();
+                const key = `${year}-${String(mIdx + 1).padStart(2, '0')}`;
+                const label = `${monthsAr[mIdx]} ${year.toString()}`;
+                if (!monthlyMap[key]) monthlyMap[key] = { label, total: 0, sortKey: key };
+                monthlyMap[key].total += amt;
+            }
 
             // ACTIVE DASHBOARD FILTER (Selected Date)
-            if (isInRange) {
+            if (isInRange && matchesShift) {
                 totalAllInvoices += amt;
                 if (i.isCancelled === true) {
                     totalRefunds += amt;
                 } else {
-                    const pCost = parseFloat(i.laundryCost || i.partnerLaundryCost || 0);
-                    totalLaundryCosts += pCost;
-                    // Note: Laundry Debt is cumulative, handled separately below
+                    // Track Payment Methods for Z-Report Sync
+                    const pMethod = i.paymentMethod || 'cash';
+                    if (pMethod === 'cash') cashTotal += amt;
+                    else if (pMethod === 'mada' || pMethod === 'network') madaTotal += amt;
+                    else if (pMethod === 'visa') visaTotal += amt;
+                    else if (pMethod === 'mastercard') mastercardTotal += amt;
                 }
             }
         });
 
-        // 2. Process Expenses (Filtered by Selected Date)
+        // 2. Process Expenses (STRICT UI-BOUND MATCH)
+        let opExpsAudit = [];
         exps.forEach(e => {
-            const eTime = new Date(e.date).getTime();
-            if (eTime >= startBound && (endBound === Infinity || eTime <= endBound)) {
-                totalOperatingExpenses += parseFloat(e.amount) || 0;
+            if (!e) return;
+            // Strict YYYY-MM-DD match prevents yesterday's items from "bleeding" via timestamps
+            const matchesShift = isLiveShift ? !e.isZReported : true;
+            if (e.date === currentTargetDate && matchesShift) {
+                const amt = parseFloat(e.amount) || 0;
+                totalOperatingExpenses += amt;
+                opExpsAudit.push({ category: e.category, desc: e.desc, amount: amt, date: e.date });
             }
         });
+        console.log(`[Operating Expenses Breakdown for ${currentTargetDate}]:`, opExpsAudit);
 
         // 3. Laundry Debt (Handled independently as a Cumulative Balance)
         // Note: For historical reports, we might want the point-in-time debt, 
@@ -2753,11 +2755,11 @@ window.appLogic = {
         let html = `
         <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:15px; margin-bottom:25px; display:flex; justify-content:space-between; align-items:center; box-shadow:var(--shadow-sm);">
             <div>
-                <h2 style="font-size:18px; color:var(--primary); margin-bottom:3px;"><i class="fa-solid fa-calendar-check"></i> عرض البيانات المالية لـ: ${this.currentViewDate}</h2>
+                <h2 style="font-size:18px; color:var(--primary); margin-bottom:3px;"><i class="fa-solid fa-calendar-check"></i> عرض البيانات المالية لـ: ${currentTargetDate}</h2>
                 <p style="font-size:12px; color:var(--text-muted); margin:0;">اختر تاريخاً لمراجعة الأداء والعمليات المالية السابقة.</p>
             </div>
             <div style="display:flex; gap:10px; align-items:center;">
-                <input type="date" value="${this.currentViewDate}" onchange="appLogic.filterReportsByDate(this.value)" style="background:#000; color:#fff; border:1px solid var(--border); padding:10px; border-radius:8px; font-size:14px; outline:none; text-align:center;">
+                <input type="date" value="${currentTargetDate}" onchange="appLogic.filterReportsByDate(this.value)" style="background:#000; color:#fff; border:1px solid var(--border); padding:10px; border-radius:8px; font-size:14px; outline:none; text-align:center;">
                 <button class="btn" style="background:rgba(253,184,19,0.1); color:var(--primary); padding:10px 15px; font-size:12px; font-weight:bold; border:1px solid var(--primary); border-radius:8px;" onclick="appLogic.resetReportFilter()">اليوم <i class="fa-solid fa-rotate-left"></i></button>
             </div>
         </div>
@@ -2767,28 +2769,47 @@ window.appLogic = {
             <!-- 1. Gross Sales -->
             <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px; text-align:center; box-shadow:var(--shadow-sm);">
                 <h3 style="color:var(--text-muted); font-size:13px; margin-bottom:5px;">إجمالي المبيعات (Gross Sales)</h3>
-                <div style="font-size:24px; font-weight:800; direction:ltr; color:var(--text-main);">${totalAllInvoices.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ر.س</div>
+                <div id="db-gross-sales" style="font-size:24px; font-weight:800; direction:ltr; color:var(--text-main);">${totalAllInvoices.toFixed(2)} ر.س</div>
             </div>
 
             <!-- 2. Refunds -->
             <div style="background:var(--bg-surface); border:1px solid rgba(255, 69, 58, 0.2); border-radius:var(--radius-md); padding:20px; text-align:center; box-shadow:var(--shadow-sm);">
                 <h3 style="color:var(--text-muted); font-size:13px; margin-bottom:5px;">إجمالي المرتجعات (Refunds)</h3>
-                <div style="font-size:24px; font-weight:800; direction:ltr; color:#ff453a;">- ${totalRefunds.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ر.س</div>
+                <div id="db-refunds" style="font-size:24px; font-weight:800; direction:ltr; color:#ff453a;">- ${totalRefunds.toFixed(2)} ر.س</div>
             </div>
 
             <!-- 3. Net Revenue -->
             <div style="background:var(--bg-surface); border:1px solid rgba(76, 175, 80, 0.2); border-radius:var(--radius-md); padding:20px; text-align:center; box-shadow:var(--shadow-sm);">
                 <h3 style="color:var(--text-muted); font-size:13px; margin-bottom:5px;">صافي الإيرادات (Net Revenue)</h3>
-                <div style="font-size:24px; font-weight:800; direction:ltr; color:#4CAF50;">${totalNetRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ر.س</div>
+                <div id="db-net-revenue" style="font-size:24px; font-weight:800; direction:ltr; color:#4CAF50;">${totalNetRevenue.toFixed(2)} ر.س</div>
+            </div>
+
+            <!-- 4. Operating Expenses (NEW BOX) -->
+            <div style="background:var(--bg-surface); border:1px solid rgba(255, 69, 58, 0.2); border-radius:var(--radius-md); padding:20px; text-align:center; box-shadow:var(--shadow-sm);">
+                <h3 style="color:var(--text-muted); font-size:13px; margin-bottom:5px;">إجمالي المصاريف التشغيلية</h3>
+                <div id="db-op-expenses-display" style="font-size:24px; font-weight:800; direction:ltr; color:#ff453a;">- ${totalOperatingExpenses.toFixed(2)} ر.س</div>
             </div>
 
             <!-- 6. FINAL NET PROFIT OVERLAY (Full Width) -->
             <div style="grid-column: 1 / -1; background:var(--bg-elevated); border:2px solid var(--primary); border-radius:var(--radius-md); padding:25px; text-align:center; box-shadow:var(--shadow-lg);">
                 <h3 style="color:var(--text-muted); font-size:15px; margin-bottom:10px;">صافي الربح النهائي (Net Profit)</h3>
-                <div style="font-size:42px; font-weight:900; color:${netProfit >= 0 ? 'var(--primary)' : '#ff453a'}; direction:ltr; text-shadow:0 0 20px rgba(253,184,19,0.1);">
-                    ${netProfit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span style="font-size:20px;"> ر.س</span>
+                <div id="db-net-profit" style="font-size:42px; font-weight:900; color:${netProfit >= 0 ? 'var(--primary)' : '#ff453a'}; direction:ltr; text-shadow:0 0 20px rgba(253,184,19,0.1);">
+                    ${netProfit.toFixed(2)} <span style="font-size:20px;"> ر.س</span>
                 </div>
                 <p style="margin-top:10px; font-size:12px; color:var(--text-muted); opacity:0.8;">[صافي الإيراد] - [إجمالي المصروفات والسداد]</p>
+            </div>
+            
+            <!-- Hidden Sync Data (For 100% Reliable Z-Report Scrape) -->
+            <div id="db-sync-data" style="display:none;" 
+                 data-gross="${totalAllInvoices.toFixed(2)}"
+                 data-refunds="${totalRefunds.toFixed(2)}"
+                 data-net-rev="${totalNetRevenue.toFixed(2)}"
+                 data-profit="${netProfit.toFixed(2)}"
+                 data-opex="${totalOperatingExpenses.toFixed(2)}"
+                 data-cash="${cashTotal.toFixed(2)}"
+                 data-mada="${madaTotal.toFixed(2)}"
+                 data-visa="${visaTotal.toFixed(2)}"
+                 data-mastercard="${mastercardTotal.toFixed(2)}">
             </div>
         </div>
 
@@ -2877,13 +2898,13 @@ window.appLogic = {
 
     // Consolidated Expenses (Moved to renderExpenses)
     async renderLaundryAccounts() {
-         return this.renderExpenses();
+        return this.renderExpenses();
     },
 
     async settleAllLaundryDues(compKey) {
         let [targetName, targetHood = ''] = compKey.split('|');
         let displayName = targetHood ? `${targetName} (${targetHood})` : targetName;
-        
+
         // REPAIR GUARD: Ensure we have clean strings for comparison
         const cleanTargetName = targetName.trim().toLowerCase();
         const cleanTargetHood = targetHood.trim().toLowerCase();
@@ -2897,7 +2918,7 @@ window.appLogic = {
             invs.forEach(i => {
                 const pName = (i.partnerLaundryName || '').trim().toLowerCase();
                 const pHood = (i.partnerLaundryNeighborhood || '').trim().toLowerCase();
-                
+
                 // Match with robust trim/case comparison
                 if (pName === cleanTargetName && pHood === cleanTargetHood && !i.laundryPaid && parseFloat(i.laundryCost || i.partnerLaundryCost || 0) > 0) {
                     i.laundryPaid = true;
@@ -2909,14 +2930,14 @@ window.appLogic = {
                 // 1. Reset Cumulative Balance
                 let balances = await localforage.getItem('laundry_balances') || {};
                 const currentDue = (balances[compKey] && balances[compKey].balance) ? balances[compKey].balance : 0;
-                
+
                 if (balances[compKey]) {
                     balances[compKey].balance = 0;
                 } else {
                     // Create if missing (e.g. for stuck entries)
                     balances[compKey] = { balance: 0 };
                 }
-                
+
                 await localforage.setItem('laundry_balances', balances);
                 localStorage.setItem('laundry_balances', JSON.stringify(balances));
 
@@ -2942,8 +2963,8 @@ window.appLogic = {
                 await manualSyncToCloud('invoices', invs);
 
                 this.renderHistory();
-                this.renderExpenses(); 
-                this.renderReports(); 
+                this.renderExpenses();
+                this.renderReports();
                 this.showToast(`تم تسديد مستحقات '${displayName}' بالكامل وتحديث الموقف المالي`);
             } else {
                 // FORCE REPAIR for stuck entries (even if no invoices found, we zero the balance if user clicked settle)
@@ -2951,7 +2972,7 @@ window.appLogic = {
                 if (balances[compKey]) balances[compKey].balance = 0;
                 await localforage.setItem('laundry_balances', balances);
                 localStorage.setItem('laundry_balances', JSON.stringify(balances));
-                
+
                 this.renderExpenses();
                 this.showToast(`تم تصفير رصيد '${displayName}' يدوياً`);
             }
@@ -2971,7 +2992,7 @@ window.appLogic = {
         try {
             const snap = await firebase.database().ref('admin/stores').once('value');
             const stores = snap.val() || {};
-            
+
             let html = `
                 <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px; box-shadow:var(--shadow-sm);">
                     <h3 style="margin-bottom:15px; border-bottom:1px solid var(--border); padding-bottom:10px; color:var(--primary);">قائمة المشتركين النشطة (${Object.keys(stores).length} مغسلة)</h3>
@@ -2991,7 +3012,7 @@ window.appLogic = {
             `;
 
             const sortedPins = Object.keys(stores).sort((a, b) => (stores[b].timestamp || 0) - (stores[a].timestamp || 0));
-            
+
             if (sortedPins.length === 0) {
                 html += '<tr><td colspan="6" style="padding:30px; text-align:center; color:var(--text-muted);">لا يوجد مغاسل مسجلة حالياً. استخدم النموذج أعلاه للبدء.</td></tr>';
             } else {
@@ -3052,14 +3073,14 @@ window.appLogic = {
         try {
             const check = await firebase.database().ref(`admin/stores/${pin}`).once('value');
             if (check.exists()) return this.createStore(); // retry
-            
-            const storeData = { 
-                name, phone, taxNumber: tax, 
-                timestamp: Date.now(), 
-                status: 'active' 
+
+            const storeData = {
+                name, phone, taxNumber: tax,
+                timestamp: Date.now(),
+                status: 'active'
             };
             await firebase.database().ref(`admin/stores/${pin}`).set(storeData);
-            
+
             this.showToast(`تم إنشاء المغسلة بنجاح. PIN: ${pin}`);
             document.getElementById('admin-new-name').value = '';
             document.getElementById('admin-new-phone').value = '';
@@ -3077,10 +3098,10 @@ window.appLogic = {
         try {
             const updates = {};
             updates[`admin/stores/${pin}/status`] = newStatus;
-            
+
             await firebase.database().ref().update(updates);
             console.log(`[Admin-Sync] Successfully synchronized Firebase for PIN ${pin}`);
-            
+
             this.showToast(newStatus === 'active' ? 'تم تفعيل الحساب بنجاح ✅' : 'تم تعطيل الحساب ⚠️');
             this.renderAdmin();
         } catch (err) {
@@ -3137,7 +3158,7 @@ window.appLogic = {
         btn.disabled = true;
 
         console.log(`[Smart-Gate] Directing traffic for PIN: [${pin}]`);
-        
+
         try {
             // 1. Secret Master Admin Check: Redirect to Command Center
             if (pin === ADMIN_PIN) {
@@ -3153,7 +3174,7 @@ window.appLogic = {
             const pinSnap = await firebase.database().ref(`pincodes/${pin}`).once('value');
             const pinData = pinSnap.val();
             let targetUID = null;
-            
+
             if (pinData && typeof pinData === 'object') {
                 targetUID = pinData.uid;
             } else if (typeof pinData === 'string') {
@@ -3178,7 +3199,7 @@ window.appLogic = {
             if (targetUID) {
                 const accountSnap = await firebase.database().ref(`users/${targetUID}/accountDetails`).once('value');
                 const accountData = accountSnap.val() || {};
-                
+
                 if (accountData.isActivated !== true) {
                     throw new Error('account-deactivated');
                 }
@@ -3194,7 +3215,7 @@ window.appLogic = {
             try {
                 localStorage.removeItem('sahab_auth_blocked');
                 await firebase.auth().signInWithEmailAndPassword(email, pin);
-                
+
                 // 3a. Update Mapping if necessary (If Auth UID is different from Registry UID)
                 const user = firebase.auth().currentUser;
                 if (user && targetUID && targetUID !== user.uid) {
@@ -3202,7 +3223,7 @@ window.appLogic = {
                     const migrationUpdates = {};
                     migrationUpdates[`pincodes/${pin}`] = user.uid;
                     migrationUpdates[`admin/stores/${pin}/uid`] = user.uid;
-                    
+
                     // Copy existing data to new UID node
                     const oldDataSnap = await firebase.database().ref(`users/${targetUID}`).once('value');
                     if (oldDataSnap.exists()) {
@@ -3216,38 +3237,38 @@ window.appLogic = {
                 // 4. Auto-Registration for authorized new stores
                 const code = authErr.code;
                 if (code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-credential' || code === 'auth/invalid-login-credentials') {
-                     console.log(`[Smart-Gate] Auto-provisioning Auth account for PIN ${pin}...`);
-                     await firebase.auth().createUserWithEmailAndPassword(email, pin);
-                     const user = firebase.auth().currentUser;
-                     if (user) {
-                         const syncUpdates = {};
-                         // Ensure we bridge the registry to this new permanent UID
-                         syncUpdates[`pincodes/${pin}`] = { uid: user.uid, isActivated: true };
-                         syncUpdates[`admin/stores/${pin}/uid`] = user.uid;
-                         
-                         // If we have meta from Step 2, use it to initialize settings
-                         syncUpdates[`users/${user.uid}/settings`] = {
-                             name: meta.name || 'مغسلة جديدة',
-                             phone: meta.phone || '',
-                             status: 'active',
-                             pin: pin 
-                         };
-                         syncUpdates[`users/${user.uid}/accountDetails`] = { 
-                             isActivated: true, 
-                             name: meta.name || 'مغسلة جديدة',
-                             phone: meta.phone || '',
-                             firstUsedDate: Date.now() 
-                         };
-                         
-                         // If targetUID was a placeholder, copy its data too
-                         if (targetUID && targetUID !== user.uid) {
-                             const oldSnap = await firebase.database().ref(`users/${targetUID}`).once('value');
-                             if (oldSnap.exists()) syncUpdates[`users/${user.uid}`] = oldSnap.val();
-                         }
+                    console.log(`[Smart-Gate] Auto-provisioning Auth account for PIN ${pin}...`);
+                    await firebase.auth().createUserWithEmailAndPassword(email, pin);
+                    const user = firebase.auth().currentUser;
+                    if (user) {
+                        const syncUpdates = {};
+                        // Ensure we bridge the registry to this new permanent UID
+                        syncUpdates[`pincodes/${pin}`] = { uid: user.uid, isActivated: true };
+                        syncUpdates[`admin/stores/${pin}/uid`] = user.uid;
 
-                         await firebase.database().ref().update(syncUpdates);
-                         console.log(`[Smart-Gate] Permanent identity established for UID: ${user.uid}`);
-                     }
+                        // If we have meta from Step 2, use it to initialize settings
+                        syncUpdates[`users/${user.uid}/settings`] = {
+                            name: meta.name || 'مغسلة جديدة',
+                            phone: meta.phone || '',
+                            status: 'active',
+                            pin: pin
+                        };
+                        syncUpdates[`users/${user.uid}/accountDetails`] = {
+                            isActivated: true,
+                            name: meta.name || 'مغسلة جديدة',
+                            phone: meta.phone || '',
+                            firstUsedDate: Date.now()
+                        };
+
+                        // If targetUID was a placeholder, copy its data too
+                        if (targetUID && targetUID !== user.uid) {
+                            const oldSnap = await firebase.database().ref(`users/${targetUID}`).once('value');
+                            if (oldSnap.exists()) syncUpdates[`users/${user.uid}`] = oldSnap.val();
+                        }
+
+                        await firebase.database().ref().update(syncUpdates);
+                        console.log(`[Smart-Gate] Permanent identity established for UID: ${user.uid}`);
+                    }
                 } else {
                     throw authErr;
                 }
@@ -3255,9 +3276,9 @@ window.appLogic = {
         } catch (err) {
             console.error('[Smart-Gate] Routing Failure:', err.message);
             let errMsg = 'الرمز خاطئ، يرجى التأكد من الرمز والمحاولة مرة أخرى.';
-            if (err.message === 'account-deactivated')  errMsg = 'عذراً، هذا الحساب معطل من قبل الإدارة.';
+            if (err.message === 'account-deactivated') errMsg = 'عذراً، هذا الحساب معطل من قبل الإدارة.';
             else if (err.message === 'trial-expired') errMsg = 'انتهت الفترة التجريبية. يرجى التواصل مع الإدارة للتجديد.';
-            
+
             errEl.textContent = errMsg;
             errEl.classList.remove('hidden');
             btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> دخول';
@@ -3271,7 +3292,7 @@ window.appLogic = {
         authRef.on('value', async (snap) => {
             if (!snap.exists()) return;
             const data = snap.val();
-            
+
             // 1. THE KILL SWITCH: Instant Eviction on deactivation
             if (data.isActivated === false) {
                 console.warn("[SECURITY] Kill switch triggered! Account deactivated from Admin.");
@@ -3300,7 +3321,7 @@ window.appLogic = {
                 if (banner) banner.classList.add('hidden');
             } else if (data.isTrial === true && data.trialEndDate) {
                 const daysLeft = Math.ceil((data.trialEndDate - Date.now()) / (1000 * 60 * 60 * 24));
-                
+
                 if (daysLeft <= 0) {
                     // Trial expired - HARD LOCK
                     console.warn("[SECURITY] Trial Expired! Locking POS.");
@@ -3345,9 +3366,9 @@ window.appLogic = {
 
     openSettingsModal() {
         const s = window.tenantSettings;
-        document.getElementById('setting-name').value  = s.name  || '';
+        document.getElementById('setting-name').value = s.name || '';
         document.getElementById('setting-phone').value = s.phone || '';
-        document.getElementById('setting-tax').value   = s.taxNumber || '';
+        document.getElementById('setting-tax').value = s.taxNumber || '';
         document.getElementById('settings-modal').classList.remove('hidden');
     },
 
@@ -3372,42 +3393,42 @@ window.appLogic = {
             '.main-nav .nav-btn:nth-child(5)': { ar: '<i class="fa-solid fa-money-bill-transfer"></i> المصروفات', en: '<i class="fa-solid fa-money-bill-transfer"></i> Expenses' },
             '.main-nav .nav-btn:nth-child(6)': { ar: '<i class="fa-solid fa-chart-line"></i> القوائم المالية', en: '<i class="fa-solid fa-chart-line"></i> Reports' },
             '#settings-nav-btn': { ar: '<i class="fa-solid fa-gear"></i> الإعدادات', en: '<i class="fa-solid fa-gear"></i> Settings' },
-            
+
             // Fast Batch Toggles
             '#fb-type-wash_iron': { ar: 'غسيل وكوي', en: 'Wash & Iron' },
             '#fb-type-iron': { ar: 'كوي فقط', en: 'Iron Only' },
             '#fb-type-wash': { ar: 'غسيل فقط', en: 'Wash Only' },
             '#fb-speed-normal': { ar: 'عادي', en: 'Normal' },
             '#fb-speed-express': { ar: 'مستعجل', en: 'Express' },
-            
+
             // POS Header
             '.items-header h2': { ar: 'الخدمات', en: 'Services' },
             '.cart-header h2': { ar: 'الفاتورة', en: 'Invoice' },
             '.trigger-text': { ar: 'الفاتورة <i class="fa-solid fa-chevron-up" id="mobile-cart-icon"></i>', en: 'Invoice <i class="fa-solid fa-chevron-up" id="mobile-cart-icon"></i>' },
-            
+
             // Categories
             '#category-filter button:nth-child(1)': { ar: 'الكل', en: 'All' },
             '#category-filter button:nth-child(2)': { ar: 'رجالي', en: 'Men' },
             '#category-filter button:nth-child(3)': { ar: 'نسائي', en: 'Women' },
             '#category-filter button:nth-child(4)': { ar: 'أخرى', en: 'Misc' },
-            
+
             // Cart elements
             '.delivery-options h4': { ar: 'رسوم التوصيل:', en: 'Delivery Fee:' },
             '.grand-total span:nth-child(1)': { ar: 'الإجمالي النهائي:', en: 'Grand Total:' },
             '.totals .total-row:nth-child(2) span': { ar: '* الأسعار لا تشمل ضريبة القيمة المضافة', en: '* Prices exclude VAT' },
             '.cart-actions .btn-primary': { ar: '<i class="fa-solid fa-file-invoice"></i> إنشاء فاتورة', en: '<i class="fa-solid fa-file-invoice"></i> Checkout' },
-            
+
             // Settings Modal
             '#settings-modal h3': { ar: '<i class="fa-solid fa-gear"></i> الإعدادات', en: '<i class="fa-solid fa-gear"></i> Settings' },
             '#theme-toggle-btn span:first-child': { ar: 'تبديل المظهر', en: 'Toggle Theme' },
-            
+
             // View Titles
             '#view-history h2': { ar: 'سجل الفواتير', en: 'Invoice History' },
             '#view-customers h2': { ar: 'سجل العملاء', en: 'Customers Directory' },
             '#view-inventory h2': { ar: 'إدارة المخزون', en: 'Inventory Management' },
             '#view-expenses h2': { ar: 'المصروفات التشغيلية', en: 'Operational Expenses' },
             '#view-reports h2': { ar: 'القوائم المالية وإقرارات الزكاة', en: 'Financial Reports & ZATCA' },
-            
+
             // Payment Methods
             '#method-cash span': { ar: '<i class="fa-solid fa-money-bill-1-wave" style="margin-left:10px;"></i> كاش (Cash)', en: '<i class="fa-solid fa-money-bill-1-wave" style="margin-left:10px;"></i> Cash' },
             '#method-mada span': { ar: '<i class="fa-solid fa-credit-card" style="margin-left:10px;"></i> مدى (Mada)', en: '<i class="fa-solid fa-credit-card" style="margin-left:10px;"></i> Mada' },
@@ -3422,20 +3443,20 @@ window.appLogic = {
                 else el.innerHTML = textObj[lang] || textObj['ar'];
             });
         }
-        
+
         // Advanced placeholders & adjacent labels
         const nameInput = document.getElementById('setting-name');
         if (nameInput && nameInput.previousElementSibling) nameInput.previousElementSibling.innerText = lang === 'en' ? 'Business Name' : 'اسم النشاط التجاري';
-        
+
         const phoneInput = document.getElementById('setting-phone');
         if (phoneInput && phoneInput.previousElementSibling) phoneInput.previousElementSibling.innerText = lang === 'en' ? 'Phone Number' : 'رقم الجوال';
 
         const taxInput = document.getElementById('setting-tax');
         if (taxInput && taxInput.previousElementSibling) taxInput.previousElementSibling.innerText = lang === 'en' ? 'VAT Number (Optional)' : 'الرقم الضريبي (اختياري)';
-        
+
         const itemSearch = document.getElementById('item-search');
         if (itemSearch) itemSearch.placeholder = lang === 'en' ? 'Search items...' : 'ابحث عن صنف...';
-        
+
         const custName = document.getElementById('customer-name');
         if (custName) custName.placeholder = lang === 'en' ? 'Customer Name (Optional)' : 'اسم العميل (اختياري)';
 
@@ -3444,7 +3465,7 @@ window.appLogic = {
 
         const invSearch = document.getElementById('history-search');
         if (invSearch) invSearch.placeholder = lang === 'en' ? 'Search by ID, Customer...' : 'بحث بالرقم، العميل أو الجوال...';
-        
+
         const saveSettingsBtn = document.getElementById('settings-save-btn');
         if (saveSettingsBtn) saveSettingsBtn.innerHTML = lang === 'en' ? '<i class="fa-solid fa-floppy-disk"></i> Save Settings' : '<i class="fa-solid fa-floppy-disk"></i> حفظ الإعدادات';
 
@@ -3457,12 +3478,12 @@ window.appLogic = {
     },
 
     async saveTenantSettings() {
-        const name  = document.getElementById('setting-name').value.trim()  || '';
+        const name = document.getElementById('setting-name').value.trim() || '';
         const phone = document.getElementById('setting-phone').value.trim();
         let taxElement = document.getElementById('setting-tax');
         if (!taxElement) taxElement = document.getElementById('vatNumberInput'); // fail-safe if UI layout swapped
         let vatValue = taxElement ? taxElement.value.trim() : '';
-        
+
         if (vatValue !== "") {
             let isValidVat = /^\d{15}$/.test(vatValue) && vatValue.startsWith('3') && vatValue.endsWith('3');
             if (!isValidVat) {
@@ -3471,7 +3492,7 @@ window.appLogic = {
             }
         }
         const tax = vatValue;
-        
+
         window.tenantSettings = { name, phone, taxNumber: tax };
 
         // window.tenantSettings = { name, phone, taxNumber: tax }; // Already set above
@@ -3522,55 +3543,31 @@ window.appLogic = {
         const name = window.tenantSettings?.name || '';
         const hStore = document.getElementById('header-store-name');
         if (hStore) hStore.textContent = name;
-        
+
         document.title = name ? `سحاب POS | ${name}` : 'سحاب POS';
     },
 
     async confirmCloseDay() {
+        // UI-Bound Synchronization
+        const syncEl = document.getElementById('db-sync-data');
+        if (!syncEl) {
+            alert('خطأ في مزامنة البيانات: يرجى التوجه لصفحة القوائم المالية أولاً.');
+            return;
+        }
+
         if (!confirm('هل أنت متأكد من إغلاق اليومية وإصدار التقرير؟')) return;
 
-        // 1. Calculate current active totals
-        const invoices = await localforage.getItem('invoices') || [];
-        const exps = await localforage.getItem('expenses') || [];
-        const now = new Date();
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        // Pull EXACT values from UI elements
+        const gross = parseFloat(syncEl.dataset.gross) || 0;
+        const refunds = parseFloat(syncEl.dataset.refunds) || 0;
+        const netRev = parseFloat(syncEl.dataset.netRev) || 0;
+        const opExps = parseFloat(syncEl.dataset.opex) || 0;
+        const netProfit = netRev - opExps;
+        const cashTotal = parseFloat(syncEl.dataset.cash) || 0;
+        const madaTotal = parseFloat(syncEl.dataset.mada) || 0;
+        const visaTotal = parseFloat(syncEl.dataset.visa) || 0;
+        const mastercardTotal = parseFloat(syncEl.dataset.mastercard) || 0;
 
-        let gross = 0, refunds = 0, lCosts = 0, netProfit = 0, opExps = 0;
-        let cashTotal = 0, madaTotal = 0, visaTotal = 0, mastercardTotal = 0;
-        
-        // 📅 SYNC: Pull EXACT same data as Dashboard (Focus on NOT YET REPORTED)
-        invoices.forEach(i => {
-            if (!i.isZReported) {
-                const amt = parseFloat(i.total || i.grandTotal || 0);
-                gross += amt;
-                if (i.isCancelled) {
-                    refunds += amt;
-                } else {
-                    lCosts += parseFloat(i.laundryCost || i.partnerLaundryCost || 0);
-                    const pMethod = i.paymentMethod || 'cash';
-                    if (pMethod === 'cash') cashTotal += amt;
-                    else if (pMethod === 'mada' || pMethod === 'network') madaTotal += amt;
-                    else if (pMethod === 'visa') visaTotal += amt;
-                    else if (pMethod === 'mastercard') mastercardTotal += amt;
-                }
-            }
-        });
-
-        exps.forEach(e => {
-            if (!e.isZReported) {
-                opExps += parseFloat(e.amount) || 0;
-            }
-        });
-
-        netProfit = (gross - refunds) - opExps;
-        const netRev = gross - refunds;
-        
-        // Fix 99: Stop the double counting for Laundry Costs in Profit Calculation
-        // (OpExps already includes laundry payouts if they were settled)
-        // netProfit = netRev - (opExps + lCosts); // DELETED to prevent double counting
-
-        // 2. Generate PDF Report
-        // Fix 9: Date Standardization (English Numerals)
         const reportDate = new Date().toLocaleDateString('en-US');
         const bizName = window.tenantSettings?.name || 'سحاب';
 
@@ -3584,7 +3581,7 @@ window.appLogic = {
                 </div>
 
                 <!-- Payment Breakdown Section -->
-                <div style="margin-bottom: 30px; border: 1px solid #eee; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.02);">
+                <div style="margin-bottom: 30px; border: 1px solid #eee; border-radius: 8px; overflow: hidden;">
                     <div style="background: #f8f9fa; padding: 12px 20px; font-weight: bold; border-bottom: 1px solid #eee; color: #444; font-size: 16px;">تفاصيل الدفع</div>
                     <table style="width: 100%; border-collapse: collapse; font-size: 15px;">
                         <tr style="border-bottom: 1px solid #f0f0f0;">
@@ -3607,7 +3604,7 @@ window.appLogic = {
                 </div>
 
                 <!-- Financial Table -->
-                <div style="border:1px solid #ddd; border-radius:8px; overflow:hidden; box-shadow:0 4px 10px rgba(0,0,0,0.05);">
+                <div style="border:1px solid #ddd; border-radius:8px; overflow:hidden;">
                     <table style="width:100%; border-collapse:collapse; font-size:16px;">
                         <tr style="background:#fcfcfc; border-bottom:1px solid #eee;">
                             <td style="padding:18px 25px; color:#666; font-weight:bold; text-align:right;">إجمالي المبيعات</td>
@@ -3625,10 +3622,6 @@ window.appLogic = {
                             <td style="padding:18px 25px; color:#666; font-weight:bold; text-align:right;">المصاريف التشغيلية</td>
                             <td style="padding:18px 25px; font-weight:900; text-align:left; color:#ff453a; direction:ltr;">- ${opExps.toFixed(2)} ر.س</td>
                         </tr>
-                        <tr style="background:#fcfcfc; border-bottom:1px solid #eee;">
-                            <td style="padding:18px 25px; color:#666; font-weight:bold; text-align:right;">حسابات المغاسل</td>
-                            <td style="padding:18px 25px; font-weight:900; text-align:left; color:#ff453a; direction:ltr;">- ${lCosts.toFixed(2)} ر.س</td>
-                        </tr>
                         <tr style="background:#e8f5e9; border-top:2px solid #333;">
                             <td style="padding:25px; font-size:22px; font-weight:900; color:#1b5e20; text-align:right;">صافي الربح النهائي</td>
                             <td style="padding:25px; font-size:28px; font-weight:900; text-align:left; color:#1b5e20; direction:ltr;">${netProfit.toFixed(2)} ر.س</td>
@@ -3637,7 +3630,7 @@ window.appLogic = {
                 </div>
 
                 <!-- Footer -->
-                <div style="text-align:center; color:#aaa; font-size:13px; margin-top:80px; font-style:italic;">
+                <div style="text-align:center; color:#aaa; font-size:13px; margin-top:80px;">
                     تم توليد هذا التقرير المحاسبي بواسطة نظام سحاب POS
                 </div>
             </div>
@@ -3647,88 +3640,68 @@ window.appLogic = {
         element.innerHTML = reportContent;
         await html2pdf().from(element).save(`Z-Report_${reportDate.replace(/\//g, '-')}.pdf`);
 
-        // 3. Archive Data
+        // Zero Reset (Live Database Update)
+        const invoices = await localforage.getItem('invoices') || [];
+        const exps = await localforage.getItem('expenses') || [];
+
+        // Archive Data with full Lists (FILTERED for CURRENT shift only)
+        const shiftInvoices = invoices.filter(i => !i.isZReported);
+        const shiftExpenses = exps.filter(e => !e.isZReported);
+
         const archiveEntry = {
             id: 'Z-' + Date.now(),
             timestamp: Date.now(),
             date: reportDate,
-            totals: { gross, refunds, netRev, opExps, lCosts, netProfit, paymentBreakdown: { cashTotal, madaTotal, visaTotal, mastercardTotal } }
+            totals: { gross, refunds, netRev, opExps, netProfit, paymentBreakdown: { cashTotal, madaTotal, visaTotal, mastercardTotal } },
+            invoices: shiftInvoices,
+            expenses: shiftExpenses
         };
         let archived = await localforage.getItem('archived_z_reports') || [];
         archived.push(archiveEntry);
         await localforage.setItem('archived_z_reports', archived);
         await manualSyncToCloud('archived_z_reports', archived);
 
-        // 4. Zero Reset (Mark transactions as reported)
-        invoices.forEach(i => {
-            if (!i.isZReported) {
-                i.isZReported = true;
-            }
-        });
-        exps.forEach(e => {
-            if (!e.isZReported) {
-                e.isZReported = true;
-            }
-        });
+        // MARK ALL ITEMS AS REPORTED
+        invoices.forEach(i => { i.isZReported = true; });
+        exps.forEach(e => { e.isZReported = true; });
 
         await localforage.setItem('invoices', invoices);
         await localforage.setItem('expenses', exps);
-        localStorage.setItem('expenses', JSON.stringify(exps)); // Sync backup
         await manualSyncToCloud('invoices', invoices);
         await manualSyncToCloud('expenses', exps);
 
-        // 5. Refresh
         this.renderReports();
         const msg = 'تم إغلاق اليومية بنجاح وإصدار التقرير وأرشفة البيانات.';
         this.showToast ? this.showToast(msg) : alert(msg);
-        
-        // Hide the preview modal after success
+
         const previewModal = document.getElementById('z-report-preview-modal');
         if (previewModal) previewModal.classList.add('hidden');
     },
 
     async showZReportPreview() {
-        const invoices = await localforage.getItem('invoices') || [];
-        const exps = await localforage.getItem('expenses') || [];
-        const now = new Date();
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        // UI-Bound Synchronization: Pull data from the Dashboard UI instead of re-calculating
+        const syncEl = document.getElementById('db-sync-data');
+        if (!syncEl) {
+            alert('يرجى فتح صفحة القوائم المالية لمزامنة البيانات قبل الإغلاق.');
+            return;
+        }
 
-        let gross = 0, refunds = 0, lCosts = 0, opExps = 0;
-        let cashTotal = 0, madaTotal = 0, visaTotal = 0, mastercardTotal = 0;
-        invoices.forEach(i => {
-            const rTime = new Date(i.date || i.timestamp).getTime();
-            if (rTime >= todayStart && !i.isZReported) {
-                const amt = parseFloat(i.total || i.grandTotal || 0);
-                gross += amt;
-                if (i.isCancelled) {
-                    refunds += amt;
-                } else {
-                    lCosts += parseFloat(i.laundryCost || i.partnerLaundryCost || 0);
-                    // Calculate Breakdown
-                    const pMethod = i.paymentMethod || 'cash';
-                    if (pMethod === 'cash') cashTotal += amt;
-                    else if (pMethod === 'mada') madaTotal += amt;
-                    else if (pMethod === 'visa') visaTotal += amt;
-                    else if (pMethod === 'mastercard') mastercardTotal += amt;
-                    else if (pMethod === 'network') madaTotal += amt; 
-                }
-            }
-        });
-
-        exps.forEach(e => {
-            if (!e.isZReported) {
-                opExps += parseFloat(e.amount) || 0;
-            }
-        });
-
-        const netRev = gross - refunds;
-        const netProfit = netRev - opExps; // FIXED: Stopped double-counting laundry costs
+        const gross = parseFloat(syncEl.dataset.gross) || 0;
+        const refunds = parseFloat(syncEl.dataset.refunds) || 0;
+        const netRev = parseFloat(syncEl.dataset.netRev) || 0;
+        const opExps = parseFloat(syncEl.dataset.opex) || 0;
+        const lCosts = parseFloat(syncEl.dataset.laundryCosts) || 0;
+        const netProfit = parseFloat(syncEl.dataset.profit) || 0;
+        const cashTotal = parseFloat(syncEl.dataset.cash) || 0;
+        const madaTotal = parseFloat(syncEl.dataset.mada) || 0;
+        const visaTotal = parseFloat(syncEl.dataset.visa) || 0;
+        const mastercardTotal = parseFloat(syncEl.dataset.mastercard) || 0;
 
         const format = (num) => num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
         const content = `
             <!-- Payment Breakdown Section -->
-            <div style="background: rgba(253, 184, 19, 0.05); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 25px; box-shadow: inset 0 0 15px rgba(0,0,0,0.2);">
+            <div style="background: rgba(253, 184, 19, 0.05); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 25px;">
                 <h4 style="margin: 0 0 15px 0; color: var(--primary); font-size: 15px; border-bottom: 1px solid rgba(253,184,19,0.2); padding-bottom: 10px; display: flex; align-items: center;">
                     <i class="fa-solid fa-receipt" style="margin-left: 10px;"></i> تفاصيل الدفع
                 </h4>
@@ -3777,32 +3750,24 @@ window.appLogic = {
                 <div class="z-report-item">
                     <div class="info">
                         <i class="fa-solid fa-file-invoice-dollar" style="color:var(--danger); margin-left:10px;"></i>
-                        <span class="label">المصاريف التشغيلية</span>
+                        <span class="label">إجمالي المصاريف التشغيلية</span>
                     </div>
                     <span class="value" style="color:var(--danger)">- ${format(opExps)} ر.س</span>
-                </div>
-                <div class="z-report-item">
-                    <div class="info">
-                        <i class="fa-solid fa-handshake-angle" style="color:var(--danger); margin-left:10px;"></i>
-                        <span class="label">حسابات المغاسل (شركاء)</span>
-                    </div>
-                    <span class="value" style="color:var(--danger)">- ${format(lCosts)} ر.س</span>
                 </div>
                 <div class="z-report-item profit">
                     <div class="info">
                         <i class="fa-solid fa-wallet" style="color:var(--primary); margin-left:10px; font-size: 24px;"></i>
                         <div style="display:flex; flex-direction:column;">
                             <span class="label">صافي الربح النهائي</span>
-                            <small style="font-size:10px; opacity:0.6;">(Net Profit after all costs)</small>
                         </div>
                     </div>
                     <span class="value">${format(netProfit)} ر.س</span>
                 </div>
             </div>
-            <div style="margin-top:25px; padding:15px; background:rgba(253,184,19,0.05); border-radius:12px; border:1px solid rgba(253,184,19,0.1); text-align:center;">
+            <div style="margin-top:25px; padding:15px; background:rgba(253,184,19,0.05); border-radius:12px; text-align:center;">
                 <p style="font-size:13px; color:var(--text-muted); line-height:1.6; margin:0;">
                     <i class="fa-solid fa-triangle-exclamation" style="color:var(--primary); margin-left:5px;"></i>
-                    عند الاعتماد، سيتم تصفير جميع العمليات الحالية وأرشفتها. لن تتمكن من تعديل هذه الفواتير بعد الإغلاق.
+                    عند الاعتماد، سيتم تصفير جميع العمليات الحالية وأرشفتها.
                 </p>
             </div>
         `;
@@ -3838,7 +3803,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // ✅ LOGGED IN - Mirror session in localStorage for tracking
             window.currentUID = user.uid;
             localStorage.setItem('sahab_session_uid', user.uid);
-            
+
             // 🔐 INITIAL SECURITY CHECK (Kill Switch)
             // Ensure account is STILL active before allowing POS dashboard access
             try {
@@ -3886,7 +3851,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (appContainer) {
                 appContainer.classList.add('app-ready');
             }
-            
+
             // 💨 HIDE LOADER: Dashboard is steady
             hideInitialLoader();
         } else {
