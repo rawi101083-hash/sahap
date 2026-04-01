@@ -1796,6 +1796,9 @@ window.appLogic = {
             const container = document.getElementById('history-content');
             if (container) container.innerHTML = `<p style="color:red; text-align:center; padding:20px;">خطأ في تحميل سجل الفواتير: ${err.message}</p>`;
         }
+
+        // Render delivery settings table which conceptually lives on the History screen
+        this.renderDeliveryManager();
     },
 
     handleHistoryAction(event) {
@@ -1943,16 +1946,24 @@ window.appLogic = {
 
         let invs = await localforage.getItem('invoices') || [];
         const invoiceData = invs.find(i => i.id === id);
-        if (!invoiceData) return;
+        
+        if (!invoiceData) {
+            alert('لا يمكن تعديل هذه الفاتورة لأنها في يومية مغلقة (مؤرشفة) أو غير موجودة.');
+            return;
+        }
 
         // Load to cart
-        this.cart = [...invoiceData.items];
-        this.customer = { phone: invoiceData.customer.phone || '', name: invoiceData.customer.name || '' };
+        this.cart = [...(invoiceData.items || [])];
+        this.customer = { phone: invoiceData.customer?.phone || '', name: invoiceData.customer?.name || '' };
         this.deliveryFee = invoiceData.deliveryFee || 0;
         this.editingInvoiceId = id; // Flag that we are updating this specific ID
 
-        document.getElementById('customer-phone').value = this.customer.phone === '0000000000' ? '' : this.customer.phone;
-        document.getElementById('customer-name').value = this.customer.name === 'عميل نقدي' ? '' : this.customer.name;
+        // Safely map customer logic to the correct DOM nodes 
+        const cPhone = this.customer.phone === '0000000000' ? '' : this.customer.phone;
+        const cName = this.customer.name === 'عميل نقدي' ? '' : this.customer.name;
+        
+        if (document.getElementById('checkout-customer-phone')) document.getElementById('checkout-customer-phone').value = cPhone;
+        if (document.getElementById('checkout-customer-name')) document.getElementById('checkout-customer-name').value = cName;
 
         if (document.getElementById('pos-laundry-name')) document.getElementById('pos-laundry-name').value = invoiceData.partnerLaundryName || '';
         if (document.getElementById('pos-laundry-hood')) document.getElementById('pos-laundry-hood').value = invoiceData.partnerLaundryNeighborhood || '';
@@ -1963,8 +1974,10 @@ window.appLogic = {
         this.updateCartUI();
         this.switchView('pos');
 
-        // ensure category is refreshed
-        document.querySelector(`.nav-btn[onclick="appLogic.switchView('pos')"]`).classList.add('active');
+        // ensure category is refreshed properly avoiding nested quotes issues
+        document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+        const posBtn = document.querySelector(`.nav-btn[onclick*="switchView('pos')"]`) || document.querySelector(`.nav-btn[onclick*='switchView("pos")']`);
+        if (posBtn) posBtn.classList.add('active');
     },
 
     // Helper: Aggregates customer data from all non-cancelled invoices
@@ -2315,7 +2328,6 @@ window.appLogic = {
             html += `</tbody></table></div></div>`;
 
             container.innerHTML = html;
-            window.appLogic.renderDeliveryManager();
             console.log('[UI] renderInventory completed successfully.');
         } catch (err) {
             console.error('[UI] Critical failure in renderInventory:', err);
@@ -2528,12 +2540,30 @@ window.appLogic = {
         }
 
         await localforage.setItem('delivery_options', this.deliveryOptions);
-        await manualSyncToCloud('delivery_options', this.deliveryOptions);
+        
+        // Non-blocking background sync
+        manualSyncToCloud('delivery_options', this.deliveryOptions);
 
         this.closeDeliveryModal();
-        this.renderInventory();
+        this.renderDeliveryManager(); // Update local table directly
+        this.renderCheckoutDeliveryButtons(); // Ensures POS checkout updates
         this.updateCartUI();
         this.showToast('تم حفظ رسوم التوصيل');
+    },
+
+    async deleteDeliveryOption(id) {
+        if (!confirm('هل أنت متأكد من حذف خيار التوصيل؟')) return;
+
+        this.deliveryOptions = this.deliveryOptions.filter(o => o.id !== id);
+        
+        await localforage.setItem('delivery_options', this.deliveryOptions);
+        
+        // Non-blocking background sync
+        manualSyncToCloud('delivery_options', this.deliveryOptions);
+
+        this.renderDeliveryManager(); // Render table immediately
+        this.renderCheckoutDeliveryButtons(); // Render POS immediately 
+        this.showToast('تم حذف خيار التوصيل بنجاح');
     },
 
     // Consolidated Operating Expenses (Transplanted Table UI)
