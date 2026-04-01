@@ -329,27 +329,41 @@ button:active {
 }
 
 /* =========================================
-   IPAD/TABLET OPTIMIZATION (Compactor Grid)
+   IPAD/TABLET OPTIMIZATION (MAXIMUM COMPACT 9-COLUMN GRID)
    ========================================= */
-@media (min-width: 769px) and (max-width: 1024px) {
+@media (min-width: 768px) and (max-width: 1024px) {
     .items-grid {
-        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)) !important;
-        gap: 12px !important;
+        grid-template-columns: repeat(9, 1fr) !important;
+        gap: 8px !important;
+        min-height: 0 !important;
     }
 
     .item-card {
-        padding: 15px 8px !important;
+        padding: 8px 4px !important;
+        min-height: 80px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important;
+        align-items: center !important;
     }
 
     .item-icon {
-        font-size: 28px !important;
-        margin-bottom: 8px !important;
+        font-size: 20px !important;
+        margin-bottom: 4px !important;
     }
 
     .item-name {
-        font-size: 13px !important;
+        font-size: 11px !important;
+        line-height: 1.2 !important;
+        display: -webkit-box !important;
+        line-clamp: 2 !important;
+        -webkit-line-clamp: 2 !important;
+        -webkit-box-orient: vertical !important;
+        display: -webkit-box !important;
+        overflow: hidden !important;
     }
 }
+
 
 
 /* Cart (Left Side Sidebar) */
