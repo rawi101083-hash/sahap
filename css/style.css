@@ -191,11 +191,15 @@ button:active {
     flex: 1;
     display: flex;
     flex-direction: column;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
 }
 
 .view-section {
     min-height: 0;
     flex: 1;
+    height: 100%;
     display: none;
     background-color: var(--bg-body);
     padding-bottom: 150px; /* Global Safe Zone - allows scrolling past last items */

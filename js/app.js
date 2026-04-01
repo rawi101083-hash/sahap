@@ -343,17 +343,34 @@ const hideInitialLoader = () => {
     }
 };
 
-window.appLogic = {
-    currentViewDate: new Date().toISOString().split('T')[0], // Defaults to Today (YYYY-MM-DD)
+const getLocalYMD = (d) => {
+    if (!d) d = new Date();
+    if (!(d instanceof Date) || isNaN(d)) d = new Date(d);
+    // Hard fallback if the parsed date is STILL invalid (e.g., malformed ghosts)
+    if (isNaN(d.getTime())) d = new Date(); 
+    
+    const yr = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, '0');
+    const da = String(d.getDate()).padStart(2, '0');
+    return `${yr}-${mo}-${da}`;
+};
 
+window.appLogic = {
+    currentViewDate: getLocalYMD(), // Defaults to Today (Local KSA Time)
+
+    // ── TIME-TRAVEL: Change date picker → Re-render Dashboard & History ──
     filterReportsByDate(val) {
-        this.currentViewDate = val || new Date().toISOString().split('T')[0];
-        this.renderReports();
-        this.renderHistory(); // Synchronize History with selected date
+        const selected = val || getLocalYMD();
+        this.currentViewDate = selected;    // Single source of truth
+        this.reportFilterDate = (selected !== getLocalYMD()) ? selected : null; // null = Live Shift
+        this.renderReports();               // Re-render KPI cards for selected date
+        this.renderHistory();               // Re-render invoice table for selected date
+        // NOTE: No Z-Report or print window is triggered here — view only.
     },
 
     resetReportFilter() {
-        this.currentViewDate = new Date().toISOString().split('T')[0];
+        this.currentViewDate = getLocalYMD();
+        this.reportFilterDate = null;       // Return to Live Shift mode
         this.renderReports();
         this.renderHistory();
     },
@@ -994,6 +1011,13 @@ window.appLogic = {
         }
 
         this.closePaymentModal();
+        
+        // 🛡️ CRITICAL FIX: Ensure modal is in "Preview" state, not stuck in "Success" from a previous invoice
+        const previewActions = document.getElementById('modal-actions-preview');
+        const successActions = document.getElementById('modal-actions-success');
+        if (previewActions) previewActions.classList.remove('hidden');
+        if (successActions) successActions.classList.add('hidden');
+
         document.getElementById('invoice-preview-modal').classList.remove('hidden');
     },
 
@@ -1212,8 +1236,17 @@ window.appLogic = {
     },
     closeInvoicePreview() {
         document.getElementById('invoice-preview-modal').classList.add('hidden');
+        
+        // 🔄 COMPLETE POS STATE RESET FOR NEXT INVOICE
         this.currentInvoice = null;
         this.pendingInvoice = null;
+        this.paymentMethod = 'cash';
+        
+        // Reset Modal actions state for the next time it opens
+        const previewActions = document.getElementById('modal-actions-preview');
+        const successActions = document.getElementById('modal-actions-success');
+        if (previewActions) previewActions.classList.remove('hidden');
+        if (successActions) successActions.classList.add('hidden');
     },
 
     // Live Saudi phone validator — called oninput on the phone field
@@ -1631,14 +1664,35 @@ window.appLogic = {
         const historyContent = document.getElementById('history-content');
         if (!historyContent) return;
 
-        let invoices = await localforage.getItem('invoices') || [];
+        const todayYMD = getLocalYMD();
+        const isLiveShift = !this.currentViewDate || this.currentViewDate === todayYMD;
 
-        // 📅 GLOBAL DATE FILTER: Only show invoices for currentViewDate
+        let invoices = [];
+        const activeInvs = await localforage.getItem('invoices') || [];
+
+        if (isLiveShift) {
+            invoices = activeInvs;
+        } else {
+            // Historical View: Retrieve from active (if unclosed) + archives
+            const targetDateStr = this.currentViewDate;
+            invoices = [...activeInvs];
+            
+            const archives = await localforage.getItem('archived_z_reports') || [];
+            archives.forEach(arc => {
+                if (arc.invoices) invoices.push(...arc.invoices);
+            });
+        }
+
+        // 📅 GLOBAL DATE FILTER: Strictly isolate Live Shift from Archived data
         invoices = invoices.filter(inv => {
             if (!inv) return false;
-            // Normalize dates to YYYY-MM-DD for comparison
-            const invDate = new Date(inv.timestamp || inv.date).toISOString().split('T')[0];
-            return invDate === this.currentViewDate;
+            
+            // If we are looking at the LIVE shift, completely hide closed/archived invoices
+            if (isLiveShift && inv.isZReported) return false;
+
+            // Normalize dates to KSA Local YYYY-MM-DD for comparison ensuring 100% strict match
+            const invDate = getLocalYMD(inv.timestamp || inv.date);
+            return invDate === (this.currentViewDate || todayYMD);
         });
 
         // Search Filter (Secondary)
@@ -1665,14 +1719,20 @@ window.appLogic = {
 
             let filtered = validInvoices;
 
-            let html = '<table style="width:100%; border-collapse:collapse; background:var(--bg-surface); border-radius:12px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.5)">';
+            let html = '<table onclick="appLogic.handleHistoryAction(event)" style="width:100%; border-collapse:collapse; background:var(--bg-surface); border-radius:12px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.5)">';
             html += '<thead><tr style="background:#111; color:var(--primary)"><th style="padding:15px; text-align:right;">رقم الفاتورة</th><th style="padding:15px; text-align:right;">العميل</th><th style="padding:15px; text-align:right;">المبلغ</th><th style="padding:15px; text-align:right;">التاريخ</th><th style="padding:15px; text-align:center;">إجراءات</th></tr></thead><tbody>';
 
             if (filtered.length === 0) {
                 html += '<tr><td colspan="5" style="padding:20px; text-align:center;">لا توجد فواتير مطابقة للبحث.</td></tr>';
             } else {
-                // UNIFIED SORTING: Newest First based on timestamp
-                const displayInvoices = [...filtered].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+                // UNIFIED SORTING: Newest First based on timestamp. Max DOM array clamped to 500 to kill browser thread freezes.
+                const displayInvoices = [...filtered].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, 500);
+
+                // Pre-compile DateFormat buffer centrally to completely destroy the artificial delay (10-second sync freeze)
+                const dFormatter = new Intl.DateTimeFormat('en-US', { 
+                    year: 'numeric', month: 'numeric', day: 'numeric', 
+                    hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true 
+                });
 
                 displayInvoices.forEach(i => {
                     if (!i) return;
@@ -1681,7 +1741,7 @@ window.appLogic = {
                     let customerPhone = (i.customer && i.customer.phone) ? i.customer.phone : '0000000000';
                     let cellPhone = (customerPhone !== '0000000000') ? `<br><small style="color:var(--text-muted); direction:ltr; display:inline-block">${customerPhone}</small>` : '';
                     let total = i.grandTotal || 0;
-                    let dateStr = i.timestamp ? new Date(i.timestamp).toLocaleString('en-US') : '-';
+                    let dateStr = i.timestamp ? dFormatter.format(new Date(i.timestamp)) : '-';
                     let partnerBadge = i.partnerLaundryName ? `<br><span onclick="appLogic.toggleLaundryPaid('${i.id}')" style="cursor:pointer; display:inline-block; margin-top:5px; font-size:11px; padding:3px 8px; border-radius:12px; background:${i.laundryPaid ? '#4CAF50' : '#f44336'}; color:#fff;"><i class="fa-solid ${i.laundryPaid ? 'fa-check' : 'fa-times'}"></i> مغسلة: ${i.partnerLaundryName} (${i.laundryPaid ? 'مدفوع' : 'غير مدفوع'})</span>` : '';
 
                     // Cancelled invoice visuals
@@ -1693,7 +1753,7 @@ window.appLogic = {
                         : `${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ر.س ${partnerBadge}`;
                     const cancelBtn = isCancelled
                         ? '' // Already cancelled — hide button
-                        : `<button class="btn-action-icon btn-action-delete" onclick="appLogic.cancelInvoice('${i.id}')" title="إلغاء الفاتورة"><i class="fa-solid fa-ban"></i></button>`;
+                        : `<button class="btn-action-icon btn-action-delete" type="button" data-action="cancel_inv" data-id="${i.id}" title="إلغاء الفاتورة"><i class="fa-solid fa-ban" style="pointer-events:none;"></i></button>`;
 
                     html += `<tr style="${rowStyle}">
                         <td style="padding:15px; font-weight:bold;">${i.id || 'N/A'}</td>
@@ -1701,9 +1761,9 @@ window.appLogic = {
                         <td style="padding:15px; font-weight:bold; color:${isCancelled ? '#f44336' : 'var(--primary)'}">${totalDisplay}</td>
                         <td style="padding:15px;">${dateStr}</td>
                         <td style="padding:15px; text-align:center;">
-                            ${isCancelled ? '' : `<button class="btn-action-icon btn-action-info" onclick="appLogic.togglePartnerInfo('${i.id}')" title="تفاصيل المغسلة الشريكة"><i class="fa-solid fa-truck-ramp-box"></i></button>`}
-                            <button class="btn-action-icon btn-action-print" onclick="appLogic.reprintInvoice('${i.id}')" title="معاينة وإعادة طباعة"><i class="fa-solid fa-print"></i></button>
-                            ${isCancelled ? '' : `<button class="btn-action-icon btn-action-edit" onclick="appLogic.editInvoice('${i.id}')" title="تعديل"><i class="fa-solid fa-edit"></i></button>`}
+                            ${isCancelled ? '' : `<button class="btn-action-icon btn-action-info" type="button" data-action="partner_info" data-id="${i.id}" title="تفاصيل المغسلة الشريكة"><i class="fa-solid fa-truck-ramp-box" style="pointer-events:none;"></i></button>`}
+                            <button class="btn-action-icon btn-action-print" type="button" data-action="print_inv" data-id="${i.id}" title="معاينة وإعادة طباعة"><i class="fa-solid fa-print" style="pointer-events:none;"></i></button>
+                            ${isCancelled ? '' : `<button class="btn-action-icon btn-action-edit" type="button" data-action="edit_inv" data-id="${i.id}" title="تعديل"><i class="fa-solid fa-edit" style="pointer-events:none;"></i></button>`}
                             ${cancelBtn}
                         </td>
                     </tr>
@@ -1738,6 +1798,25 @@ window.appLogic = {
             console.error('Render History Error:', err);
             const container = document.getElementById('history-content');
             if (container) container.innerHTML = `<p style="color:red; text-align:center; padding:20px;">خطأ في تحميل سجل الفواتير: ${err.message}</p>`;
+        }
+    },
+
+    handleHistoryAction(event) {
+        const btn = event.target.closest('.btn-action-icon');
+        if (!btn) return;
+        
+        const action = btn.getAttribute('data-action');
+        const id = btn.getAttribute('data-id');
+        if (!action || !id) return;
+        
+        if (action === 'cancel_inv') {
+            this.cancelInvoice(id);
+        } else if (action === 'partner_info') {
+            this.togglePartnerInfo(id);
+        } else if (action === 'print_inv') {
+            this.reprintInvoice(id);
+        } else if (action === 'edit_inv') {
+            this.editInvoice(id);
         }
     },
 
@@ -2586,7 +2665,7 @@ window.appLogic = {
     // Wafeq UI: Expenses
     openAddExpenseModal() {
         document.getElementById('add-expense-modal').classList.remove('hidden');
-        document.getElementById('expense-date').value = new Date().toISOString().split('T')[0];
+        document.getElementById('expense-date').value = getLocalYMD();
     },
     closeExpenseModal() { document.getElementById('add-expense-modal').classList.add('hidden'); },
     async saveExpense() {
@@ -2637,31 +2716,48 @@ window.appLogic = {
     },
 
     async renderReports() {
-        const invoices = await localforage.getItem('invoices') || [];
-        const exps = await localforage.getItem('expenses') || [];
-        let taxRecords = await localforage.getItem('tax_records') || [];
-
-        // ---------------------------------------------------------
-        // 🗓️ DATE FILTER LOGIC (Strict String Matching for Accuracy)
-        // ---------------------------------------------------------
-        let filterLabel = "اليوم (Live Shift)";
-        let startBound, endBound;
-        const isLiveShift = !this.reportFilterDate;
+        const activeInvs = await localforage.getItem('invoices') || [];
+        const activeExps = await localforage.getItem('expenses') || [];
+        const archives = await localforage.getItem('archived_z_reports') || [];
         
-        // Use a local variable to prevent infinite state update loops
-        const currentTargetDate = this.reportFilterDate || new Date().toISOString().split('T')[0];
+        let Math_invoices = [...activeInvs];
+        let Math_exps = [...activeExps];
+        
+        archives.forEach(arc => {
+            if (arc.invoices) Math_invoices.push(...arc.invoices);
+            if (arc.expenses) Math_exps.push(...arc.expenses);
+        });
 
-        if (this.reportFilterDate) {
-            filterLabel = this.reportFilterDate;
-            const parts = this.reportFilterDate.split('-');
+        const invoices = Math_invoices;
+        const exps = Math_exps;
+        let taxRecords = await localforage.getItem('tax_records') || [];
+        // ---------------------------------------------------------
+        // 🗓️ DATE FILTER LOGIC — Reads from single source: currentViewDate
+        // ---------------------------------------------------------
+        const todayYMD = getLocalYMD();
+        const isLiveShift = !this.currentViewDate || this.currentViewDate === todayYMD;
+
+        // Sync reportFilterDate with currentViewDate for backward compatibility
+        this.reportFilterDate = isLiveShift ? null : this.currentViewDate;
+
+        // Use a local constant — never modify state inside render to prevent loops
+        const currentTargetDate = this.currentViewDate || todayYMD;
+
+        let filterLabel = isLiveShift ? `اليوم ${todayYMD} (Live Shift)` : `📅 عرض تاريخ: ${currentTargetDate}`;
+        let startBound, endBound;
+
+        if (!isLiveShift) {
+            // Historical view: selected date midnight → 23:59:59
+            const parts = currentTargetDate.split('-');
             const y = parseInt(parts[0]), m = parseInt(parts[1]) - 1, d = parseInt(parts[2]);
             startBound = new Date(y, m, d, 0, 0, 0, 0).getTime();
-            endBound = new Date(y, m, d, 23, 59, 59, 999).getTime();
+            endBound   = new Date(y, m, d, 23, 59, 59, 999).getTime();
         } else {
+            // Live Shift: today's boundaries in local time
             const now = new Date();
             const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
             startBound = new Date(y, m, d, 0, 0, 0, 0).getTime();
-            endBound = new Date(y, m, d, 23, 59, 59, 999).getTime();
+            endBound   = new Date(y, m, d, 23, 59, 59, 999).getTime();
         }
 
         const weekAgo = startBound - (7 * 24 * 60 * 60 * 1000);
@@ -2699,16 +2795,16 @@ window.appLogic = {
                 if (rTime >= yearAgo) salesYear += amt;
             }
 
-            // Monthly Map (Conditionally respect shift in Live view)
-            if (matchesShift) {
-                const d = new Date(i.date || i.timestamp);
-                const mIdx = d.getMonth();
-                const year = d.getFullYear();
-                const key = `${year}-${String(mIdx + 1).padStart(2, '0')}`;
-                const label = `${monthsAr[mIdx]} ${year.toString()}`;
-                if (!monthlyMap[key]) monthlyMap[key] = { label, total: 0, sortKey: key };
-                monthlyMap[key].total += amt;
-            }
+            // 🌟 EXCEPTION: MONTHLY SALES BREAKDOWN
+            // DO NOT RESET: Must calculate sum of ALL invoices (historical + active) for calendar reporting
+            const d = new Date(i.date || i.timestamp);
+            const mIdx = d.getMonth();
+            const year = d.getFullYear();
+            const key = `${year}-${String(mIdx + 1).padStart(2, '0')}`;
+            const label = `${monthsAr[mIdx]} ${year.toString()}`;
+            if (!monthlyMap[key]) monthlyMap[key] = { label, total: 0, sortKey: key };
+            monthlyMap[key].total += amt;
+
 
             // ACTIVE DASHBOARD FILTER (Selected Date)
             if (isInRange && matchesShift) {
@@ -2753,13 +2849,24 @@ window.appLogic = {
         let netProfit = totalNetRevenue - totalOperatingExpenses;
 
         let html = `
+        ${!isLiveShift ? `
+        <div style="background: rgba(253,184,19,0.1); border:1px solid var(--primary); border-radius:var(--radius-md); padding:12px 18px; margin-bottom:18px; display:flex; align-items:center; gap:12px;">
+            <i class="fa-solid fa-clock-rotate-left" style="color:var(--primary); font-size:20px;"></i>
+            <div>
+                <div style="font-size:14px; font-weight:800; color:var(--primary);">وضع الاستعراض التاريخي</div>
+                <div style="font-size:12px; color:var(--text-muted);">تعرض الأرقام بيانات يوم ${currentTargetDate} فقط. لا يمكن إغلاق اليومية في هذا الوضع.</div>
+            </div>
+            <button class="btn" onclick="appLogic.resetReportFilter()" style="margin-right:auto; background:var(--primary); color:#000; padding:8px 16px; font-size:12px; font-weight:800; border:none; border-radius:8px; cursor:pointer;">
+                <i class="fa-solid fa-rotate-left"></i> العودة لليوم الحالي
+            </button>
+        </div>` : ''}
         <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:15px; margin-bottom:25px; display:flex; justify-content:space-between; align-items:center; box-shadow:var(--shadow-sm);">
             <div>
                 <h2 style="font-size:18px; color:var(--primary); margin-bottom:3px;"><i class="fa-solid fa-calendar-check"></i> عرض البيانات المالية لـ: ${currentTargetDate}</h2>
                 <p style="font-size:12px; color:var(--text-muted); margin:0;">اختر تاريخاً لمراجعة الأداء والعمليات المالية السابقة.</p>
             </div>
             <div style="display:flex; gap:10px; align-items:center;">
-                <input type="date" value="${currentTargetDate}" onchange="appLogic.filterReportsByDate(this.value)" style="background:#000; color:#fff; border:1px solid var(--border); padding:10px; border-radius:8px; font-size:14px; outline:none; text-align:center;">
+                <input type="date" value="${currentTargetDate}" onchange="appLogic.filterReportsByDate(this.value)" style="color-scheme: dark; cursor: pointer; background:#000; color:#fff; border:1px solid var(--border); padding:10px; border-radius:8px; font-size:14px; outline:none; text-align:center;">
                 <button class="btn" style="background:rgba(253,184,19,0.1); color:var(--primary); padding:10px 15px; font-size:12px; font-weight:bold; border:1px solid var(--primary); border-radius:8px;" onclick="appLogic.resetReportFilter()">اليوم <i class="fa-solid fa-rotate-left"></i></button>
             </div>
         </div>
@@ -2950,7 +3057,7 @@ window.appLogic = {
                         category: 'تسديد مغاسل',
                         amount: currentDue,
                         desc: `تسديد مستحقات بالكامل: ${displayName}`,
-                        date: new Date().toISOString().split('T')[0]
+                        date: getLocalYMD()
                     };
                     exps.push(settlementExpense);
                     await localforage.setItem('expenses', exps);
@@ -3568,92 +3675,149 @@ window.appLogic = {
         const visaTotal = parseFloat(syncEl.dataset.visa) || 0;
         const mastercardTotal = parseFloat(syncEl.dataset.mastercard) || 0;
 
-        const reportDate = new Date().toLocaleDateString('en-US');
+        // === KSA STRICT LOCAL DATE (prevents UTC timezone drift) ===
+        const todayKSA = getLocalYMD();          // e.g. "2026-04-01"
+        const now = new Date();
+        const reportDate = `${now.getMonth() + 1}/${now.getDate()}/${now.getFullYear()}`;
         const bizName = window.tenantSettings?.name || 'سحاب';
 
         const reportContent = `
-            <div style="padding:50px; font-family:'Tajawal', sans-serif; direction:rtl; color:#333; background:#fff; min-height:280mm;">
-                <!-- Header Section -->
-                <div style="text-align:center; padding-bottom:30px; margin-bottom:40px; border-bottom:3px solid #333;">
-                    <h1 style="margin:0; font-size:32px; color:#000;">تقرير إغلاق اليومية</h1>
-                    <div style="font-size:22px; margin-top:15px; font-weight:bold; color:#555;">${bizName}</div>
-                    <div style="font-size:16px; color:#888; margin-top:8px;">بتاريخ: ${reportDate}</div>
-                </div>
+            <style>
+                * { box-sizing: border-box; margin: 0; padding: 0; }
+                body { font-family: 'Tajawal', Arial, sans-serif; direction: rtl; background: #fff; color: #222; font-size: 12px; }
+                @media print {
+                    @page { margin: 10mm; size: A4 portrait; }
+                    body, html { height: auto !important; overflow: visible !important; background: #fff; }
+                    .z-page { page-break-inside: avoid; }
+                    table { page-break-inside: auto; }
+                    tr { page-break-inside: avoid; page-break-after: auto; }
+                    .final-summary { page-break-inside: avoid !important; }
+                }
+            </style>
+            <div class="z-page" style="padding: 18px 28px; max-width: 760px; margin: 0 auto; background: #fff;">
 
-                <!-- Payment Breakdown Section -->
-                <div style="margin-bottom: 30px; border: 1px solid #eee; border-radius: 8px; overflow: hidden;">
-                    <div style="background: #f8f9fa; padding: 12px 20px; font-weight: bold; border-bottom: 1px solid #eee; color: #444; font-size: 16px;">تفاصيل الدفع</div>
-                    <table style="width: 100%; border-collapse: collapse; font-size: 15px;">
-                        <tr style="border-bottom: 1px solid #f0f0f0;">
-                            <td style="padding: 12px 25px; color: #666;">نقدي (Cash)</td>
-                            <td style="padding: 12px 25px; text-align: left; font-weight: 900; direction: ltr;">${cashTotal.toFixed(2)} ر.س</td>
-                        </tr>
-                        <tr style="border-bottom: 1px solid #f0f0f0;">
-                            <td style="padding: 12px 25px; color: #666;">مدى (Mada)</td>
-                            <td style="padding: 12px 25px; text-align: left; font-weight: 900; direction: ltr;">${madaTotal.toFixed(2)} ر.س</td>
-                        </tr>
-                        <tr style="border-bottom: 1px solid #f0f0f0;">
-                            <td style="padding: 12px 25px; color: #666;">فيزا (Visa)</td>
-                            <td style="padding: 12px 25px; text-align: left; font-weight: 900; direction: ltr;">${visaTotal.toFixed(2)} ر.س</td>
-                        </tr>
-                        <tr style="border-bottom: 1px solid #f0f0f0;">
-                            <td style="padding: 12px 25px; color: #666;">ماستركارد (Mastercard)</td>
-                            <td style="padding: 12px 25px; text-align: left; font-weight: 900; direction: ltr;">${mastercardTotal.toFixed(2)} ر.س</td>
-                        </tr>
-                    </table>
+                <!-- ══ HEADER ══ -->
+                <div style="background: #1a1a2e; color: #fff; text-align: center; padding: 16px 20px; border-radius: 8px; margin-bottom: 16px;">
+                    <div style="font-size: 9px; letter-spacing: 2px; color: #fdb813; text-transform: uppercase; margin-bottom: 4px;">نظام سحاب POS</div>
+                    <h1 style="margin: 0; font-size: 20px; font-weight: 900; color: #fff; line-height: 1.3;">تقرير إغلاق اليومية</h1>
+                    <div style="margin-top: 6px; font-size: 14px; font-weight: bold; color: #fdb813;">${bizName}</div>
+                    <div style="margin-top: 4px; font-size: 11px; color: rgba(255,255,255,0.7);">بتاريخ: ${reportDate}</div>
                 </div>
+                <hr style="border: 0; border-top: 2px solid #e0e0e0; margin-bottom: 14px;">
 
-                <!-- Financial Table -->
-                <div style="border:1px solid #ddd; border-radius:8px; overflow:hidden;">
-                    <table style="width:100%; border-collapse:collapse; font-size:16px;">
-                        <tr style="background:#fcfcfc; border-bottom:1px solid #eee;">
-                            <td style="padding:18px 25px; color:#666; font-weight:bold; text-align:right;">إجمالي المبيعات</td>
-                            <td style="padding:18px 25px; font-weight:900; text-align:left; direction:ltr; color:#000;">${gross.toFixed(2)} ر.س</td>
-                        </tr>
-                        <tr style="background:#f4f4f4; border-bottom:1px solid #eee;">
-                            <td style="padding:18px 25px; color:#666; font-weight:bold; text-align:right;">إجمالي المرتجعات</td>
-                            <td style="padding:18px 25px; font-weight:900; text-align:left; color:#ff453a; direction:ltr;">- ${refunds.toFixed(2)} ر.س</td>
-                        </tr>
-                        <tr style="background:#fcfcfc; border-bottom:1px solid #eee;">
-                            <td style="padding:18px 25px; color:#666; font-weight:bold; text-align:right;">صافي الإيرادات</td>
-                            <td style="padding:18px 25px; font-weight:900; text-align:left; color:#2e7d32; direction:ltr;">${netRev.toFixed(2)} ر.س</td>
-                        </tr>
-                        <tr style="background:#f4f4f4; border-bottom:1px solid #eee;">
-                            <td style="padding:18px 25px; color:#666; font-weight:bold; text-align:right;">المصاريف التشغيلية</td>
-                            <td style="padding:18px 25px; font-weight:900; text-align:left; color:#ff453a; direction:ltr;">- ${opExps.toFixed(2)} ر.س</td>
-                        </tr>
-                        <tr style="background:#e8f5e9; border-top:2px solid #333;">
-                            <td style="padding:25px; font-size:22px; font-weight:900; color:#1b5e20; text-align:right;">صافي الربح النهائي</td>
-                            <td style="padding:25px; font-size:28px; font-weight:900; text-align:left; color:#1b5e20; direction:ltr;">${netProfit.toFixed(2)} ر.س</td>
-                        </tr>
-                    </table>
-                </div>
+                <!-- ══ TWO-COLUMN LAYOUT: Payments LEFT, Financial Summary RIGHT ══ -->
+                <table style="width: 100%; border-collapse: collapse; vertical-align: top;">
+                    <tr>
+                        <!-- LEFT COLUMN: Payment Methods -->
+                        <td style="width: 48%; vertical-align: top; padding-left: 8px;">
+                            <div style="font-size: 11px; font-weight: 800; color: #444; border-right: 3px solid #fdb813; padding-right: 8px; margin-bottom: 8px;">تفاصيل طرق الدفع</div>
+                            <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                                <thead>
+                                    <tr style="background: #f5f5f5;">
+                                        <th style="padding: 7px 10px; text-align: right; color: #666; font-weight: 700;">طريقة الدفع</th>
+                                        <th style="padding: 7px 10px; text-align: left; color: #666; font-weight: 700;">المبلغ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr style="border-bottom: 1px solid #f0f0f0; background: #fff;">
+                                        <td style="padding: 7px 10px; color: #333; font-weight: 600;">💵 نقدي (Cash)</td>
+                                        <td style="padding: 7px 10px; text-align: left; font-weight: 900; direction: ltr; color: #000;">${cashTotal.toFixed(2)} ر.س</td>
+                                    </tr>
+                                    <tr style="border-bottom: 1px solid #f0f0f0; background: #fafafa;">
+                                        <td style="padding: 7px 10px; color: #333; font-weight: 600;">💳 مدى (Mada)</td>
+                                        <td style="padding: 7px 10px; text-align: left; font-weight: 900; direction: ltr; color: #000;">${madaTotal.toFixed(2)} ر.س</td>
+                                    </tr>
+                                    <tr style="border-bottom: 1px solid #f0f0f0; background: #fff;">
+                                        <td style="padding: 7px 10px; color: #333; font-weight: 600;">💳 فيزا (Visa)</td>
+                                        <td style="padding: 7px 10px; text-align: left; font-weight: 900; direction: ltr; color: #000;">${visaTotal.toFixed(2)} ر.س</td>
+                                    </tr>
+                                    <tr style="border-bottom: 1px solid #f0f0f0; background: #fafafa;">
+                                        <td style="padding: 7px 10px; color: #333; font-weight: 600;">💳 ماستركارد</td>
+                                        <td style="padding: 7px 10px; text-align: left; font-weight: 900; direction: ltr; color: #000;">${mastercardTotal.toFixed(2)} ر.س</td>
+                                    </tr>
+                                    <tr style="background: #fffbea; border-top: 2px solid #fdb813;">
+                                        <td style="padding: 8px 10px; font-weight: 900; color: #333;">إجمالي المقبوضات</td>
+                                        <td style="padding: 8px 10px; text-align: left; font-weight: 900; direction: ltr; color: #000; font-size: 13px;">${(cashTotal + madaTotal + visaTotal + mastercardTotal).toFixed(2)} ر.س</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </td>
 
-                <!-- Footer -->
-                <div style="text-align:center; color:#aaa; font-size:13px; margin-top:80px;">
-                    تم توليد هذا التقرير المحاسبي بواسطة نظام سحاب POS
+                        <!-- SPACER -->
+                        <td style="width: 4%;"></td>
+
+                        <!-- RIGHT COLUMN: Financial Summary -->
+                        <td style="width: 48%; vertical-align: top; padding-right: 8px;">
+                            <div class="final-summary">
+                                <div style="font-size: 11px; font-weight: 800; color: #444; border-right: 3px solid #2e7d32; padding-right: 8px; margin-bottom: 8px;">ملخص القوائم المالية</div>
+                                <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                                    <tbody>
+                                        <tr style="background: #fff; border-bottom: 1px solid #eee;">
+                                            <td style="padding: 8px 10px; color: #444; font-weight: 700;">إجمالي المبيعات</td>
+                                            <td style="padding: 8px 10px; text-align: left; font-weight: 900; direction: ltr; color: #000; font-size: 13px;">${gross.toFixed(2)} ر.س</td>
+                                        </tr>
+                                        <tr style="background: #fff8f8; border-bottom: 1px solid #eee;">
+                                            <td style="padding: 8px 10px; color: #c62828; font-weight: 700;">إجمالي المرتجعات</td>
+                                            <td style="padding: 8px 10px; text-align: left; font-weight: 900; direction: ltr; color: #c62828; font-size: 13px;">- ${refunds.toFixed(2)} ر.س</td>
+                                        </tr>
+                                        <tr style="background: #f1f8e9; border-bottom: 1px solid #a5d6a7;">
+                                            <td style="padding: 8px 10px; color: #2e7d32; font-weight: 700;">صافي الإيرادات</td>
+                                            <td style="padding: 8px 10px; text-align: left; font-weight: 900; direction: ltr; color: #2e7d32; font-size: 13px;">${netRev.toFixed(2)} ر.س</td>
+                                        </tr>
+                                        <tr style="background: #fff8f8; border-bottom: 2px solid #e0e0e0;">
+                                            <td style="padding: 8px 10px; color: #c62828; font-weight: 700;">إجمالي المصاريف</td>
+                                            <td style="padding: 8px 10px; text-align: left; font-weight: 900; direction: ltr; color: #c62828; font-size: 13px;">- ${opExps.toFixed(2)} ر.س</td>
+                                        </tr>
+                                        <!-- FINAL NET PROFIT - BOLD STANDOUT ROW -->
+                                        <tr style="background: #1b5e20; border-top: 3px double #a5d6a7;">
+                                            <td style="padding: 10px 10px; font-size: 13px; font-weight: 900; color: #fff;">🏆 صافي الربح النهائي</td>
+                                            <td style="padding: 10px 10px; text-align: left; font-weight: 900; direction: ltr; color: #fff; font-size: 16px;">${netProfit.toFixed(2)} ر.س</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+
+                <!-- ══ FOOTER ══ -->
+                <div style="text-align: center; margin-top: 16px; padding-top: 10px; border-top: 1px solid #eee; color: #aaa; font-size: 10px;">
+                    <span>تم توليد هذا التقرير بواسطة <strong>نظام سحاب POS</strong></span>
+                    &nbsp;|&nbsp;
+                    <span style="direction: ltr; display: inline-block;">${new Date().toLocaleString('en-US')}</span>
                 </div>
             </div>
         `;
-
-        const element = document.createElement('div');
-        element.innerHTML = reportContent;
-        await html2pdf().from(element).save(`Z-Report_${reportDate.replace(/\//g, '-')}.pdf`);
 
         // Zero Reset (Live Database Update)
         const invoices = await localforage.getItem('invoices') || [];
         const exps = await localforage.getItem('expenses') || [];
 
-        // Archive Data with full Lists (FILTERED for CURRENT shift only)
-        const shiftInvoices = invoices.filter(i => !i.isZReported);
-        const shiftExpenses = exps.filter(e => !e.isZReported);
+        /* Begin localized date logic */
+        const KSA_DATE_FORMATTER = new Intl.DateTimeFormat('ar-SA', { year: 'numeric', month: 'numeric', day: 'numeric', calendar: 'gregorian' });
+        const targetFormattedDate = getLocalYMD(); 
+
+        // Filter invoices based on KSA date logic
+        const filteredInvoices = invoices.filter(invoice => {
+            if (!invoice) return false;
+            if (invoice.isZReported) return false;
+            
+            // Format match check: Ensure strict alignment with the current shift
+            const dStr = invoice.timestamp || invoice.date || new Date().toISOString();
+            const fallbackStr = getLocalYMD(new Date(dStr));
+            return fallbackStr === targetFormattedDate;
+        });
+        /* End localized date logic */
+
+        // Apply identical bounds to expenses
+        const shiftExpenses = exps.filter(e => e && !e.isZReported && (e.date === targetFormattedDate || getLocalYMD(e.timestamp) === targetFormattedDate));
 
         const archiveEntry = {
             id: 'Z-' + Date.now(),
             timestamp: Date.now(),
             date: reportDate,
             totals: { gross, refunds, netRev, opExps, netProfit, paymentBreakdown: { cashTotal, madaTotal, visaTotal, mastercardTotal } },
-            invoices: shiftInvoices,
+            invoices: filteredInvoices,
             expenses: shiftExpenses
         };
         let archived = await localforage.getItem('archived_z_reports') || [];
@@ -3661,21 +3825,57 @@ window.appLogic = {
         await localforage.setItem('archived_z_reports', archived);
         await manualSyncToCloud('archived_z_reports', archived);
 
-        // MARK ALL ITEMS AS REPORTED
-        invoices.forEach(i => { i.isZReported = true; });
-        exps.forEach(e => { e.isZReported = true; });
+        // ═══ STEP 3: CLEAR ACTIVE STATE (Remove closed items from active arrays) ═══
+        invoices.forEach(i => { if (i) i.isZReported = true; });
+        exps.forEach(e => { if (e) e.isZReported = true; });
+        
+        // Filter out the closed items physically from the live queue
+        const activeInvoices = invoices.filter(i => i && !i.isZReported);
+        const activeExps = exps.filter(e => e && !e.isZReported);
 
-        await localforage.setItem('invoices', invoices);
-        await localforage.setItem('expenses', exps);
-        await manualSyncToCloud('invoices', invoices);
-        await manualSyncToCloud('expenses', exps);
+        await localforage.setItem('invoices', activeInvoices);
+        await localforage.setItem('expenses', activeExps);
+        await manualSyncToCloud('invoices', activeInvoices);
+        await manualSyncToCloud('expenses', activeExps);
 
-        this.renderReports();
-        const msg = 'تم إغلاق اليومية بنجاح وإصدار التقرير وأرشفة البيانات.';
-        this.showToast ? this.showToast(msg) : alert(msg);
+        // ═══ STEP 4: CLEAN SLATE — Reset the active Live view to empty ═══
+        // Reset date to today in Live Shift mode (clears the historical browse state)
+        this.currentViewDate = getLocalYMD();
+        this.reportFilterDate = null; // null = Live Shift mode (only un-reported invoices)
 
+        // Close modal before re-rendering
         const previewModal = document.getElementById('z-report-preview-modal');
         if (previewModal) previewModal.classList.add('hidden');
+
+        // Force full re-render: Dashboard → 0.00 SAR, Invoice Table → empty
+        await this.renderReports();
+        await this.renderHistory();
+
+        // ═══ FORCE DASHBOARD TO 0.00 (SLEDGEHAMMER) ═══
+        const safeZero = "0.00";
+        if(document.getElementById('db-gross-sales')) document.getElementById('db-gross-sales').innerText = safeZero + " ر.س";
+        if(document.getElementById('db-refunds')) document.getElementById('db-refunds').innerText = "- " + safeZero + " ر.س";
+        if(document.getElementById('db-net-revenue')) document.getElementById('db-net-revenue').innerText = safeZero + " ر.س";
+        if(document.getElementById('db-op-expenses-display')) document.getElementById('db-op-expenses-display').innerText = "- " + safeZero + " ر.س";
+        if(document.getElementById('db-net-profit')) document.getElementById('db-net-profit').innerHTML = safeZero + ' <span style="font-size:20px;"> ر.س</span>';
+
+        // ═══ STEP 5: SUCCESS FEEDBACK ═══
+        const msg = '✅ تم إغلاق اليومية بنجاح وتصفير السجل. يمكنك الاطلاع على بيانات اليوم عبر القوائم المالية باختيار التاريخ.';
+        this.showToast ? this.showToast(msg) : alert(msg);
+
+        // ═══ STEP 6: GENERATE PDF (Non-blocking & Safe) ═══
+        try {
+            const element = document.createElement('div');
+            element.innerHTML = reportContent;
+            html2pdf().from(element).set({
+                margin: [5, 5, 5, 5],
+                filename: `Z-Report_${reportDate.replace(/\//g, '-')}.pdf`,
+                html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            }).save();
+        } catch (pdfErr) {
+            console.error('[PDF Gen] Failed to generate PDF:', pdfErr);
+        }
     },
 
     async showZReportPreview() {
