@@ -295,7 +295,9 @@ button:active {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
     gap: 16px;
-    min-height: 600px; /* Pre-allocate space for items to prevent layout jump */
+    align-items: start;
+    justify-content: start;
+    min-height: 0;
 }
 
 .item-card {
@@ -306,6 +308,12 @@ button:active {
     cursor: pointer;
     transition: all 0.2s ease;
     border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    aspect-ratio: 1 / 1;
+    width: 100%;
 }
 
 .item-card:hover {
@@ -329,9 +337,26 @@ button:active {
 }
 
 /* =========================================
-   IPAD/TABLET OPTIMIZATION (MAXIMUM COMPACT 9-COLUMN GRID)
+   IPAD/TABLET OPTIMIZATION (Compactor Grid)
    ========================================= */
-@media (min-width: 768px) and (max-width: 1024px) {
+
+/* 1. PORTRAIT (768px - 1024px) */
+@media only screen and (min-width: 768px) and (max-width: 1024px) and (orientation: portrait) {
+    .items-grid {
+        grid-template-columns: repeat(6, 1fr) !important; /* Perfect for portrait */
+        gap: 12px !important;
+    }
+    .item-card {
+        padding: 10px !important;
+        aspect-ratio: 1 / 1 !important;
+        height: auto !important;
+    }
+    .item-icon { font-size: 24px !important; margin-bottom: 6px !important; }
+    .item-name { font-size: 13px !important; }
+}
+
+/* 2. LANDSCAPE (768px - 1024px) - MAXIMUM COMPACT 9-COLUMN GRID */
+@media only screen and (min-device-width: 768px) and (max-device-width: 1024px) and (orientation: landscape) {
     .items-grid {
         grid-template-columns: repeat(9, 1fr) !important;
         gap: 8px !important;
@@ -339,8 +364,9 @@ button:active {
     }
 
     .item-card {
-        padding: 8px 4px !important;
-        min-height: 80px !important;
+        padding: 5px !important;
+        aspect-ratio: 1 / 1 !important;
+        height: auto !important;
         display: flex !important;
         flex-direction: column !important;
         justify-content: center !important;
@@ -359,12 +385,10 @@ button:active {
         line-clamp: 2 !important;
         -webkit-line-clamp: 2 !important;
         -webkit-box-orient: vertical !important;
-        display: -webkit-box !important;
         overflow: hidden !important;
+        display: -webkit-box !important;
     }
 }
-
-
 
 /* Cart (Left Side Sidebar) */
 .cart-section {
