@@ -328,6 +328,30 @@ button:active {
     color: var(--text-main);
 }
 
+/* =========================================
+   IPAD/TABLET OPTIMIZATION (Compactor Grid)
+   ========================================= */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .items-grid {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)) !important;
+        gap: 12px !important;
+    }
+
+    .item-card {
+        padding: 15px 8px !important;
+    }
+
+    .item-icon {
+        font-size: 28px !important;
+        margin-bottom: 8px !important;
+    }
+
+    .item-name {
+        font-size: 13px !important;
+    }
+}
+
+
 /* Cart (Left Side Sidebar) */
 .cart-section {
     background-color: var(--bg-surface);
@@ -1207,14 +1231,17 @@ button:active {
     }
 
     .view-section {
-        height: auto;
+        height: auto !important;
         min-height: 100%;
+        overflow-y: visible;
+        padding-bottom: 120px; /* Clearance for the fixed mobile drawer handle */
     }
 
     /* POS Section */
     .items-section {
         padding: 16px;
-        padding-bottom: 80px; /* Just enough to clear the 64px handle */
+        padding-bottom: 120px; /* Clearance for the fixed mobile drawer handle */
+        -webkit-overflow-scrolling: touch;
     }
 
     .items-header {
@@ -1668,7 +1695,20 @@ button:active {
 #fb-speed-express { border-color: rgba(255, 69, 0, 0.4) !important; color: #ff4500 !important; font-weight: bold !important; }
 #fb-speed-express.active { background-color: #ff4500 !important; color: #fff !important; border-color: #ff4500 !important; font-weight: bold !important; }
 
-@media (max-width: 768px) { 
+@media (max-width: 768px) {
+    html, body {
+        height: auto !important;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    #app {
+        height: auto !important;
+        min-height: 100vh;
+        overflow: visible;
+    }
+
+    .main-header { flex-direction: column; padding: 12px; margin-bottom: 12px; } 
     .fb-container { flex-direction: column; padding: 12px; margin-bottom: 12px; } 
     .fb-group { flex-direction: column; width: 100%; margin-bottom: 10px; } 
     .group-speeds { margin-bottom: 0; } 
