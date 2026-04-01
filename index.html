@@ -36,8 +36,16 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <!-- ===== LOGIN OVERLAY ===== -->
-    <div id="login-overlay">
+    <!-- ===== INITIAL LOADER (Professional Rendering Guard) ===== -->
+    <div id="initial-loader" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0a0a0a; display: flex; justify-content: center; align-items: center; z-index: 10001; transition: opacity 0.6s ease, visibility 0.6s;">
+        <div style="text-align: center;">
+            <i class="fa-solid fa-cloud fa-fade" style="font-size: 50px; color: #FDB813; margin-bottom: 25px; filter: drop-shadow(0 0 15px rgba(253, 184, 19, 0.3));"></i>
+            <h2 style="color: #FDB813; font-family: 'Tajawal', sans-serif; font-weight: 800; font-size: 24px; margin: 0; letter-spacing: 1px;">جاري التحميل...</h2>
+        </div>
+    </div>
+
+    <!-- ===== LOGIN OVERLAY (Hidden by default to prevent flash) ===== -->
+    <div id="login-overlay" style="display: none;">
         <div class="login-card">
             <div class="login-logo">
                 <img src="sahap logo.jpeg" alt="Sahab Logo" style="border-radius: 50% !important; object-fit: cover !important; background-color: transparent !important;" onerror="this.style.display='none'">
@@ -74,7 +82,8 @@
         </div>
     </div>
 
-    <div id="app">
+    <!-- ===== APP DASHBOARD (Hidden by default to prevent flash) ===== -->
+    <div id="app" style="display: none;">
         <!-- Trial Banner -->
         <div id="trial-banner" class="hidden no-print" style="background:#ff9800; color:#fff; text-align:center; padding:10px 20px; font-weight:bold; font-size:14px; z-index:9000; position:relative;">
             نسخة تجريبية: متبقي <span id="trial-days">5</span> أيام

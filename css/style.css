@@ -102,8 +102,14 @@ button:active {
 #app {
     display: flex;
     flex-direction: column;
-    height: 100vh;
-    overflow: hidden;
+    min-height: 100vh;
+    overflow: visible;
+    opacity: 0; /* Professional Rendering Guard: Hidden until ready */
+    transition: opacity 0.4s ease;
+}
+
+#app.app-ready {
+    opacity: 1 !important;
 }
 
 /* Header */
@@ -175,17 +181,14 @@ button:active {
 /* Layout - Cart on Left */
 .main-content {
     flex: 1;
-    overflow: hidden;
     display: flex;
     flex-direction: column;
 }
 
 .view-section {
-    height: 100%;
     min-height: 0;
     flex: 1;
     display: none;
-    overflow-y: auto !important; /* Restore scrolling across all managed views */
     background-color: var(--bg-body);
 }
 
@@ -204,7 +207,6 @@ button:active {
 /* Categories & Items Grid */
 .items-section {
     padding: 24px;
-    overflow-y: auto;
     background-color: var(--bg-body);
     min-height: 0;
 }
@@ -293,6 +295,7 @@ button:active {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
     gap: 16px;
+    min-height: 600px; /* Pre-allocate space for items to prevent layout jump */
 }
 
 .item-card {
@@ -333,7 +336,7 @@ button:active {
     flex-direction: column;
     z-index: 5;
     height: 100%;
-    min-height: 0;
+    min-height: 500px; /* Maintain vertical structure during load */
     overflow: hidden !important; /* Definitive fix for outer cart scrollbar */
 }
 

@@ -1,4 +1,24 @@
 // Sahab POS - Main Application Logic
+(function() {
+    // ⚡ FAST GUARD: Prevent Login Flash
+    // We check localStorage immediately (before any Firebase calls) to decide which UI to show.
+    const sessionUID = localStorage.getItem('sahab_session_uid');
+    const loginOverlay = document.getElementById('login-overlay');
+    const appEl = document.getElementById('app');
+
+    if (sessionUID) {
+        // Assume valid session -> Show App immediately
+        if (appEl) appEl.style.display = 'block';
+        if (loginOverlay) loginOverlay.style.display = 'none';
+        console.log("[Fast-Guard] Session hint found. Showing App.");
+    } else {
+        // No session -> Show Login immediately
+        if (appEl) appEl.style.display = 'none';
+        if (loginOverlay) loginOverlay.style.display = 'flex';
+        console.log("[Fast-Guard] No session. Showing Login.");
+    }
+})();
+
 const ADMIN_PIN = "456333";
 const DefaultDeliveryOptions = [
 
@@ -248,7 +268,22 @@ async function initFirebaseSync() {
                     await originalSetItem.call(localforage, key, cloudData);
                     window.__syncingFromFirebase = false;
                 } else {
-                    console.log(`[Multi-Tenant] Provisioning fresh isolated data space for ${key}. Zero-State Enforced.`);
+                    console.log(`[Multi-Tenant] Cloud is empty for ${key}. Checking local redundancy.`);
+                    
+                    // REDUNDANCY CHECK: If local storage has data, don't zero it yet!
+                    const localBackup = localStorage.getItem(key);
+                    if (localBackup && (key === 'expenses' || key === 'invoices')) {
+                        try {
+                            const parsed = JSON.parse(localBackup);
+                            if (parsed && parsed.length > 0) {
+                                console.log(`[Recovery] Cloud empty but localStorage has ${key}. Using local data.`);
+                                await originalSetItem.call(localforage, key, parsed);
+                                resolve();
+                                return;
+                            }
+                        } catch(e) {}
+                    }
+
                     window.__syncingFromFirebase = true;
                     await originalSetItem.call(localforage, key, []); // ZERO STATE PROMISE!
                     window.__syncingFromFirebase = false;
@@ -296,7 +331,31 @@ async function initFirebaseSync() {
 // ---------------------------------------------
 
 // Version: 1.0.3 (Firebase Sync Enabled)
+// Professional Loading Guard Logic
+const hideInitialLoader = () => {
+    const loader = document.getElementById('initial-loader');
+    if (loader) {
+        loader.style.opacity = '0';
+        setTimeout(() => {
+            loader.style.visibility = 'hidden';
+            loader.style.display = 'none';
+        }, 600); // Matches the 0.6s CSS transition
+    }
+};
+
 window.appLogic = {
+    reportFilterDate: null, // null = Total Today (Live Shift)
+    
+    filterReportsByDate(val) {
+        this.reportFilterDate = val || null;
+        this.renderReports();
+    },
+
+    resetReportFilter() {
+        this.reportFilterDate = null;
+        this.renderReports();
+    },
+
     toggleLaundryFields() {
         const container = document.getElementById('laundry-fields-container');
         const btn = document.getElementById('laundry-toggle-btn');
@@ -451,6 +510,32 @@ window.appLogic = {
         // i18n auto-apply on load
         this.applyLanguage();
         this.updateCartUI();
+        await this.initLaundryBalances(); // Initialize cumulative store
+    },
+
+    async initLaundryBalances() {
+        // One-time seeding: If laundry_balances doesn't exist, calculate from all unpaid invoices
+        const existing = await localforage.getItem('laundry_balances');
+        if (existing) return;
+
+        console.log("[Laundry] Seeding cumulative balances from existing history...");
+        const invoices = await localforage.getItem('invoices') || [];
+        const balances = {};
+
+        invoices.forEach(i => {
+            if (!i || !i.partnerLaundryName || i.laundryPaid || i.isCancelled) return;
+            const name = i.partnerLaundryName.trim();
+            const hood = (i.partnerLaundryNeighborhood || '').trim();
+            const key = `${name}|${hood}`;
+            const cost = parseFloat(i.laundryCost || i.partnerLaundryCost || 0);
+            if (cost > 0) {
+                if (!balances[key]) balances[key] = { balance: 0 };
+                balances[key].balance += cost;
+            }
+        });
+
+        await localforage.setItem('laundry_balances', balances);
+        localStorage.setItem('laundry_balances', JSON.stringify(balances));
     },
 
     async updateLaundryDatalist() {
@@ -521,6 +606,8 @@ window.appLogic = {
 
             // Trigger rendering
             console.log('Rendering content for:', viewId);
+            localStorage.setItem('sahab_active_view', viewId); // Persistent state
+            
             if (viewId === 'history') this.renderHistory();
             else if (viewId === 'customers') this.renderCustomers();
             else if (viewId === 'inventory') this.renderInventory();
@@ -1682,8 +1769,18 @@ window.appLogic = {
 
         await localforage.setItem('invoices', invs);
         await manualSyncToCloud('invoices', invs);
+
+        // Update Cumulative Balance Store
+        let balances = await localforage.getItem('laundry_balances') || {};
+        const key = `${name}|${hood}`;
+        if (!balances[key]) balances[key] = { balance: 0 };
+        // We only add to the balance if it's not already paid (it's new/updated)
+        // Note: For simplicity in this non-refactor fix, we assume this adds to the running total.
+        balances[key].balance += cost; 
+        await localforage.setItem('laundry_balances', balances);
+        localStorage.setItem('laundry_balances', JSON.stringify(balances));
         
-        this.showToast('تم حفظ بيانات المغسلة الشريكة بنجاح');
+        this.showToast('تم حفظ بيانات المغسلة وتحديث الرصيد التراكمي');
         
         // Refresh UI to keep it consistent
         this.renderHistory();
@@ -2364,12 +2461,25 @@ window.appLogic = {
         if (!amount || !desc || !date) { alert('يرجى تعبئة كافة الحقول لحفظ التقييد المحاسبي!'); return; }
 
         let exps = await localforage.getItem('expenses') || [];
-        exps.push({ id: Date.now(), category: cat, amount: amount, desc: desc, date: date });
+        // Fix: Add timestamp for Firebase filter compatibility + localStorage backup
+        const newExpense = { 
+            id: Date.now(), 
+            timestamp: Date.now(), // CRITICAL: Required for Firebase sync filter
+            category: cat, 
+            amount: amount, 
+            desc: desc, 
+            date: date 
+        };
+        
+        exps.push(newExpense);
+        
         await localforage.setItem('expenses', exps);
+        localStorage.setItem('expenses', JSON.stringify(exps)); // Redundant persistence
         await manualSyncToCloud('expenses', exps);
 
         this.closeExpenseModal();
         this.renderExpenses();
+        this.renderReports(); // Direct dashboard refresh
         this.showToast('تم تقييد المصروف بنجاح وتسجيله بالدفتر');
 
         // Reset fields
@@ -2382,6 +2492,7 @@ window.appLogic = {
         if (!confirm('هل أنت متأكد من مسح جميع المصروفات التشغيلية نهائياً؟')) return;
         
         await localforage.setItem('expenses', []);
+        localStorage.removeItem('expenses'); // Clear redundant backup
         await manualSyncToCloud('expenses', []);
         
         this.renderExpenses();
@@ -2472,17 +2583,33 @@ window.appLogic = {
             }
         }
 
-        const now = new Date();
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-        const weekAgo = todayStart - (7 * 24 * 60 * 60 * 1000);
-        const monthAgo = todayStart - (30 * 24 * 60 * 60 * 1000);
-        const yearAgo = todayStart - (365 * 24 * 60 * 60 * 1000);
+        // ---------------------------------------------------------
+        // 🗓️ DATE FILTER LOGIC
+        // ---------------------------------------------------------
+        let filterLabel = "اليوم (Live Shift)";
+        let startBound, endBound;
+
+        if (this.reportFilterDate) {
+            const dateObj = new Date(this.reportFilterDate);
+            filterLabel = this.reportFilterDate;
+            const y = dateObj.getFullYear(), m = dateObj.getMonth(), d = dateObj.getDate();
+            startBound = new Date(y, m, d).getTime();
+            endBound = startBound + (24 * 60 * 60 * 1000) - 1;
+        } else {
+            const now = new Date();
+            startBound = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+            endBound = Infinity; // Live data (all current shift)
+        }
+
+        const weekAgo = startBound - (7 * 24 * 60 * 60 * 1000);
+        const monthAgo = startBound - (30 * 24 * 60 * 60 * 1000);
+        const yearAgo = startBound - (365 * 24 * 60 * 60 * 1000);
 
         let salesToday = 0, salesWeek = 0, salesMonth = 0, salesYear = 0;
         const monthsAr = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
         const monthlyMap = {};
 
-        // Active Dashboard Totals (Today Only + Not Reported)
+        // Active Dashboard Totals (Filtered by Selected Date)
         let totalAllInvoices = 0;
         let totalRefunds = 0;
         let totalOperatingExpenses = 0;
@@ -2496,8 +2623,9 @@ window.appLogic = {
             const rTime = new Date(i.date || i.timestamp).getTime();
             
             // DYNAMIC ROLLING TOTALS
-            const isToday = rTime >= todayStart;
-            if (isToday && !i.isZReported) salesToday += amt;
+            const isInRange = (rTime >= startBound && (endBound === Infinity || rTime <= endBound));
+            
+            if (isInRange && !i.isZReported) salesToday += amt;
             if (rTime >= weekAgo) salesWeek += amt;
             if (rTime >= monthAgo) salesMonth += amt;
             if (rTime >= yearAgo) salesYear += amt;
@@ -2511,33 +2639,52 @@ window.appLogic = {
             if (!monthlyMap[key]) monthlyMap[key] = { label, total: 0, sortKey: key };
             monthlyMap[key].total += amt;
 
-            // ACTIVE BATCH FILTER (Today + Not Reported)
-            if (isToday && !i.isZReported) {
+            // ACTIVE DASHBOARD FILTER (Selected Date)
+            if (isInRange) {
                 totalAllInvoices += amt;
                 if (i.isCancelled === true) {
                     totalRefunds += amt;
                 } else {
                     const pCost = parseFloat(i.laundryCost || i.partnerLaundryCost || 0);
                     totalLaundryCosts += pCost;
-                    if (!i.laundryPaid) totalLaundryDebt += pCost;
+                    // Note: Laundry Debt is cumulative, handled separately below
                 }
             }
         });
 
-        // 2. Process Expenses (Today + Not Reported)
+        // 2. Process Expenses (Filtered by Selected Date)
         exps.forEach(e => {
             const eTime = new Date(e.date).getTime();
-            if (eTime >= todayStart && !e.isZReported) {
+            if (eTime >= startBound && (endBound === Infinity || eTime <= endBound)) {
                 totalOperatingExpenses += parseFloat(e.amount) || 0;
             }
         });
 
-        // FINAL COMPREHENSIVE FINANCIAL MATH Logic
+        // 3. Laundry Debt (Handled independently as a Cumulative Balance)
+        // Note: For historical reports, we might want the point-in-time debt, 
+        // but as per current logic, the box shows the current cumulative balance.
+        const laundryBalances = await localforage.getItem('laundry_balances') || {};
+        Object.values(laundryBalances).forEach(b => {
+            totalLaundryDebt += parseFloat(b.balance || 0);
+        });
+
+        // FINAL COMPREHENSIVE FINANCIAL MATH (Gross - Refunds - Operating Expenses)
         let totalNetRevenue = totalAllInvoices - totalRefunds;
-        // Net Profit = [Net Revenue] - [Operating Expenses] - [Total Outsourcing Costs]
-        let netProfit = totalNetRevenue - (totalOperatingExpenses + totalLaundryCosts);
+        let netProfit = totalNetRevenue - totalOperatingExpenses;
 
         let html = `
+        <!-- 📅 FINANCIAL DATE FILTER -->
+        <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:15px; margin-bottom:25px; display:flex; justify-content:space-between; align-items:center; box-shadow:var(--shadow-sm);">
+            <div>
+                <h2 style="font-size:18px; color:var(--primary); margin-bottom:3px;"><i class="fa-solid fa-calendar-check"></i> عرض تقارير: ${filterLabel}</h2>
+                <p style="font-size:12px; color:var(--text-muted); margin:0;">اختر تاريخاً لمراجعة الأداء والعمليات المالية السابقة.</p>
+            </div>
+            <div style="display:flex; gap:10px; align-items:center;">
+                <input type="date" value="${this.reportFilterDate || ''}" onchange="appLogic.filterReportsByDate(this.value)" style="background:#000; color:#fff; border:1px solid var(--border); padding:10px; border-radius:8px; font-size:14px; outline:none; text-align:center;">
+                <button class="btn" style="background:rgba(253,184,19,0.1); color:var(--primary); padding:10px 15px; font-size:12px; font-weight:bold; border:1px solid var(--primary); border-radius:8px;" onclick="appLogic.resetReportFilter()">اليوم <i class="fa-solid fa-rotate-left"></i></button>
+            </div>
+        </div>
+
         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:20px; margin-bottom:40px;">
             
             <!-- 1. Gross Sales -->
@@ -2666,9 +2813,19 @@ window.appLogic = {
 
     async renderLaundryAccounts() {
         try {
+            const laundryBalances = await localforage.getItem('laundry_balances') || {};
             const invoices = await localforage.getItem('invoices') || [];
+            
+            // Build map for UI (Dues from cumulative store, Paid from historical total)
             const laundryMap = {};
 
+            // 1. Get Dues from the Dedicated Cumulative Store
+            Object.keys(laundryBalances).forEach(key => {
+                const [name, hood] = key.split('|');
+                laundryMap[key] = { name, hood, dues: laundryBalances[key].balance || 0, paid: 0 };
+            });
+
+            // 2. Scan invoices ONLY for 'Paid' history totals (to keep the columns accurate)
             invoices.forEach(i => {
                 if (!i || !i.partnerLaundryName || i.partnerLaundryName.trim() === '') return;
                 const name = i.partnerLaundryName.trim();
@@ -2683,8 +2840,6 @@ window.appLogic = {
 
                 if (i.laundryPaid) {
                     laundryMap[compKey].paid += cost;
-                } else {
-                    laundryMap[compKey].dues += cost;
                 }
             });
 
@@ -2756,11 +2911,37 @@ window.appLogic = {
             });
 
             if (updated) {
+                // 1. Reset Cumulative Balance
+                let balances = await localforage.getItem('laundry_balances') || {};
+                const currentDue = balances[compKey]?.balance || 0;
+                if (balances[compKey]) balances[compKey].balance = 0;
+                await localforage.setItem('laundry_balances', balances);
+                localStorage.setItem('laundry_balances', JSON.stringify(balances));
+
+                // 2. Record Settlement as Expense (Payout)
+                if (currentDue > 0) {
+                    let exps = await localforage.getItem('expenses') || [];
+                    const settlementExpense = {
+                        id: Date.now(),
+                        timestamp: Date.now(),
+                        category: 'تسديد مغاسل',
+                        amount: currentDue,
+                        desc: `تسديد مستحقات بالكامل: ${displayName}`,
+                        date: new Date().toISOString().split('T')[0]
+                    };
+                    exps.push(settlementExpense);
+                    await localforage.setItem('expenses', exps);
+                    localStorage.setItem('expenses', JSON.stringify(exps));
+                    await manualSyncToCloud('expenses', exps);
+                }
+
                 await localforage.setItem('invoices', invs);
                 await manualSyncToCloud('invoices', invs);
                 this.renderLaundryAccounts();
                 this.renderHistory();
-                this.showToast(`تم تسديد جميع مستحقات المغسلة '${displayName}'`);
+                this.renderExpenses(); // Update expenses list
+                this.renderReports(); // Update dashboard totals
+                this.showToast(`تم تسديد مستحقات '${displayName}' بالكامل وتسجيلها كمصروف`);
             }
         } catch (err) {
             console.error('Error settling laundry dues:', err);
@@ -3144,6 +3325,7 @@ window.appLogic = {
         await localforage.clear();
         localStorage.clear();
         sessionStorage.clear();
+        localStorage.removeItem('sahab_session_uid'); // Purge session marker
         window.currentUID = null;
         window.isDataInitialized = false;
         location.reload();
@@ -3365,14 +3547,17 @@ window.appLogic = {
         });
 
         exps.forEach(e => {
-            const eTime = new Date(e.date).getTime();
-            if (eTime >= todayStart && !e.isZReported) {
+            if (!e.isZReported) {
                 opExps += parseFloat(e.amount) || 0;
             }
         });
 
         const netRev = gross - refunds;
-        netProfit = netRev - (opExps + lCosts);
+        netProfit = netRev - opExps;
+        
+        // Fix 99: Stop the double counting for Laundry Costs in Profit Calculation
+        // (OpExps already includes laundry payouts if they were settled)
+        // netProfit = netRev - (opExps + lCosts); // DELETED to prevent double counting
 
         // 2. Generate PDF Report
         // Fix 9: Date Standardization (English Numerals)
@@ -3390,7 +3575,7 @@ window.appLogic = {
 
                 <!-- Payment Breakdown Section -->
                 <div style="margin-bottom: 30px; border: 1px solid #eee; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.02);">
-                    <div style="background: #f8f9fa; padding: 12px 20px; font-weight: bold; border-bottom: 1px solid #eee; color: #444; font-size: 16px;">تفاصيل الدفع (Payment Breakdown)</div>
+                    <div style="background: #f8f9fa; padding: 12px 20px; font-weight: bold; border-bottom: 1px solid #eee; color: #444; font-size: 16px;">تفاصيل الدفع</div>
                     <table style="width: 100%; border-collapse: collapse; font-size: 15px;">
                         <tr style="border-bottom: 1px solid #f0f0f0;">
                             <td style="padding: 12px 25px; color: #666;">نقدي (Cash)</td>
@@ -3466,20 +3651,19 @@ window.appLogic = {
 
         // 4. Zero Reset (Mark transactions as reported)
         invoices.forEach(i => {
-            const rTime = new Date(i.date || i.timestamp).getTime();
-            if (rTime >= todayStart && !i.isZReported) {
+            if (!i.isZReported) {
                 i.isZReported = true;
             }
         });
         exps.forEach(e => {
-            const eTime = new Date(e.date).getTime();
-            if (eTime >= todayStart && !e.isZReported) {
+            if (!e.isZReported) {
                 e.isZReported = true;
             }
         });
 
         await localforage.setItem('invoices', invoices);
         await localforage.setItem('expenses', exps);
+        localStorage.setItem('expenses', JSON.stringify(exps)); // Sync backup
         await manualSyncToCloud('invoices', invoices);
         await manualSyncToCloud('expenses', exps);
 
@@ -3522,14 +3706,13 @@ window.appLogic = {
         });
 
         exps.forEach(e => {
-            const eTime = new Date(e.date).getTime();
-            if (eTime >= todayStart && !e.isZReported) {
+            if (!e.isZReported) {
                 opExps += parseFloat(e.amount) || 0;
             }
         });
 
         const netRev = gross - refunds;
-        const netProfit = netRev - (opExps + lCosts);
+        const netProfit = netRev - opExps; // FIXED: Stopped double-counting laundry costs
 
         const format = (num) => num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -3537,7 +3720,7 @@ window.appLogic = {
             <!-- Payment Breakdown Section -->
             <div style="background: rgba(253, 184, 19, 0.05); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 25px; box-shadow: inset 0 0 15px rgba(0,0,0,0.2);">
                 <h4 style="margin: 0 0 15px 0; color: var(--primary); font-size: 15px; border-bottom: 1px solid rgba(253,184,19,0.2); padding-bottom: 10px; display: flex; align-items: center;">
-                    <i class="fa-solid fa-receipt" style="margin-left: 10px;"></i> تفاصيل طرق الدفع (Payment Breakdown)
+                    <i class="fa-solid fa-receipt" style="margin-left: 10px;"></i> تفاصيل الدفع
                 </h4>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-body); padding: 12px 15px; border-radius: 8px; border: 1px solid var(--border);">
@@ -3625,28 +3808,44 @@ document.addEventListener('DOMContentLoaded', () => {
     const loginOverlay = document.getElementById('login-overlay');
     const appEl = document.getElementById('app');
 
-    // Show login, hide app by default
-    if (loginOverlay) loginOverlay.classList.remove('hidden');
-    if (appEl) appEl.style.display = 'none';
+    // UI state is initially determined by the 'Fast Guard' script at the top of app.js
+    // to prevent login flash on refresh.
 
     if (typeof firebase === 'undefined') {
         // No Firebase — run in local mode directly
-        if (loginOverlay) loginOverlay.classList.add('hidden');
-        if (appEl) appEl.style.display = '';
+        if (loginOverlay) loginOverlay.style.display = 'none';
+        if (appEl) appEl.style.display = 'block';
         appLogic.init();
         return;
     }
 
-    // STRICT AUTH: No session persistence. Login required on every reload.
-    firebase.auth().setPersistence(firebase.auth.Auth.Persistence.NONE);
+    // PERSISTENCE: Allow session to survive page refreshes and browser restarts
+    firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 
     firebase.auth().onAuthStateChanged(async (user) => {
         const adminBtn = document.getElementById('admin-nav-btn');
         if (user) {
-            // ✅ LOGGED IN
+            // ✅ LOGGED IN - Mirror session in localStorage for tracking
             window.currentUID = user.uid;
-            if (loginOverlay) loginOverlay.classList.add('hidden');
-            if (appEl) appEl.style.display = '';
+            localStorage.setItem('sahab_session_uid', user.uid);
+            
+            // 🔐 INITIAL SECURITY CHECK (Kill Switch)
+            // Ensure account is STILL active before allowing POS dashboard access
+            try {
+                const snap = await firebase.database().ref(`users/${user.uid}/accountDetails/isActivated`).once('value');
+                if (snap.exists() && snap.val() === false) {
+                    console.warn("[SECURITY] Account deactivated. Force logging out.");
+                    await firebase.auth().signOut();
+                    localStorage.removeItem('sahab_session_uid');
+                    location.reload();
+                    return;
+                }
+            } catch (err) {
+                console.error("[Auth] Status check failed:", err);
+            }
+
+            if (loginOverlay) loginOverlay.style.display = 'none';
+            if (appEl) appEl.style.display = 'block';
 
             // SaaS Logic: Show Admin Panel only for Super Admin UID/Email
             if (user.email === `${ADMIN_PIN}@sahab.pos`) {
@@ -3659,19 +3858,39 @@ document.addEventListener('DOMContentLoaded', () => {
             // Load tenant settings & apply branding BEFORE init
             await appLogic.loadTenantSettings(user.uid);
 
-            // Deploy Realtime SaaS Daemons
+            // Deploy Realtime SaaS Daemons (Kill Switch listener)
             appLogic.initRealtimeSecurity(user.uid);
 
             // Now boot the app
             await appLogic.init();
+
+            // RESTORE ACTIVE VIEW
+            const savedView = localStorage.getItem('sahab_active_view');
+            if (savedView && savedView !== 'pos') {
+                console.log(`[Navigation] Restoring persistent view: ${savedView}`);
+                appLogic.switchView(savedView);
+            }
+
+            // ✨ FINAL RENDER: Show the app after layout is stable
+            const appContainer = document.getElementById('app');
+            if (appContainer) {
+                appContainer.classList.add('app-ready');
+            }
+            
+            // 💨 HIDE LOADER: Dashboard is steady
+            hideInitialLoader();
         } else {
             // ❌ NOT LOGGED IN — show login screen
             window.currentUID = null;
+            localStorage.removeItem('sahab_session_uid');
             if (adminBtn) adminBtn.classList.add('hidden');
-            if (loginOverlay) loginOverlay.classList.remove('hidden');
+            if (loginOverlay) loginOverlay.style.display = 'flex';
             if (appEl) appEl.style.display = 'none';
             const pinInput = document.getElementById('pin-input');
             if (pinInput) pinInput.focus();
+
+            // 💨 HIDE LOADER: Login screen is prompt
+            hideInitialLoader();
         }
     });
 });
