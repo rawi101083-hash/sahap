@@ -1591,10 +1591,7 @@ window.appLogic = {
                     <td style="color:#555; text-align:right;">التاريخ:</td>
                     <td style="text-align:left; direction:ltr;">${dStr}</td>
                 </tr>
-                <tr style="border-bottom:1px solid #eee;">
-                    <td style="color:#555; text-align:right;">العميل:</td>
-                    <td style="font-weight:bold; text-align:right;">${_custName || 'عميل نقدي'}</td>
-                </tr>
+                ${_custName ? `<tr style="border-bottom:1px solid #eee;"><td style="color:#555; text-align:right;">العميل:</td><td style="font-weight:bold; text-align:right;">${_custName}</td></tr>` : ''}
                 ${data.customer.phone && data.customer.phone !== '0000000000' ? `<tr><td style="color:#555; text-align:right;">رقم الجوال:</td><td style="direction:ltr; text-align:left; font-weight:bold;">${data.customer.phone}</td></tr>` : ''}
             </table>
 
