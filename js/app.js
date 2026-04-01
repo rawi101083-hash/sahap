@@ -347,8 +347,8 @@ const getLocalYMD = (d) => {
     if (!d) d = new Date();
     if (!(d instanceof Date) || isNaN(d)) d = new Date(d);
     // Hard fallback if the parsed date is STILL invalid (e.g., malformed ghosts)
-    if (isNaN(d.getTime())) d = new Date(); 
-    
+    if (isNaN(d.getTime())) d = new Date();
+
     const yr = d.getFullYear();
     const mo = String(d.getMonth() + 1).padStart(2, '0');
     const da = String(d.getDate()).padStart(2, '0');
@@ -1011,7 +1011,7 @@ window.appLogic = {
         }
 
         this.closePaymentModal();
-        
+
         // 🛡️ CRITICAL FIX: Ensure modal is in "Preview" state, not stuck in "Success" from a previous invoice
         const previewActions = document.getElementById('modal-actions-preview');
         const successActions = document.getElementById('modal-actions-success');
@@ -1236,12 +1236,12 @@ window.appLogic = {
     },
     closeInvoicePreview() {
         document.getElementById('invoice-preview-modal').classList.add('hidden');
-        
+
         // 🔄 COMPLETE POS STATE RESET FOR NEXT INVOICE
         this.currentInvoice = null;
         this.pendingInvoice = null;
         this.paymentMethod = 'cash';
-        
+
         // Reset Modal actions state for the next time it opens
         const previewActions = document.getElementById('modal-actions-preview');
         const successActions = document.getElementById('modal-actions-success');
@@ -1673,7 +1673,7 @@ window.appLogic = {
             // Historical View: Retrieve from active (if unclosed) + archives
             const targetDateStr = this.currentViewDate;
             invoices = [...activeInvs];
-            
+
             const archives = await localforage.getItem('archived_z_reports') || [];
             archives.forEach(arc => {
                 if (arc.invoices) invoices.push(...arc.invoices);
@@ -1683,7 +1683,7 @@ window.appLogic = {
         // 📅 GLOBAL DATE FILTER: Strictly isolate Live Shift from Archived data
         invoices = invoices.filter(inv => {
             if (!inv) return false;
-            
+
             // If we are looking at the LIVE shift, completely hide closed/archived invoices
             if (isLiveShift && inv.isZReported) return false;
 
@@ -1726,9 +1726,9 @@ window.appLogic = {
                 const displayInvoices = [...filtered].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, 500);
 
                 // Pre-compile DateFormat buffer centrally to completely destroy the artificial delay (10-second sync freeze)
-                const dFormatter = new Intl.DateTimeFormat('en-US', { 
-                    year: 'numeric', month: 'numeric', day: 'numeric', 
-                    hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true 
+                const dFormatter = new Intl.DateTimeFormat('en-US', {
+                    year: 'numeric', month: 'numeric', day: 'numeric',
+                    hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true
                 });
 
                 displayInvoices.forEach(i => {
@@ -1801,11 +1801,11 @@ window.appLogic = {
     handleHistoryAction(event) {
         const btn = event.target.closest('.btn-action-icon');
         if (!btn) return;
-        
+
         const action = btn.getAttribute('data-action');
         const id = btn.getAttribute('data-id');
         if (!action || !id) return;
-        
+
         if (action === 'cancel_inv') {
             this.cancelInvoice(id);
         } else if (action === 'partner_info') {
@@ -2601,7 +2601,7 @@ window.appLogic = {
             });
 
             const keys = Object.keys(laundryMap).sort();
-            
+
             // Calculate column totals
             let totalDues = 0;
             let totalPaid = 0;
@@ -2716,10 +2716,10 @@ window.appLogic = {
         const activeInvs = await localforage.getItem('invoices') || [];
         const activeExps = await localforage.getItem('expenses') || [];
         const archives = await localforage.getItem('archived_z_reports') || [];
-        
+
         let Math_invoices = [...activeInvs];
         let Math_exps = [...activeExps];
-        
+
         archives.forEach(arc => {
             if (arc.invoices) Math_invoices.push(...arc.invoices);
             if (arc.expenses) Math_exps.push(...arc.expenses);
@@ -2748,13 +2748,13 @@ window.appLogic = {
             const parts = currentTargetDate.split('-');
             const y = parseInt(parts[0]), m = parseInt(parts[1]) - 1, d = parseInt(parts[2]);
             startBound = new Date(y, m, d, 0, 0, 0, 0).getTime();
-            endBound   = new Date(y, m, d, 23, 59, 59, 999).getTime();
+            endBound = new Date(y, m, d, 23, 59, 59, 999).getTime();
         } else {
             // Live Shift: today's boundaries in local time
             const now = new Date();
             const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
             startBound = new Date(y, m, d, 0, 0, 0, 0).getTime();
-            endBound   = new Date(y, m, d, 23, 59, 59, 999).getTime();
+            endBound = new Date(y, m, d, 23, 59, 59, 999).getTime();
         }
 
         const weekAgo = startBound - (7 * 24 * 60 * 60 * 1000);
@@ -2777,7 +2777,7 @@ window.appLogic = {
             if (!i) return;
             const amt = parseFloat(i.total || i.grandTotal || 0);
             const rTime = new Date(i.date || i.timestamp).getTime();
-            
+
             // If Live Shift: only show what hasn't been closed.
             // If History: show everything for that selected date.
             const matchesShift = isLiveShift ? !i.isZReported : true;
@@ -3791,14 +3791,14 @@ window.appLogic = {
         const exps = await localforage.getItem('expenses') || [];
 
         /* Begin localized date logic */
-        const KSA_DATE_FORMATTER = new Intl.DateTimeFormat('ar-SA', { year: 'numeric', month: 'numeric', day: 'numeric', calendar: 'gregorian' });
-        const targetFormattedDate = getLocalYMD(); 
+        const KSA_DATE_FORMATTER = new Intl.DateTimeFormat('ar-SA', { year: 'numeric', month: 'numeric', day: 'numeric', calendar: 'gregory' });
+        const targetFormattedDate = getLocalYMD();
 
-        // Filter invoices based on KSA date logic
+        // Filter invoices based on KSA date logi
         const filteredInvoices = invoices.filter(invoice => {
             if (!invoice) return false;
             if (invoice.isZReported) return false;
-            
+
             // Format match check: Ensure strict alignment with the current shift
             const dStr = invoice.timestamp || invoice.date || new Date().toISOString();
             const fallbackStr = getLocalYMD(new Date(dStr));
@@ -3809,6 +3809,15 @@ window.appLogic = {
         // Apply identical bounds to expenses
         const shiftExpenses = exps.filter(e => e && !e.isZReported && (e.date === targetFormattedDate || getLocalYMD(e.timestamp) === targetFormattedDate));
 
+        // ═══ CRITICAL FIX: MARK CLOSED STATE *BEFORE* SERIALIZING TO ARCHIVE DB ═══
+        filteredInvoices.forEach(i => { if (i) i.isZReported = true; });
+        shiftExpenses.forEach(e => { if (e) e.isZReported = true; });
+
+        // Wait... there may be invoices that didn't match the KSA date but ARE from today's shift visually?
+        // To be absolutely safe and prevent rogue ghost invoices from persisting: 
+        invoices.forEach(i => { if (i) i.isZReported = true; });
+        exps.forEach(e => { if (e) e.isZReported = true; });
+
         const archiveEntry = {
             id: 'Z-' + Date.now(),
             timestamp: Date.now(),
@@ -3817,15 +3826,12 @@ window.appLogic = {
             invoices: filteredInvoices,
             expenses: shiftExpenses
         };
+
         let archived = await localforage.getItem('archived_z_reports') || [];
         archived.push(archiveEntry);
         await localforage.setItem('archived_z_reports', archived);
         await manualSyncToCloud('archived_z_reports', archived);
 
-        // ═══ STEP 3: CLEAR ACTIVE STATE (Remove closed items from active arrays) ═══
-        invoices.forEach(i => { if (i) i.isZReported = true; });
-        exps.forEach(e => { if (e) e.isZReported = true; });
-        
         // Filter out the closed items physically from the live queue
         const activeInvoices = invoices.filter(i => i && !i.isZReported);
         const activeExps = exps.filter(e => e && !e.isZReported);
@@ -3848,31 +3854,32 @@ window.appLogic = {
         await this.renderReports();
         await this.renderHistory();
 
-        // ═══ FORCE DASHBOARD TO 0.00 (SLEDGEHAMMER) ═══
-        const safeZero = "0.00";
-        if(document.getElementById('db-gross-sales')) document.getElementById('db-gross-sales').innerText = safeZero + " ر.س";
-        if(document.getElementById('db-refunds')) document.getElementById('db-refunds').innerText = "- " + safeZero + " ر.س";
-        if(document.getElementById('db-net-revenue')) document.getElementById('db-net-revenue').innerText = safeZero + " ر.س";
-        if(document.getElementById('db-op-expenses-display')) document.getElementById('db-op-expenses-display').innerText = "- " + safeZero + " ر.س";
-        if(document.getElementById('db-net-profit')) document.getElementById('db-net-profit').innerHTML = safeZero + ' <span style="font-size:20px;"> ر.س</span>';
+        // === مسح الذاكرة المحلية بالقوة ===
+        localStorage.setItem('invoices', '[]');
+        localStorage.setItem('expenses', '[]');
 
-        // ═══ STEP 5: SUCCESS FEEDBACK ═══
-        const msg = '✅ تم إغلاق اليومية بنجاح وتصفير السجل. يمكنك الاطلاع على بيانات اليوم عبر القوائم المالية باختيار التاريخ.';
-        this.showToast ? this.showToast(msg) : alert(msg);
+        // === رسالة النجاح ===
+        const msg = '✅ تم إغلاق اليومية بنجاح وتصفير السجل.';
+        if (this.showToast) this.showToast(msg); else alert(msg);
 
-        // ═══ STEP 6: GENERATE PDF (Non-blocking & Safe) ═══
+        // === إصدار ملف PDF ===
         try {
             const element = document.createElement('div');
             element.innerHTML = reportContent;
             html2pdf().from(element).set({
                 margin: [5, 5, 5, 5],
-                filename: `Z-Report_${reportDate.replace(/\//g, '-')}.pdf`,
+                filename: `Z-Report_${reportDate ? reportDate.replace(/\//g, '-') : 'Today'}.pdf`,
                 html2canvas: { scale: 2, useCORS: true, letterRendering: true },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
             }).save();
         } catch (pdfErr) {
-            console.error('[PDF Gen] Failed to generate PDF:', pdfErr);
+            console.error('[PDF Gen] Error:', pdfErr);
         }
+
+        // 🔥 الضربة القاضية: تحديث الصفحة لفرمتة الشاشة وتصفير الأرقام غصب 🔥
+        setTimeout(() => {
+            window.location.href = window.location.pathname;
+        }, 1500);
     },
 
     async showZReportPreview() {
