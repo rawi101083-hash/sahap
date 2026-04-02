@@ -1376,6 +1376,7 @@ window.appLogic = {
 
             <!-- Header: Store Name → VAT Number → Phone -->
             <div style="text-align:center; margin-bottom:30px; padding-bottom:20px; border-bottom:2px solid #000;">
+                ${window.tenantSettings?.logo ? `<img src="${window.tenantSettings.logo}" style="width: 100%; max-width: 80px; height: auto; display: block; margin: 0 auto 15px auto; border-radius: 6px;">` : ''}
                 <div style="font-size:32px; font-weight:900; color:#000; margin-top:6px; margin-bottom:14px;">${window.tenantSettings?.name || ''}</div>
                 ${_storeAddress}
                 ${_storeTax}
@@ -1396,6 +1397,10 @@ window.appLogic = {
                     <td style="padding:5px 10px; font-weight:bold; color:#000;">${_custName}</td>
                     <td style="padding:5px 0; color:#555; unicode-bidi:plaintext; direction:rtl;">&#x202B;رقم الجوال:&#x200F;</td>
                     <td style="padding:5px 10px; font-weight:bold; color:#000; direction:ltr; text-align:right;">${data.customer.phone || '-'}</td>
+                </tr>
+                <tr>
+                    <td style="padding:5px 0; color:#555; unicode-bidi:plaintext; direction:rtl;">&#x202B;وقت الطباعة:&#x200F;</td>
+                    <td colspan="3" style="padding:5px 10px; color:#333; direction:ltr; text-align:right;">${new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</td>
                 </tr>
             </table>
 
@@ -1617,7 +1622,11 @@ window.appLogic = {
                     <td style="text-align:left; direction:ltr;">${dStr}</td>
                 </tr>
                 ${_custName ? `<tr style="border-bottom:1px solid #eee;"><td style="color:#555; text-align:right;">العميل:</td><td style="font-weight:bold; text-align:right;">${_custName}</td></tr>` : ''}
-                ${data.customer.phone && data.customer.phone !== '0000000000' ? `<tr><td style="color:#555; text-align:right;">رقم الجوال:</td><td style="direction:ltr; text-align:left; font-weight:bold;">${data.customer.phone}</td></tr>` : ''}
+                ${data.customer.phone && data.customer.phone !== '0000000000' ? `<tr style="border-bottom:1px solid #eee;"><td style="color:#555; text-align:right;">رقم الجوال:</td><td style="direction:ltr; text-align:left; font-weight:bold;">${data.customer.phone}</td></tr>` : ''}
+                <tr>
+                    <td style="color:#555; text-align:right; font-size: 11px;">وقت الطباعة:</td>
+                    <td style="text-align:left; direction:ltr; font-size: 11px; color:#333;">${new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</td>
+                </tr>
             </table>
 
             <!-- Items Table -->
@@ -4009,7 +4018,11 @@ window.appLogic = {
                     ${window.tenantSettings?.logo ? `<img src="${window.tenantSettings.logo}" style="width: 100%; max-width: 50px; height: auto; display: block; margin: 0 auto 10px auto; border-radius: 4px; background: #fff; padding: 2px;">` : `<div style="font-size: 9px; letter-spacing: 2px; color: #fdb813; text-transform: uppercase; margin-bottom: 4px;">نظام سحاب POS</div>`}
                     <h1 style="margin: 0; font-size: 20px; font-weight: 900; color: #fff; line-height: 1.3;">تقرير إغلاق اليومية</h1>
                     <div style="margin-top: 6px; font-size: 14px; font-weight: bold; color: #fdb813;">${bizName}</div>
-                    <div style="margin-top: 4px; font-size: 11px; color: rgba(255,255,255,0.7);">بتاريخ: ${reportDate}</div>
+                    <div style="margin-top: 4px; font-size: 11px; color: rgba(255,255,255,0.7);">
+                        <span>بتاريخ: ${reportDate}</span>
+                        &nbsp;|&nbsp;
+                        <span style="direction:ltr; display:inline-block;">وقت الطباعة: ${new Date().toLocaleTimeString('ar-SA', { hour: 'numeric', minute: '2-digit', hour12: true })}</span>
+                    </div>
                 </div>
                 <hr style="border: 0; border-top: 2px solid #e0e0e0; margin-bottom: 14px;">
 
