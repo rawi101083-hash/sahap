@@ -3,6 +3,17 @@
    ========================================= */
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
 
+/* 
+ * MAGIC DIGIT SHIELD
+ * Intercepts ONLY numeric characters (0-9, %, ., ,) across the entire application 
+ * and forces them to render in a standard system font, bypassing Arabic ligatures 
+ */
+@font-face {
+    font-family: 'StrictDigits';
+    src: local('Arial'), local('Helvetica'), local('system-ui');
+    unicode-range: U+0030-0039, U+0025, U+002E, U+002C; /* 0-9, %, ., , */
+}
+
 :root {
     /* SHARED BRAND COLORS */
     --primary: #FDB813;
@@ -59,7 +70,7 @@ h3,
 h4,
 h5,
 h6 {
-    font-family: 'Tajawal', sans-serif !important;
+    font-family: 'StrictDigits', 'Tajawal', sans-serif !important;
 }
 
 * {

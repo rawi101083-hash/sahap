@@ -685,7 +685,7 @@ window.appLogic = {
         data.forEach(item => {
             const card = document.createElement('div');
             card.className = 'item-card';
-            card.innerHTML = `<div class="item-icon"><i class="fa-solid ${item.icon}"></i></div><div class="item-name">${item.name}</div>`;
+            card.innerHTML = `<div class="item-icon"><i class="fa-solid ${item.icon}"></i></div><div class="item-name">${this.translate(item.name)}</div>`;
             card.onclick = () => this.fastAddToCart(item);
             grid.appendChild(card);
         });
@@ -898,11 +898,11 @@ window.appLogic = {
                     <div class="cart-item">
                         <div class="cart-item-header">
                             <div class="cart-item-main-info">
-                                <span class="cart-item-title">${item.name}</span>
-                                <span class="cart-item-qty">x${item.qty}</span>
+                                <span class="cart-item-title">${this.translate(item.name)}</span>
+                                <span class="cart-item-qty num-en">x${item.qty}</span>
                             </div>
                             <div class="cart-item-price-block">
-                                <div class="cart-item-price">${(item.unitPrice * item.qty).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                <div class="cart-item-price num-en">${(item.unitPrice * item.qty).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                                 <button class="btn-remove" onclick="appLogic.removeFromCart(${index})">
                                     <i class="fa-solid fa-times"></i>
                                 </button>
@@ -3602,10 +3602,45 @@ window.appLogic = {
                 else if (currentViewId === 'expenses') this.renderExpenses();
             }
         }
+        
+        // Force generic services grid repaint
+        this.renderItems(this.services);
 
         if (this.showToast) {
             this.showToast(lang === 'en' ? 'Language switched to English' : 'تم تغيير اللغة إلى العربية');
         }
+    },
+    translate(arString) {
+        if (this.currentLang !== 'en') return arString;
+        const dynDict = {
+            'ثوب': 'Thobe',
+            'ثوب قطن': 'Cotton Thobe',
+            'ثوب صوف': 'Wool Thobe',
+            'شماغ': 'Shemagh',
+            'غترة': 'Ghutra',
+            'ايجار': 'Shop Rent',
+            'رواتب': 'Salaries',
+            'فواتير': 'Bills & Utilities',
+            'صيانة': 'Maintenance',
+            'مشتريات': 'Operating Purchases',
+            'أخرى': 'Misc Expenses',
+            'تم حفظ القيد المحاسبي': 'Journal entry saved successfully',
+            'يرجى تعبئة كافة الحقول لحفظ التقييد المحاسبي!': 'Please fill all fields to save!',
+            'غسيل وكوي': 'Wash & Iron',
+            'كوي': 'Iron',
+            'غسيل': 'Wash',
+            'عادي': 'Normal',
+            'مستعجل': 'Express',
+            'نقدي': 'Cash',
+            'مدى': 'Mada',
+            'فيزا': 'Visa',
+            'ماستركارد': 'Mastercard',
+            'شبكة': 'Network',
+            'دفع لاحقاً': 'Pay Later',
+            'غير مدفوع': 'Unpaid',
+            'مدفوع': 'Paid'
+        };
+        return dynDict[arString] || arString;
     },
 
     applyLanguage() {
@@ -3648,6 +3683,19 @@ window.appLogic = {
             '#settings-modal h3': { ar: '<i class="fa-solid fa-gear"></i> الإعدادات', en: '<i class="fa-solid fa-gear"></i> Settings' },
             '#theme-toggle-btn span:first-child': { ar: 'تبديل المظهر', en: 'Toggle Theme' },
             '#settings-save-btn': { ar: '<i class="fa-solid fa-floppy-disk"></i> حفظ الإعدادات', en: '<i class="fa-solid fa-floppy-disk"></i> Save Settings' },
+
+            // Expense Modal Option Selectors (Deep Form Translation)
+            '#exp-category option[value="ايجار"]': { ar: 'إيجار المحل', en: 'Shop Rent' },
+            '#exp-category option[value="رواتب"]': { ar: 'رواتب عمالة', en: 'Salaries' },
+            '#exp-category option[value="فواتير"]': { ar: 'فواتير ومنافع (كهرباء/ماء)', en: 'Bills & Utilities (Electric/Water)' },
+            '#exp-category option[value="صيانة"]': { ar: 'صيانة دورية', en: 'Routine Maintenance' },
+            '#exp-category option[value="مشتريات"]': { ar: 'مشتريات تشغيلية', en: 'Operating Purchases' },
+            '#exp-category option[value="أخرى"]': { ar: 'أخرى / مصاريف نثرية', en: 'Misc / Petty Cash' },
+            
+            // Sub-Headers across views
+            '.history-header h2': { ar: 'سجل الفاتورة', en: 'Invoice History' },
+            '#history-search': { attr: 'placeholder', ar: 'بحث برقم الفاتورة، اسم أو جوال العميل...', en: 'Search by Invoice ID, Customer Name or Phone...' },
+            '.delivery-mgr span:first-child': { ar: '<i class="fa-solid fa-motorcycle"></i> إدارة التوصيل', en: '<i class="fa-solid fa-motorcycle"></i> Delivery Management' },
             '#settings-logout-btn': { ar: '<i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج', en: '<i class="fa-solid fa-right-from-bracket"></i> Logout' },
 
             // View Titles
@@ -3731,6 +3779,23 @@ window.appLogic = {
         if (pLHood) pLHood.placeholder = lang === 'en' ? 'Neighborhood (Required)' : 'الحي (مطلوب)';
         const pLCost = document.getElementById('pos-laundry-cost');
         if (pLCost) pLCost.placeholder = lang === 'en' ? 'Cost (Required)' : 'التكلفة (مطلوب)';
+        
+        // Add Expense Modal Deep Labels
+        const expCatLabel = document.querySelector('#exp-category')?.previousElementSibling;
+        if (expCatLabel) expCatLabel.innerText = lang === 'en' ? 'Category' : 'التصنيف';
+        const expAmtLabel = document.querySelector('#exp-amount')?.previousElementSibling;
+        if (expAmtLabel) expAmtLabel.innerText = lang === 'en' ? 'Amount (SAR)' : 'المبلغ (ر.س)';
+        const expDescLabel = document.querySelector('#exp-desc')?.previousElementSibling;
+        if (expDescLabel) expDescLabel.innerText = lang === 'en' ? 'Description' : 'البيان / الوصف';
+        const expDateLabel = document.querySelector('#expense-date')?.previousElementSibling;
+        if (expDateLabel) expDateLabel.innerText = lang === 'en' ? 'Expense Date' : 'تاريخ المصروف';
+        const expModalTitle = document.querySelector('#add-expense-modal h3');
+        if (expModalTitle) expModalTitle.innerHTML = lang === 'en' ? '<i class="fa-solid fa-hand-holding-dollar"></i> Add New Expense' : '<i class="fa-solid fa-hand-holding-dollar"></i> تقييد مصروف جديد';
+        const expSubmitBtn = document.querySelector('#add-expense-modal .btn');
+        if (expSubmitBtn) expSubmitBtn.innerHTML = lang === 'en' ? '<i class="fa-solid fa-check"></i> Save Expense Record' : '<i class="fa-solid fa-check"></i> حفظ القيد المحاسبي';
+
+        // Force native chromium inputs (DatePicker) into english locale explicitly
+        document.documentElement.lang = lang === 'en' ? 'en' : 'ar';
     },
 
     closeSettingsModal() {
@@ -3966,7 +4031,7 @@ window.appLogic = {
         const exps = await localforage.getItem('expenses') || [];
 
         /* Begin localized date logic */
-        const KSA_DATE_FORMATTER = new Intl.DateTimeFormat('ar-SA', { year: 'numeric', month: 'numeric', day: 'numeric', calendar: 'gregory' });
+        const KSA_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'numeric', day: 'numeric', calendar: 'gregory' });
         const targetFormattedDate = getLocalYMD();
 
         // Filter invoices based on KSA date logi
