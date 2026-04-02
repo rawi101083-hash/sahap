@@ -3165,7 +3165,9 @@ window.appLogic = {
                                     ${s.status !== 'expired' ? 'نشط' : 'معطل'}
                                 </span>
                             </td>
-                            <td style="padding:14px; font-weight:900; color:var(--primary); font-size:18px; letter-spacing:2px;">${pin}</td>
+                            <td style="padding:14px; font-weight:900; color:var(--primary); font-size:18px; letter-spacing:2px;">
+                                ${s.pin || s.password || (pin.length <= 6 ? pin : 'غير محدد')}
+                            </td>
                             <td style="padding:14px; text-align:center;">
                                 <button class="btn" style="background:${s.status !== 'expired' ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)'}; 
                                                           color:${s.status !== 'expired' ? '#ef4444' : '#22c55e'}; 
@@ -3627,15 +3629,27 @@ window.appLogic = {
         }
         const tax = vatValue;
 
-        window.tenantSettings = { name, phone, taxNumber: tax };
+        // Merge locally so we don't destroy pre-existing properties like pin or status
+        window.tenantSettings = { 
+            ...(window.tenantSettings || {}),
+            name, phone, taxNumber: tax 
+        };
 
-        // window.tenantSettings = { name, phone, taxNumber: tax }; // Already set above
-        // REMOVED local storage persistence for security
-
-        // Persist to Firebase under user node
+        // Persist to Firebase using atomic multi-path update to prevent data destruction
         if (window.currentUID && typeof firebase !== 'undefined') {
             try {
-                await firebase.database().ref(`users/${window.currentUID}/settings`).set(window.tenantSettings);
+                const updates = {};
+                // Update primary settings
+                updates[`users/${window.currentUID}/settings/name`] = name;
+                updates[`users/${window.currentUID}/settings/phone`] = phone;
+                updates[`users/${window.currentUID}/settings/taxNumber`] = tax;
+                
+                // CRITICAL SYNC: Mirror updates to accountDetails so the Master Dashboard knows instantly
+                updates[`users/${window.currentUID}/accountDetails/laundryName`] = name;
+                updates[`users/${window.currentUID}/accountDetails/name`] = name;
+                updates[`users/${window.currentUID}/accountDetails/phone`] = phone;
+
+                await firebase.database().ref().update(updates);
             } catch (e) {
                 console.warn('[Settings] Firebase save failed, using local only:', e);
             }

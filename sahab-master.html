@@ -246,10 +246,15 @@
                 document.getElementById('loading-spinner').style.display = 'block';
 
                 try {
-                    // treating /users as the primary source of truth for the dashboard
-                    const snap = await db.ref('users').once('value');
-                    const users = snap.val() || {};
-                    this.renderTable(users);
+                    // Fetch both users and stores mapping to perform reverse PIN lookups
+                    const [usersSnap, storesSnap] = await Promise.all([
+                        db.ref('users').once('value'),
+                        db.ref('admin/stores').once('value')
+                    ]);
+                    const users = usersSnap.val() || {};
+                    const stores = storesSnap.val() || {};
+                    
+                    this.renderTable(users, stores);
                 } catch (e) {
                     console.error("Firebase read error:", e);
                     alert("Error reaching Firebase. Check permissions.");
@@ -257,7 +262,7 @@
                 }
             },
 
-            renderTable(usersData) {
+            renderTable(usersData, storesData) {
                 const tbody = document.getElementById('tenants-table-body');
                 tbody.innerHTML = '';
                 let total = 0, active = 0, expired = 0;
@@ -271,7 +276,15 @@
                     const name = account.laundryName || account.name || settings.name || 'Unnamed';
                     const phone = account.phone || settings.phone || '--';
                     const isActivated = (account.isActivated === true);
-                    const pin = settings.pin || '--';
+                    
+                    // Robust Reverse PIN Lookup to recover corrupted PIN fields
+                    let resolvedPin = settings.pin || account.pin || settings.password || account.password;
+                    if (!resolvedPin) {
+                        const foundStoreKey = Object.keys(storesData || {}).find(key => storesData[key] && storesData[key].uid === uid);
+                        if (foundStoreKey) resolvedPin = foundStoreKey;
+                    }
+                    const pin = resolvedPin || 'غير محدد';
+                    
                     const createdAt = account.firstUsedDate || null;
                     const isSubscribed = (account.isSubscribed === true);
 
@@ -310,11 +323,17 @@
                     const tr = document.createElement('tr');
                     tr.style.opacity = !isActivated ? '0.6' : '1';
                     const deleteBtn = `<button style="background:var(--danger); border:none; color:white; padding:6px 12px; margin-right:8px; border-radius:4px; font-weight:bold; cursor:pointer;" onclick="masterApp.deleteStore('${uid}', '${pin}')" title="حذف نهائي"><i class="fa-solid fa-trash"></i></button>`;
+                    const safeName = name.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+                    const safePhone = phone.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+                    const pinEditBtn = `<button class="btn-action" style="background:var(--primary); color:#000; padding:4px 8px; font-size:11px; margin-right:8px; border-radius:4px; font-weight:bold; cursor:pointer;" onclick="masterApp.changePin('${uid}', '${pin}', '${safeName}', '${safePhone}')" title="تغيير الرمز السري"><i class="fa-solid fa-pen"></i> تعديل</button>`;
+                    
                     tr.innerHTML = `
                         <td dir="ltr" style="font-size:12px; color:#888;">${dateStr}</td>
                         <td style="font-weight:bold; color:#fff;">${name}</td>
                         <td dir="ltr" style="font-family: monospace;">${phone}</td>
-                        <td style="font-family: monospace; color:var(--primary); font-weight:bold; letter-spacing:1px;">${pin}</td>
+                        <td style="font-family: monospace; color:var(--primary); font-weight:bold; letter-spacing:1px; display:flex; align-items:center; justify-content:flex-end;">
+                            ${pin} ${pinEditBtn}
+                        </td>
                         <td style="text-align: center;">
                             <div style="display:flex; gap:5px; align-items:center; justify-content:center;">
                                 <input type="number" id="renew-${uid}" placeholder="الأيام" style="width:60px; padding:5px; background:#000; border:1px solid var(--border); color:#fff; border-radius:4px; font-size:12px; text-align:center;">
@@ -359,8 +378,22 @@
                     // Check if PIN already exists
                     const check = await db.ref(`admin/stores/${pin}`).once('value');
                     if (check.exists()) {
-                        alert("عذراً، هذا الرمز مستخدم مسبقاً لمغسلة أخرى.");
-                        return;
+                        const existingData = check.val() || {};
+                        const linkedUid = existingData.uid;
+                        
+                        if (linkedUid) {
+                            const userCheck = await db.ref(`users/${linkedUid}`).once('value');
+                            if (userCheck.exists()) {
+                                alert("عذراً، هذا الرمز مستخدم مسبقاً لمغسلة أخرى نشطة.");
+                                return;
+                            } else {
+                                console.warn(`[Master-Sync] Found ghost PIN ${pin} (User ${linkedUid} deleted). Reclaiming...`);
+                            }
+                        } else {
+                            // Legacy pin with no UID mapping, might be actively used
+                            alert("عذراً، هذا الرمز مستخدم مسبقاً ومحجوز في السجلات القديمة.");
+                            return;
+                        }
                     }
 
                     // Native Firebase Auth Provisioning
@@ -456,21 +489,41 @@
 
                 try {
                     const updates = {};
-                    if (pin && pin !== '--') {
-                        updates[`pincodes/${pin}`] = null;
-                        updates[`admin/stores/${pin}`] = null;
-                    }
+                    
+                    // SWEEP: Dynamically find all PINs/auth nodes tied to this UID to prevent ghosts
                     if (uid && uid !== 'undefined') {
+                        const storesSnap = await db.ref('admin/stores').once('value');
+                        const stores = storesSnap.val() || {};
+                        Object.keys(stores).forEach(k => {
+                            if (stores[k].uid === uid) updates[`admin/stores/${k}`] = null;
+                        });
+
+                        const pinsSnap = await db.ref('pincodes').once('value');
+                        const pincodes = pinsSnap.val() || {};
+                        Object.keys(pincodes).forEach(k => {
+                            const pdata = pincodes[k];
+                            // Check if pdata is object with uid OR direct string
+                            if (pdata === uid || (pdata && pdata.uid === uid)) {
+                                updates[`pincodes/${k}`] = null;
+                            }
+                        });
+                        
                         updates[`users/${uid}`] = null;
                     }
 
+                    // Fallback to literal pin if missing in sweep
+                    if (pin && pin !== '--' && pin !== 'غير محدد') {
+                        updates[`pincodes/${pin}`] = null;
+                        updates[`admin/stores/${pin}`] = null;
+                    }
+
                     await db.ref().update(updates);
-                    console.log(`[Master-Sync] NUCLEAR DELETION successful for PIN: ${pin}, UID: ${uid}`);
-                    alert("تم حذف المغسلة نهائياً بنجاح.");
+                    console.log(`[Master-Sync] NUCLEAR DELETION successful for UID: ${uid}`);
+                    alert("تم حذف المغسلة نهائياً بنجاح وتم تحرير كافة سجلاتها والرمز الخاص بها.");
                     this.fetchData(); // Dynamically remove row by refreshing list
                 } catch (e) {
                     console.error("Nuke failed:", e);
-                    alert("فشل حذف المغسلة. يرجى المحاولة مرة أخرى.");
+                    alert("فشل حذف المغسلة. يرجى التأكد من الصلاحيات والمحاولة مرة أخرى.");
                 }
             },
 
@@ -522,6 +575,100 @@
                 } catch (e) {
                     console.error("Failed to update subscription:", e);
                     alert("Update failed. Permission denied.");
+                }
+            },
+
+            async changePin(uid, oldPin, name, phone) {
+                const newPin = prompt("أدخل الرمز السري الجديد للمغسلة (6 أرقام فقط):");
+                if (!newPin) return;
+                
+                if (newPin.length !== 6 || isNaN(newPin)) {
+                    alert("خطأ: الرمز السري يجب أن يكون مكوّناً من 6 أرقام فقط.");
+                    return;
+                }
+                
+                if (newPin === oldPin) {
+                    alert("الرمز الجديد هو نفس الرمز الحالي!");
+                    return;
+                }
+
+                try {
+                    // 1. Verify New PIN Uniqueness
+                    const check = await db.ref(`admin/stores/${newPin}`).once('value');
+                    if (check.exists()) {
+                        const existingData = check.val() || {};
+                        const linkedUid = existingData.uid;
+                        if (linkedUid) {
+                            const userCheck = await db.ref(`users/${linkedUid}`).once('value');
+                            if (userCheck.exists()) {
+                                alert("عذراً، هذا الرمز مستخدم مسبقاً لمغسلة نشطة أخرى. اختر رمزاً آخر.");
+                                return;
+                            }
+                        }
+                    }
+
+                    document.getElementById('loading-spinner').style.display = 'block';
+                    let successAuthUpdate = false;
+
+                    // 2. Try to update Auth Seamlessly if we know the old valid PIN
+                    if (oldPin && oldPin !== '--' && oldPin !== 'غير محدد') {
+                        try {
+                            const oldEmail = `${oldPin}@sahab.pos`;
+                            const newEmail = `${newPin}@sahab.pos`;
+                            
+                            // Emulate tenant login to update their credentials
+                            const cred = await firebase.auth().signInWithEmailAndPassword(oldEmail, oldPin);
+                            await cred.user.updateEmail(newEmail);
+                            await cred.user.updatePassword(newPin);
+                            await firebase.auth().signOut();
+                            successAuthUpdate = true;
+                            console.log(`[Master-Sync] Firebase Auth credentials seamlessly updated for UID: ${uid}`);
+                        } catch (err) {
+                            console.warn(`[Master-Sync] Seamless Auth update failed (old credentials might be invalid): ${err.message}`);
+                            await firebase.auth().signOut();
+                        }
+                    }
+
+                    // 3. Sweep and Rebuild Route Registries
+                    const updates = {};
+                    const timestamp = Date.now();
+
+                    // Cleanup old route mappings
+                    const storesSnap = await db.ref('admin/stores').once('value');
+                    const stores = storesSnap.val() || {};
+                    Object.keys(stores).forEach(k => {
+                        if (stores[k].uid === uid || k === oldPin) updates[`admin/stores/${k}`] = null;
+                    });
+
+                    const pinsSnap = await db.ref('pincodes').once('value');
+                    const pincodes = pinsSnap.val() || {};
+                    Object.keys(pincodes).forEach(k => {
+                        const pdata = pincodes[k];
+                        if (pdata === uid || (pdata && pdata.uid === uid) || k === oldPin) updates[`pincodes/${k}`] = null;
+                    });
+
+                    // Insert new route mappings
+                    updates[`pincodes/${newPin}`] = { uid: uid, isActivated: true };
+                    updates[`admin/stores/${newPin}`] = { 
+                        uid: uid, 
+                        name: name || 'مغسلة', 
+                        phone: phone || '', 
+                        status: 'active', 
+                        timestamp: timestamp 
+                    };
+
+                    // Deep tenant profile update
+                    updates[`users/${uid}/accountDetails/pin`] = newPin;
+                    updates[`users/${uid}/settings/pin`] = newPin;
+
+                    await db.ref().update(updates);
+                    
+                    alert(`تم تغيير الرمز السري بنجاح إلى: ${newPin}${successAuthUpdate ? '' : '\nملاحظة: سيتم توليد حساب المصادقة تلقائياً عند أول عملية دخول للمغسلة.'}`);
+                    this.fetchData();
+                } catch (e) {
+                    console.error("Change PIN failed:", e);
+                    alert("عذراً، حدث خطأ أثناء محاولة تغيير الرمز السري.");
+                    document.getElementById('loading-spinner').style.display = 'none';
                 }
             }
         };
