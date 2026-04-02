@@ -1506,6 +1506,30 @@ window.appLogic = {
 
     // Toast Message Fix
     showToast(msg) {
+        const lang = this.currentLang || 'ar';
+        if (lang === 'en') {
+            if (msg.includes('تم حذف خيار التوصيل بنجاح')) msg = 'Delivery option deleted successfully';
+            else if (msg.includes('تم حفظ رسوم التوصيل')) msg = 'Delivery fees saved successfully';
+            else if (msg.includes('تم حفظ بيانات المغسلة')) msg = 'Partner laundry data saved';
+            else if (msg.includes('تم تحديث حالة دفع المغسلة')) msg = 'Partner payment status updated';
+            else if (msg.includes('تم تصفير رصيد')) msg = msg.replace("تم تصفير رصيد '", "Balance cleared manually for '").replace("' يدوياً", "'");
+            else if (msg.includes('تم تسديد مستحقات')) msg = msg.replace("تم تسديد مستحقات '", "Dues fully settled for '").replace("' بالكامل وتحديث الموقف المالي", "'");
+            else if (msg.includes('تم حذف الخدمة بنجاح')) msg = 'Service deleted successfully';
+            else if (msg.includes('تم حفظ بيانات الخدمة بنجاح')) msg = 'Service data saved successfully';
+            else if (msg.includes('تم حفظ الصنف بنجاح')) msg = 'Item saved successfully';
+            else if (msg.includes('تم حذف المادة بنجاح')) msg = 'Consumable deleted successfully';
+            else if (msg.includes('تم إصدار الفاتورة رقم')) msg = msg.replace('تم إصدار الفاتورة رقم ', 'Invoice #').replace(' بنجاح', ' issued successfully');
+            else if (msg.includes('تمت إضافة:')) msg = msg.replace('تمت إضافة:', 'Added:');
+            else if (msg.includes('هذه الخدمة غير متوفرة بهذا الخيار')) msg = 'This service is not available for this option';
+            else if (msg.includes('تم تصفير جميع المصروفات التشغيلية')) msg = 'All operational expenses cleared';
+            else if (msg.includes('تم تقييد المصروف بنجاح')) msg = 'Expense recorded successfully';
+            else if (msg.includes('تم إلغاء الفاتورة') && msg.includes('وتسجيلها كمرتجع ✓')) msg = msg.replace('تم إلغاء الفاتورة ', 'Invoice ').replace(' وتسجيلها كمرتجع ✓', ' has been cancelled ✓').replace('وتسجيلها كمرتجع ✓', 'has been cancelled ✓');
+            else if (msg.includes('✅ تم إغلاق اليومية بنجاح')) msg = '✅ Daily shift closed and records cleared.';
+            else if (msg.includes('تم تفعيل المظهر الداكن')) msg = 'Dark mode activated 🌙';
+            else if (msg.includes('تم تفعيل المظهر الفاتح')) msg = 'Light mode activated ☀️';
+            else if (msg.includes('تمفظ إعدادات المغسلة') || msg.includes('تم حفظ إعدادات المغسلة')) msg = 'Store settings saved successfully ✓';
+        }
+
         let t = document.getElementById('toast-msg');
         if (!t) {
             t = document.createElement('div');
@@ -1679,7 +1703,6 @@ window.appLogic = {
                 if (arc.invoices) invoices.push(...arc.invoices);
             });
         }
-
         // 📅 GLOBAL DATE FILTER: Strictly isolate Live Shift from Archived data
         invoices = invoices.filter(inv => {
             if (!inv) return false;
@@ -1717,10 +1740,17 @@ window.appLogic = {
             let filtered = validInvoices;
 
             let html = '<table onclick="appLogic.handleHistoryAction(event)" style="width:100%; border-collapse:collapse; background:var(--bg-surface); border-radius:12px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.5)">';
-            html += '<thead><tr style="background:#111; color:var(--primary)"><th style="padding:15px; text-align:right;">رقم الفاتورة</th><th style="padding:15px; text-align:right;">العميل</th><th style="padding:15px; text-align:right;">المبلغ</th><th style="padding:15px; text-align:right;">التاريخ</th><th style="padding:15px; text-align:center;">إجراءات</th></tr></thead><tbody>';
+            const lang = this.currentLang || 'ar';
+            const thId = lang === 'en' ? 'Invoice ID' : 'رقم الفاتورة';
+            const thCust = lang === 'en' ? 'Customer' : 'العميل';
+            const thAmt = lang === 'en' ? 'Amount' : 'المبلغ';
+            const thDate = lang === 'en' ? 'Date' : 'التاريخ';
+            const thAct = lang === 'en' ? 'Actions' : 'إجراءات';
+            html += `<thead><tr style="background:#111; color:var(--primary)"><th style="padding:15px; text-align:right;">${thId}</th><th style="padding:15px; text-align:right;">${thCust}</th><th style="padding:15px; text-align:right;">${thAmt}</th><th style="padding:15px; text-align:right;">${thDate}</th><th style="padding:15px; text-align:center;">${thAct}</th></tr></thead><tbody>`;
 
             if (filtered.length === 0) {
-                html += '<tr><td colspan="5" style="padding:20px; text-align:center;">لا توجد فواتير مطابقة للبحث.</td></tr>';
+                const noInv = lang === 'en' ? 'No invoices match your search.' : 'لا توجد فواتير مطابقة للبحث.';
+                html += `<tr><td colspan="5" style="padding:20px; text-align:center;">${noInv}</td></tr>`;
             } else {
                 // UNIFIED SORTING: Newest First based on timestamp. Max DOM array clamped to 500 to kill browser thread freezes.
                 const displayInvoices = [...filtered].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, 500);
@@ -1739,18 +1769,26 @@ window.appLogic = {
                     let cellPhone = (customerPhone !== '0000000000') ? `<br><small style="color:var(--text-muted); direction:ltr; display:inline-block">${customerPhone}</small>` : '';
                     let total = i.grandTotal || 0;
                     let dateStr = i.timestamp ? dFormatter.format(new Date(i.timestamp)) : '-';
-                    let partnerBadge = i.partnerLaundryName ? `<br><span onclick="appLogic.toggleLaundryPaid('${i.id}')" style="cursor:pointer; display:inline-block; margin-top:5px; font-size:11px; padding:3px 8px; border-radius:12px; background:${i.laundryPaid ? '#4CAF50' : '#f44336'}; color:#fff;"><i class="fa-solid ${i.laundryPaid ? 'fa-check' : 'fa-times'}"></i> مغسلة: ${i.partnerLaundryName} (${i.laundryPaid ? 'مدفوع' : 'غير مدفوع'})</span>` : '';
+
+                    const rsLabel = lang === 'en' ? 'SAR' : 'ر.س';
+                    const paidL = lang === 'en' ? 'Paid' : 'مدفوع';
+                    const unpaidL = lang === 'en' ? 'Unpaid' : 'غير مدفوع';
+                    const lName = lang === 'en' ? 'Laundry:' : 'مغسلة:';
+                    const cancelL = lang === 'en' ? 'Cancelled' : 'ملغاة';
+                    const actCancelTitle = lang === 'en' ? 'Cancel Invoice' : 'إلغاء الفاتورة';
+
+                    let partnerBadge = i.partnerLaundryName ? `<br><span onclick="appLogic.toggleLaundryPaid('${i.id}')" style="cursor:pointer; display:inline-block; margin-top:5px; font-size:11px; padding:3px 8px; border-radius:12px; background:${i.laundryPaid ? '#4CAF50' : '#f44336'}; color:#fff;"><i class="fa-solid ${i.laundryPaid ? 'fa-check' : 'fa-times'}"></i> ${lName} ${i.partnerLaundryName} (${i.laundryPaid ? paidL : unpaidL})</span>` : '';
 
                     // Cancelled invoice visuals
                     const rowStyle = isCancelled
                         ? 'border-bottom:1px solid var(--border); opacity:0.55; background:rgba(255,70,70,0.06);'
                         : 'border-bottom:1px solid var(--border);';
                     const totalDisplay = isCancelled
-                        ? `<span style="text-decoration:line-through; color:#f44336">${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ر.س</span> <span style="display:inline-block; background:#c62828; color:#fff; font-size:11px; font-weight:900; padding:2px 8px; border-radius:12px; margin-right:6px;">ملغاة</span>`
-                        : `${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ر.س ${partnerBadge}`;
+                        ? `<span style="text-decoration:line-through; color:#f44336">${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${rsLabel}</span> <span style="display:inline-block; background:#c62828; color:#fff; font-size:11px; font-weight:900; padding:2px 8px; border-radius:12px; margin-right:6px;">${cancelL}</span>`
+                        : `${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${rsLabel} ${partnerBadge}`;
                     const cancelBtn = isCancelled
                         ? '' // Already cancelled — hide button
-                        : `<button class="btn-action-icon btn-action-delete" type="button" data-action="cancel_inv" data-id="${i.id}" title="إلغاء الفاتورة"><i class="fa-solid fa-ban" style="pointer-events:none;"></i></button>`;
+                        : `<button class="btn-action-icon btn-action-delete" type="button" data-action="cancel_inv" data-id="${i.id}" title="${actCancelTitle}"><i class="fa-solid fa-ban" style="pointer-events:none;"></i></button>`;
 
                     html += `<tr style="${rowStyle}">
                         <td style="padding:15px; font-weight:bold;">${i.id || 'N/A'}</td>
@@ -1758,9 +1796,9 @@ window.appLogic = {
                         <td style="padding:15px; font-weight:bold; color:${isCancelled ? '#f44336' : 'var(--primary)'}">${totalDisplay}</td>
                         <td style="padding:15px;">${dateStr}</td>
                         <td style="padding:15px; text-align:center;">
-                            ${isCancelled ? '' : `<button class="btn-action-icon btn-action-info" type="button" data-action="partner_info" data-id="${i.id}" title="تفاصيل المغسلة الشريكة"><i class="fa-solid fa-truck-ramp-box" style="pointer-events:none;"></i></button>`}
-                            <button class="btn-action-icon btn-action-print" type="button" data-action="print_inv" data-id="${i.id}" title="معاينة وإعادة طباعة"><i class="fa-solid fa-print" style="pointer-events:none;"></i></button>
-                            ${isCancelled ? '' : `<button class="btn-action-icon btn-action-edit" type="button" data-action="edit_inv" data-id="${i.id}" title="تعديل"><i class="fa-solid fa-edit" style="pointer-events:none;"></i></button>`}
+                            ${isCancelled ? '' : `<button class="btn-action-icon btn-action-info" type="button" data-action="partner_info" data-id="${i.id}" title="${lang==='en'?'Partner Laundry Details':'تفاصيل المغسلة الشريكة'}"><i class="fa-solid fa-truck-ramp-box" style="pointer-events:none;"></i></button>`}
+                            <button class="btn-action-icon btn-action-print" type="button" data-action="print_inv" data-id="${i.id}" title="${lang==='en'?'Preview & Reprint':'معاينة وإعادة طباعة'}"><i class="fa-solid fa-print" style="pointer-events:none;"></i></button>
+                            ${isCancelled ? '' : `<button class="btn-action-icon btn-action-edit" type="button" data-action="edit_inv" data-id="${i.id}" title="${lang==='en'?'Edit':'تعديل'}"><i class="fa-solid fa-edit" style="pointer-events:none;"></i></button>`}
                             ${cancelBtn}
                         </td>
                     </tr>
@@ -1768,19 +1806,19 @@ window.appLogic = {
                         <td colspan="5" style="padding:20px;">
                             <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:15px; align-items:end;">
                                 <div>
-                                    <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px;">اسم المغسلة</label>
+                                    <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px;">${lang==='en'?'Laundry Name':'اسم المغسلة'}</label>
                                     <input type="text" id="partner-name-${i.id}" value="${i.partnerLaundryName || ''}" list="saved-laundries" style="width:100%; background:#000; color:#fff; border:1px solid var(--border); padding:8px; border-radius:4px;">
                                 </div>
                                 <div>
-                                    <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px;">حساب المغاسل (ر.س)</label>
+                                    <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px;">${lang==='en'?'Cost (SAR)':'حساب المغاسل (ر.س)'}</label>
                                     <input type="number" id="partner-cost-${i.id}" value="${i.laundryCost || i.partnerLaundryCost || 0}" style="width:100%; background:#000; color:#fff; border:1px solid var(--border); padding:8px; border-radius:4px;">
                                 </div>
                                 <div>
-                                    <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px;">الحي</label>
+                                    <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px;">${lang==='en'?'Neighborhood':'الحي'}</label>
                                     <input type="text" id="partner-hood-${i.id}" value="${i.partnerLaundryNeighborhood || ''}" list="saved-neighborhoods" style="width:100%; background:#000; color:#fff; border:1px solid var(--border); padding:8px; border-radius:4px;">
                                 </div>
                                 <div>
-                                    <button class="btn btn-primary" style="width:100%; padding:9px;" onclick="appLogic.savePartnerInfo('${i.id}')">حفظ التفاصيل</button>
+                                    <button class="btn btn-primary" style="width:100%; padding:9px;" onclick="appLogic.savePartnerInfo('${i.id}')">${lang==='en'?'Save Details':'حفظ التفاصيل'}</button>
                                 </div>
                             </div>
                         </td>
@@ -1793,8 +1831,9 @@ window.appLogic = {
             if (container) container.innerHTML = html;
         } catch (err) {
             console.error('Render History Error:', err);
+            const lang = this.currentLang || 'ar';
             const container = document.getElementById('history-content');
-            if (container) container.innerHTML = `<p style="color:red; text-align:center; padding:20px;">خطأ في تحميل سجل الفواتير: ${err.message}</p>`;
+            if (container) container.innerHTML = `<p style="color:red; text-align:center; padding:20px;">${lang==='en'?'Error loading invoice history: ':'خطأ في تحميل سجل الفواتير: '}${err.message}</p>`;
         }
 
         // Render delivery settings table which conceptually lives on the History screen
@@ -2065,29 +2104,41 @@ window.appLogic = {
 
     renderCustomersList(customersArray) {
         try {
+            const lang = this.currentLang || 'ar';
+            const thCust = lang === 'en' ? 'Customer' : 'العميل';
+            const thContact = lang === 'en' ? 'Contact Info' : 'بيانات التواصل';
+            const thOrders = lang === 'en' ? 'Orders Count' : 'عدد الطلبات';
+            const thSpent = lang === 'en' ? 'Total Spent' : 'إجمالي المشتريات';
+            const thAct = lang === 'en' ? 'Actions' : 'إجراءات';
+
             let html = '<table style="width:100%; border-collapse:collapse; margin-top:20px; background:var(--bg-surface); border-radius:12px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.5)">';
             html += `<thead>
                 <tr style="background:#111; color:var(--primary)">
-                    <th style="padding:15px; text-align:right;">العميل</th>
-                    <th style="padding:15px; text-align:right;">بيانات التواصل</th>
-                    <th style="padding:15px; text-align:right;">عدد الطلبات</th>
-                    <th style="padding:15px; text-align:right;">إجمالي المشتريات</th>
-                    <th style="padding:15px; text-align:center;">إجراءات</th>
+                    <th style="padding:15px; text-align:right;">${thCust}</th>
+                    <th style="padding:15px; text-align:right;">${thContact}</th>
+                    <th style="padding:15px; text-align:right;">${thOrders}</th>
+                    <th style="padding:15px; text-align:right;">${thSpent}</th>
+                    <th style="padding:15px; text-align:center;">${thAct}</th>
                 </tr>
             </thead><tbody>`;
             if (customersArray.length === 0) {
-                html += '<tr><td colspan="5" style="padding:20px; text-align:center;">لا توجد بيانات للعملاء حتى الآن.</td></tr>';
+                const emptyMsg = lang === 'en' ? 'No customer data available yet.' : 'لا توجد بيانات للعملاء حتى الآن.';
+                html += `<tr><td colspan="5" style="padding:20px; text-align:center;">${emptyMsg}</td></tr>`;
             } else {
                 // Sort by latest activity (newest first)
                 const displayCustomers = [...customersArray].sort((a, b) => b.latestTimestamp - a.latestTimestamp);
 
                 displayCustomers.forEach(c => {
                     if (!c) return;
-                    let n = c.name || 'عميل دون اسم';
-                    let p = (c.phone && c.phone !== '0000000000') ? c.phone : '<span style="color:var(--text-muted); font-size:12px;">غير مسجل</span>';
+                    const fallbackName = lang === 'en' ? 'Unnamed Customer' : 'عميل دون اسم';
+                    const unregStr = lang === 'en' ? 'Unregistered' : 'غير مسجل';
+                    let n = c.name || fallbackName;
+                    let p = (c.phone && c.phone !== '0000000000') ? c.phone : `<span style="color:var(--text-muted); font-size:12px;">${unregStr}</span>`;
                     let count = c.orderCount || 0;
                     let spent = c.totalSpent || 0;
                     let isWalkIn = c.isWalkIn;
+                    const ordersSuffix = lang === 'en' ? 'Orders' : 'طلب';
+                    const viewOrdersTxt = lang === 'en' ? 'View Orders' : 'عرض الفواتير';
 
                     // Passing invoiceId for walk-ins so logic can filter history by that specific ID
                     const actionParam = isWalkIn ? c.invoiceId : (c.phone || c.name);
@@ -2095,11 +2146,11 @@ window.appLogic = {
                     html += `<tr style="border-bottom:1px solid var(--border); ${isWalkIn ? 'background:rgba(253,184,19,0.03);' : ''}">
                         <td style="padding:15px; font-weight:bold; color:${isWalkIn ? 'var(--primary)' : 'inherit'}">${n}</td>
                         <td style="padding:15px; font-weight:bold; direction:ltr; text-align:right;">${p}</td>
-                        <td style="padding:15px; font-weight:bold; color:var(--text-muted);">${count} طلب</td>
+                        <td style="padding:15px; font-weight:bold; color:var(--text-muted);">${count} ${ordersSuffix}</td>
                         <td style="padding:15px; font-weight:bold; color:var(--primary); direction:ltr; text-align:right;">${spent.toLocaleString('en-US', { minimumFractionDigits: 2 })} SAR</td>
                         <td style="padding:15px; text-align:center;">
                             <button class="btn btn-sm" style="background:var(--primary); color:#000; padding:5px 12px; border-radius:4px; font-weight:bold;" onclick="appLogic.viewCustomerOrders('${actionParam}')">
-                                <i class="fa-solid fa-list-ul"></i> عرض الفواتير
+                                <i class="fa-solid fa-list-ul"></i> ${viewOrdersTxt}
                             </button>
                         </td>
                     </tr>`;
@@ -2451,14 +2502,18 @@ window.appLogic = {
         try {
             const container = document.getElementById('delivery-manager-content');
             if (!container) return;
+            const lang = this.currentLang || 'ar';
+            const thName = lang === 'en' ? 'Option Name' : 'اسم الخيار';
+            const thAmt = lang === 'en' ? 'Amount (SAR)' : 'المبلغ (ر.س)';
+            const thAct = lang === 'en' ? 'Actions' : 'إجراءات';
 
             let html = `
                 <table class="inventory-table">
                     <thead>
                         <tr>
-                            <th style="padding:12px; text-align:right;">اسم الخيار</th>
-                            <th style="padding:12px; text-align:right;">المبلغ (ر.س)</th>
-                            <th style="padding:12px; text-align:center;">إجراءات</th>
+                            <th style="padding:12px; text-align:right;">${thName}</th>
+                            <th style="padding:12px; text-align:right;">${thAmt}</th>
+                            <th style="padding:12px; text-align:center;">${thAct}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -2481,7 +2536,8 @@ window.appLogic = {
             });
 
             if (deliveryArray.length === 0) {
-                html += '<tr><td colspan="3" style="text-align:center; padding:20px;">لا يوجد خيارات توصيل حالياً.</td></tr>';
+                const emptyMsg = lang === 'en' ? 'No delivery options currently.' : 'لا يوجد خيارات توصيل حالياً.';
+                html += `<tr><td colspan="3" style="text-align:center; padding:20px;">${emptyMsg}</td></tr>`;
             }
 
             html += '</tbody></table>';
@@ -2579,21 +2635,29 @@ window.appLogic = {
 
             let html = '';
 
+            const lang = this.currentLang || 'ar';
+            const expTitle = lang === 'en' ? 'General Expenses' : 'المصروفات العامة (General Expenses)';
+            const noExp = lang === 'en' ? 'No manual expenses recorded' : 'لا توجد مصروفات يدوية مسجلة';
+            const thDate = lang === 'en' ? 'Date' : 'التاريخ';
+            const thCat = lang === 'en' ? 'Category' : 'التصنيف';
+            const thDesc = lang === 'en' ? 'Description' : 'البيان';
+            const thAmt = lang === 'en' ? 'Amount (SAR)' : 'المبلغ (SAR)';
+
             // --- TABLE 1: GENERAL EXPENSES (Manual Entries) ---
             html += `
             <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px; margin-bottom:30px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:12px; margin-bottom:15px;">
-                    <h3 style="color:var(--primary); font-size:16px;"><i class="fa-solid fa-receipt"></i> المصروفات العامة (General Expenses)</h3>
+                    <h3 style="color:var(--primary); font-size:16px;"><i class="fa-solid fa-receipt"></i> ${expTitle}</h3>
                 </div>
-                ${exps.length === 0 ? '<p style="color:var(--text-muted); text-align:center; padding:10px;">لا توجد مصروفات يدوية مسجلة</p>' : `
+                ${exps.length === 0 ? `<p style="color:var(--text-muted); text-align:center; padding:10px;">${noExp}</p>` : `
                 <div style="overflow-x: auto;">
                     <table style="width:100%; border-collapse:collapse; text-align:right;">
                         <thead>
                             <tr style="border-bottom:2px solid var(--border); color:var(--text-muted); font-size:12px;">
-                                <th style="padding:10px;">التاريخ</th>
-                                <th style="padding:10px;">التصنيف</th>
-                                <th style="padding:10px;">البيان</th>
-                                <th style="padding:10px; text-align:left;">المبلغ (SAR)</th>
+                                <th style="padding:10px;">${thDate}</th>
+                                <th style="padding:10px;">${thCat}</th>
+                                <th style="padding:10px;">${thDesc}</th>
+                                <th style="padding:10px; text-align:left;">${thAmt}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -2640,20 +2704,30 @@ window.appLogic = {
                 totalPaid += (laundryMap[k].paid || 0);
             });
 
+            const partnerTitle = lang === 'en' ? 'Partner Laundry Accounts' : 'حسابات المغاسل المتعاونة';
+            const noPartners = lang === 'en' ? 'No partner accounts registered' : 'لا توجد حسابات شركاء مسجلة';
+            const thName = lang === 'en' ? 'Laundry / Neighborhood' : 'اسم المغسلة / الحي';
+            const thDues = lang === 'en' ? 'Dues (Owed)' : 'المستحقات (ذمة)';
+            const thPaid = lang === 'en' ? 'Previous Payments (Paid)' : 'المدفوعات السابقة (Paid)';
+            const thActions = lang === 'en' ? 'Actions' : 'إجراءات (Actions)';
+            const settleBtn = lang === 'en' ? 'Settle' : 'تسديد';
+            const settledLbl = lang === 'en' ? 'Fully Settled' : 'مُسددة بالكامل';
+            const grandTotalLbl = lang === 'en' ? 'Grand Total' : 'المجموع الإجمالي';
+
             html += `
             <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:12px; margin-bottom:15px;">
-                    <h3 style="color:var(--primary); font-size:16px;"><i class="fa-solid fa-handshake"></i> حسابات المغاسل المتعاونة</h3>
+                    <h3 style="color:var(--primary); font-size:16px;"><i class="fa-solid fa-handshake"></i> ${partnerTitle}</h3>
                 </div>
-                ${keys.length === 0 ? '<p style="color:var(--text-muted); text-align:center; padding:10px;">لا توجد حسابات شركاء مسجلة</p>' : `
+                ${keys.length === 0 ? `<p style="color:var(--text-muted); text-align:center; padding:10px;">${noPartners}</p>` : `
                 <div style="overflow-x: auto;">
                     <table style="width:100%; border-collapse:collapse; background:var(--bg-body); border-radius:8px; overflow:hidden;">
                         <thead>
                             <tr style="background:#111; color:var(--primary); font-size:12px;">
-                                <th style="padding:12px; text-align:right;">اسم المغسلة / الحي</th>
-                                <th style="padding:12px; text-align:right;">المستحقات (ذمة)</th>
-                                <th style="padding:12px; text-align:right;">المدفوعات السابقة (Paid)</th>
-                                <th style="padding:12px; text-align:center;">إجراءات (Actions)</th>
+                                <th style="padding:12px; text-align:right;">${thName}</th>
+                                <th style="padding:12px; text-align:right;">${thDues}</th>
+                                <th style="padding:12px; text-align:right;">${thPaid}</th>
+                                <th style="padding:12px; text-align:center;">${thActions}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -2667,13 +2741,13 @@ window.appLogic = {
                                     <td style="padding:15px; font-weight:bold; color:${data.dues > 0 ? '#ff4538' : '#fff'}; direction:ltr; text-align:right;">${data.dues.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR</td>
                                     <td style="padding:15px; font-weight:bold; color:#4CAF50; direction:ltr; text-align:right;">${data.paid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR</td>
                                     <td style="padding:15px; text-align:center;">
-                                        ${data.dues > 0 ? `<button class="btn" style="background:var(--primary); color:#000; padding:8px 16px; font-weight:900; border:none; border-radius:6px; font-size:13px; cursor:pointer;" onclick="appLogic.settleAllLaundryDues('${safeKey}')"><i class="fa-solid fa-money-check-dollar"></i> تسديد</button>` : '<span style="color:#4CAF50; font-size:12px; font-weight:bold;">مُسددة بالكامل <i class="fa-solid fa-circle-check"></i></span>'}
+                                        ${data.dues > 0 ? `<button class="btn" style="background:var(--primary); color:#000; padding:8px 16px; font-weight:900; border:none; border-radius:6px; font-size:13px; cursor:pointer;" onclick="appLogic.settleAllLaundryDues('${safeKey}')"><i class="fa-solid fa-money-check-dollar"></i> ${settleBtn}</button>` : `<span style="color:#4CAF50; font-size:12px; font-weight:bold;">${settledLbl} <i class="fa-solid fa-circle-check"></i></span>`}
                                     </td>
                                 </tr>
                                 `;
             }).join('')}
                             <tr style="background:#111; border-top:2px solid var(--border); font-weight:900;">
-                                <td style="padding:15px; color:var(--primary);">المجموع الإجمالي</td>
+                                <td style="padding:15px; color:var(--primary);">${grandTotalLbl}</td>
                                 <td style="padding:15px; color:#ff4538; direction:ltr; text-align:right;">${totalDues.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR</td>
                                 <td style="padding:15px; color:#4CAF50; direction:ltr; text-align:right;">${totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR</td>
                                 <td style="padding:15px;">-</td>
@@ -2743,6 +2817,7 @@ window.appLogic = {
     },
 
     async renderReports() {
+        const lang = this.currentLang || 'ar';
         const activeInvs = await localforage.getItem('invoices') || [];
         const activeExps = await localforage.getItem('expenses') || [];
         const archives = await localforage.getItem('archived_z_reports') || [];
@@ -2893,8 +2968,8 @@ window.appLogic = {
                 <p style="font-size:12px; color:var(--text-muted); margin:0;">اختر تاريخاً لمراجعة الأداء والعمليات المالية السابقة.</p>
             </div>
             <div style="display:flex; gap:10px; align-items:center;">
-                <input type="date" value="${currentTargetDate}" onchange="appLogic.filterReportsByDate(this.value)" style="color-scheme: dark; cursor: pointer; background:#000; color:#fff; border:1px solid var(--border); padding:10px; border-radius:8px; font-size:14px; outline:none; text-align:center;">
-                <button class="btn" style="background:rgba(253,184,19,0.1); color:var(--primary); padding:10px 15px; font-size:12px; font-weight:bold; border:1px solid var(--primary); border-radius:8px;" onclick="appLogic.resetReportFilter()">اليوم <i class="fa-solid fa-rotate-left"></i></button>
+                <input type="date" lang="en" dir="ltr" value="${currentTargetDate}" onchange="appLogic.filterReportsByDate(this.value)" style="color-scheme: dark; cursor: pointer; background:#000; color:#fff; border:1px solid var(--border); padding:10px; border-radius:8px; font-size:14px; outline:none; text-align:center;">
+                <button class="btn" style="background:rgba(253,184,19,0.1); color:var(--primary); padding:10px 15px; font-size:12px; font-weight:bold; border:1px solid var(--primary); border-radius:8px;" onclick="appLogic.resetReportFilter()">${lang==='en'?'Today':'اليوم'} <i class="fa-solid fa-rotate-left"></i></button>
             </div>
         </div>
 
@@ -3285,7 +3360,8 @@ window.appLogic = {
 
         // Final Length Check
         if (pin.length !== 6) {
-            errEl.textContent = "يجب أن يتكون الرمز من 6 أرقام.";
+            const lang = this.currentLang || 'ar';
+            errEl.textContent = lang === 'en' ? "PIN must be exactly 6 digits." : "يجب أن يتكون الرمز من 6 أرقام.";
             errEl.classList.remove('hidden');
             return;
         }
@@ -3411,13 +3487,14 @@ window.appLogic = {
             }
         } catch (err) {
             console.error('[Smart-Gate] Routing Failure:', err.message);
-            let errMsg = 'الرمز خاطئ، يرجى التأكد من الرمز والمحاولة مرة أخرى.';
-            if (err.message === 'account-deactivated') errMsg = 'عذراً، هذا الحساب معطل من قبل الإدارة.';
-            else if (err.message === 'trial-expired') errMsg = 'انتهت الفترة التجريبية. يرجى التواصل مع الإدارة للتجديد.';
+            const lang = this.currentLang || 'ar';
+            let errMsg = lang === 'en' ? 'Invalid PIN. Please check and try again.' : 'الرمز خاطئ، يرجى التأكد من الرمز والمحاولة مرة أخرى.';
+            if (err.message === 'account-deactivated') errMsg = lang === 'en' ? 'Sorry, this account has been disabled by Administration.' : 'عذراً، هذا الحساب معطل من قبل الإدارة.';
+            else if (err.message === 'trial-expired') errMsg = lang === 'en' ? 'Trial period expired. Please contact administration to renew.' : 'انتهت الفترة التجريبية. يرجى التواصل مع الإدارة للتجديد.';
 
             errEl.textContent = errMsg;
             errEl.classList.remove('hidden');
-            btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> دخول';
+            btn.innerHTML = lang === 'en' ? '<i class="fa-solid fa-right-to-bracket"></i> Login' : '<i class="fa-solid fa-right-to-bracket"></i> دخول';
             btn.disabled = false;
         }
     },
@@ -3432,8 +3509,8 @@ window.appLogic = {
             // 1. THE KILL SWITCH: Instant Eviction on deactivation
             if (data.isActivated === false) {
                 console.warn("[SECURITY] Kill switch triggered! Account deactivated from Admin.");
-                alert("النظام معطل، يرجى التواصل مع الإدارة");
-                alert("النظام معطل، يرجى التواصل مع الإدارة");
+                const lang = localStorage.getItem('sahab-lang') || 'ar';
+                alert(lang === 'en' ? "System disabled. Please contact administration." : "النظام معطل، يرجى التواصل مع الإدارة");
                 localStorage.clear();
                 sessionStorage.clear();
                 await localforage.clear();
@@ -3513,6 +3590,19 @@ window.appLogic = {
         localStorage.setItem('sahab-lang', lang);
         this.applyLanguage();
         this.updateCartUI(); // Repaint Cart labels for english UI
+
+        // Dynamically repaint the active table without refreshing the page
+        const activeNav = document.querySelector('.main-nav .active');
+        if (activeNav) {
+            const viewMatch = activeNav.getAttribute('onclick')?.match(/'([^']+)'/);
+            if (viewMatch) {
+                const currentViewId = viewMatch[1];
+                if (currentViewId === 'history') this.renderHistory();
+                else if (currentViewId === 'customers') this.renderCustomers();
+                else if (currentViewId === 'expenses') this.renderExpenses();
+            }
+        }
+
         if (this.showToast) {
             this.showToast(lang === 'en' ? 'Language switched to English' : 'تم تغيير اللغة إلى العربية');
         }
@@ -3557,19 +3647,45 @@ window.appLogic = {
             // Settings Modal
             '#settings-modal h3': { ar: '<i class="fa-solid fa-gear"></i> الإعدادات', en: '<i class="fa-solid fa-gear"></i> Settings' },
             '#theme-toggle-btn span:first-child': { ar: 'تبديل المظهر', en: 'Toggle Theme' },
+            '#settings-save-btn': { ar: '<i class="fa-solid fa-floppy-disk"></i> حفظ الإعدادات', en: '<i class="fa-solid fa-floppy-disk"></i> Save Settings' },
+            '#settings-logout-btn': { ar: '<i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج', en: '<i class="fa-solid fa-right-from-bracket"></i> Logout' },
 
             // View Titles
-            '#view-history h2': { ar: 'سجل الفواتير', en: 'Invoice History' },
+            '#view-history h2:first-of-type': { ar: '<i class="fa-solid fa-clock-rotate-left"></i> سجل الفواتير السابقة', en: '<i class="fa-solid fa-clock-rotate-left"></i> Invoice History' },
+            '#view-history h2:last-of-type': { ar: '<i class="fa-solid fa-truck-fast"></i> إدارة رسوم التوصيل', en: '<i class="fa-solid fa-truck-fast"></i> Delivery Management' },
+            '#view-history p': { ar: 'تحكم في أسعار التوصيل المتاحة لموظفي الكاشير', en: 'Control delivery rates available to cashiers' },
             '#view-customers h2': { ar: 'سجل العملاء', en: 'Customers Directory' },
             '#view-inventory h2': { ar: 'إدارة المخزون', en: 'Inventory Management' },
-            '#view-expenses h2': { ar: 'المصروفات التشغيلية', en: 'Operational Expenses' },
+            '#view-expenses h2': { ar: 'إدارة المصروفات التشغيلية', en: 'Operational Expenses Management' },
+            '#view-expenses p': { ar: 'سجل وراجع جميع المصروفات اليومية للمغسلة', en: 'Record and review daily operational expenses' },
             '#view-reports h2': { ar: 'القوائم المالية وإقرارات الزكاة', en: 'Financial Reports & ZATCA' },
+
+            // Login & Auth
+            '.login-body label': { ar: 'الرمز السري (PIN)', en: 'PIN Code' },
+            '#login-btn': { ar: '<i class="fa-solid fa-right-to-bracket"></i> دخول', en: '<i class="fa-solid fa-right-to-bracket"></i> Login' },
+            '#trial-expired-overlay h2': { ar: 'انتهت الفترة التجريبية', en: 'Trial Period Expired' },
+            '#trial-expired-overlay p:first-of-type': { ar: 'نشكركم على تجربة نظام سحاب. لقد انتهت الفترة المخصصة للتجربة، يرجى التواصل مع الإدارة لتفعيل الاشتراك الدائم أو تمديد الفترة.', en: 'Thank you for trying Sahab POS. Your trial has expired. Please contact administration to activate your subscription.' },
+            '#trial-expired-overlay div p:first-of-type': { ar: 'للتواصل والدعم الفني:', en: 'Contact Technical Support:' },
+            '#trial-expired-overlay button': { ar: '<i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج', en: '<i class="fa-solid fa-right-from-bracket"></i> Logout' },
+            
+            // Buttons
+            '#view-history .btn-primary': { ar: '<i class="fa-solid fa-plus"></i> إضافة خيار توصيل', en: '<i class="fa-solid fa-plus"></i> Add Delivery Option' },
+            '#view-inventory .btn-primary': { ar: '<i class="fa-solid fa-box"></i> إضافة صنف استهلاكي', en: '<i class="fa-solid fa-box"></i> Add Consumable Item' },
+            '#view-inventory .btn-success': { ar: '<i class="fa-solid fa-shirt"></i> إضافة خدمة جديدة', en: '<i class="fa-solid fa-shirt"></i> Add New Service' },
+            '#view-expenses .btn-primary': { ar: '<i class="fa-solid fa-plus"></i> تقييد مصروف جديد', en: '<i class="fa-solid fa-plus"></i> Register New Expense' },
+            '#view-expenses .btn-danger': { ar: '<i class="fa-solid fa-trash-can"></i> تصفير', en: '<i class="fa-solid fa-trash-can"></i> Reset All' },
+            '.empty-cart-msg': { ar: 'السلة فارغة، يرجى اختيار أصناف.', en: 'Cart is empty. Please select items.' },
+            
+            // Modals Headers (Fallback for ones controlled by JS)
+            '#inventory-content h2': { ar: 'جاري تحضير قائمة الخدمات...', en: 'Preparing services list...' },
+            '#inventory-content p': { ar: 'إذا استغرق هذا وقتاً طويلاً، يرجى تحديث الصفحة.', en: 'If this takes too long, please refresh the page.' },
 
             // Payment Methods
             '#method-cash span': { ar: '<i class="fa-solid fa-money-bill-1-wave" style="margin-left:10px;"></i> كاش (Cash)', en: '<i class="fa-solid fa-money-bill-1-wave" style="margin-left:10px;"></i> Cash' },
             '#method-mada span': { ar: '<i class="fa-solid fa-credit-card" style="margin-left:10px;"></i> مدى (Mada)', en: '<i class="fa-solid fa-credit-card" style="margin-left:10px;"></i> Mada' },
             '#method-visa span': { ar: '<i class="fa-brands fa-cc-visa" style="margin-left:10px;"></i> فيزا (Visa)', en: '<i class="fa-brands fa-cc-visa" style="margin-left:10px;"></i> Visa' },
-            '#method-mastercard span': { ar: '<i class="fa-brands fa-cc-mastercard" style="margin-left:10px;"></i> ماستركارد (Mastercard)', en: '<i class="fa-brands fa-cc-mastercard" style="margin-left:10px;"></i> Mastercard' }
+            '#method-mastercard span': { ar: '<i class="fa-brands fa-cc-mastercard" style="margin-left:10px;"></i> ماستركارد (Mastercard)', en: '<i class="fa-brands fa-cc-mastercard" style="margin-left:10px;"></i> Mastercard' },
+            '#method-later span': { ar: '<i class="fa-solid fa-clock" style="margin-left:10px;"></i> دفع لاحقاً', en: '<i class="fa-solid fa-clock" style="margin-left:10px;"></i> Pay Later' }
         };
 
         for (const [selector, textObj] of Object.entries(dict)) {
@@ -3585,10 +3701,13 @@ window.appLogic = {
         if (nameInput && nameInput.previousElementSibling) nameInput.previousElementSibling.innerText = lang === 'en' ? 'Business Name' : 'اسم النشاط التجاري';
 
         const phoneInput = document.getElementById('setting-phone');
-        if (phoneInput && phoneInput.previousElementSibling) phoneInput.previousElementSibling.innerText = lang === 'en' ? 'Phone Number' : 'رقم الجوال';
+        if (phoneInput && phoneInput.previousElementSibling) phoneInput.previousElementSibling.innerText = lang === 'en' ? 'Manager Phone Number' : 'رقم الجوال';
 
         const taxInput = document.getElementById('setting-tax');
         if (taxInput && taxInput.previousElementSibling) taxInput.previousElementSibling.innerText = lang === 'en' ? 'VAT Number (Optional)' : 'الرقم الضريبي (اختياري)';
+
+        const langSelect = document.getElementById('ui-language');
+        if (langSelect && langSelect.previousElementSibling) langSelect.previousElementSibling.innerText = lang === 'en' ? 'App Language' : 'لغة التطبيق';
 
         const itemSearch = document.getElementById('item-search');
         if (itemSearch) itemSearch.placeholder = lang === 'en' ? 'Search items...' : 'ابحث عن صنف...';
@@ -3597,16 +3716,21 @@ window.appLogic = {
         if (custName) custName.placeholder = lang === 'en' ? 'Customer Name (Optional)' : 'اسم العميل (اختياري)';
 
         const custPhone = document.getElementById('customer-phone');
-        if (custPhone) custPhone.placeholder = lang === 'en' ? 'Phone Number (Optional)' : 'رقم الجوال (اختياري)';
+        if (custPhone) custPhone.placeholder = lang === 'en' ? 'Customer Phone (Optional)' : 'رقم الجوال (اختياري)';
 
         const invSearch = document.getElementById('history-search');
         if (invSearch) invSearch.placeholder = lang === 'en' ? 'Search by ID, Customer...' : 'بحث بالرقم، العميل أو الجوال...';
 
-        const saveSettingsBtn = document.getElementById('settings-save-btn');
-        if (saveSettingsBtn) saveSettingsBtn.innerHTML = lang === 'en' ? '<i class="fa-solid fa-floppy-disk"></i> Save Settings' : '<i class="fa-solid fa-floppy-disk"></i> حفظ الإعدادات';
-
-        const logoutBtn = document.getElementById('settings-logout-btn');
-        if (logoutBtn) logoutBtn.innerHTML = lang === 'en' ? '<i class="fa-solid fa-right-from-bracket"></i> Logout' : '<i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج';
+        const cSearch = document.getElementById('customer-search');
+        if (cSearch) cSearch.placeholder = lang === 'en' ? 'Search by Name or Phone...' : 'بحث باسم العميل أو الجوال...';
+        
+        // Modal Action text inside Checkout pos-laundry
+        const pLName = document.getElementById('pos-laundry-name');
+        if (pLName) pLName.placeholder = lang === 'en' ? 'Laundry Name (Required)' : 'اسم المغسلة (مطلوب)';
+        const pLHood = document.getElementById('pos-laundry-hood');
+        if (pLHood) pLHood.placeholder = lang === 'en' ? 'Neighborhood (Required)' : 'الحي (مطلوب)';
+        const pLCost = document.getElementById('pos-laundry-cost');
+        if (pLCost) pLCost.placeholder = lang === 'en' ? 'Cost (Required)' : 'التكلفة (مطلوب)';
     },
 
     closeSettingsModal() {
