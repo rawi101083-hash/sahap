@@ -1598,6 +1598,7 @@ window.appLogic = {
 
             <!-- Header: Store Name → VAT Number → Phone -->
             <div class="receipt-header">
+                ${window.tenantSettings?.logo ? `<img src="${window.tenantSettings.logo}" style="width: 100%; max-width: 60px; height: auto; display: block; margin: 0 auto 10px auto;">` : ''}
                 <div style="font-size:18px; font-weight:900; margin-bottom:4px;">${window.tenantSettings?.name || ''}</div>
                 <div style="font-size:13px; font-weight:bold; margin-bottom:4px;">${_hasValTax ? 'فاتورة ضريبية مبسطة' : 'فاتورة مبيعات'}</div>
                 ${storeAddress}
@@ -3582,8 +3583,61 @@ window.appLogic = {
         document.getElementById('setting-name').value = s.name || '';
         document.getElementById('setting-phone').value = s.phone || '';
         document.getElementById('setting-tax').value = s.taxNumber || '';
+        
+        // Load existing logo preview
+        const logoPreview = document.getElementById('setting-logo-preview');
+        if (s.logo) {
+            logoPreview.src = s.logo;
+            logoPreview.style.display = 'block';
+        } else {
+            logoPreview.style.display = 'none';
+        }
+        
         document.getElementById('settings-modal').classList.remove('hidden');
     },
+    handleLogoUpload: function(input) {
+        if (!input.files || input.files.length === 0) return;
+        const file = input.files[0];
+        if (!file.type.startsWith('image/')) {
+            alert('يرجى رفع ملف صورة صحيح (PNG / JPG).');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+                const MAX_SIZE = 300;
+
+                if (width > height && width > MAX_SIZE) {
+                    height *= MAX_SIZE / width;
+                    width = MAX_SIZE;
+                } else if (height > MAX_SIZE) {
+                    width *= MAX_SIZE / height;
+                    height = MAX_SIZE;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
+                const previewEl = document.getElementById('setting-logo-preview');
+                if (previewEl) {
+                    previewEl.src = compressedBase64;
+                    previewEl.style.display = 'block';
+                }
+                window._tempLogoBase64 = compressedBase64;
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    },
+
 
     changeLanguage(lang) {
         this.currentLang = lang;
@@ -3732,28 +3786,38 @@ window.appLogic = {
             '#method-cash span': { ar: '<i class="fa-solid fa-money-bill-1-wave" style="margin-left:10px;"></i> كاش (Cash)', en: '<i class="fa-solid fa-money-bill-1-wave" style="margin-left:10px;"></i> Cash' },
             '#method-mada span': { ar: '<i class="fa-solid fa-credit-card" style="margin-left:10px;"></i> مدى (Mada)', en: '<i class="fa-solid fa-credit-card" style="margin-left:10px;"></i> Mada' },
             '#method-visa span': { ar: '<i class="fa-brands fa-cc-visa" style="margin-left:10px;"></i> فيزا (Visa)', en: '<i class="fa-brands fa-cc-visa" style="margin-left:10px;"></i> Visa' },
-            '#method-mastercard span': { ar: '<i class="fa-brands fa-cc-mastercard" style="margin-left:10px;"></i> ماستركارد (Mastercard)', en: '<i class="fa-brands fa-cc-mastercard" style="margin-left:10px;"></i> Mastercard' },
-            '#method-later span': { ar: '<i class="fa-solid fa-clock" style="margin-left:10px;"></i> دفع لاحقاً', en: '<i class="fa-solid fa-clock" style="margin-left:10px;"></i> Pay Later' }
+            '#method-mastercard span': { ar: '<i class="fa-brands fa-cc-mastercard" style="margin-left:10px;"></i> ماستركارد', en: '<i class="fa-brands fa-cc-mastercard" style="margin-left:10px;"></i> Mastercard' },
+
+            // Confirmation Headers
+            '#modal-actions-success h4': { ar: 'تم تسجيل الفاتورة بنجاح', en: 'Invoice Generated Successfully' },
+            '#modal-actions-success p': { ar: 'العملية مقيدة بالمرجع <span id="success-invoice-ref"></span>', en: 'Reference: <span id="success-invoice-ref"></span>' },
+            '#modal-actions-success h4:nth-of-type(2)': { ar: 'إجراءات الفاتورة:', en: 'Invoice Actions:' },
+            '#modal-actions-success button:nth-of-type(1) span': { ar: 'طباعة إيصال حراري (80mm)', en: 'Print Thermal Receipt (80mm)' },
+            '#modal-actions-success button:nth-of-type(2)': { ar: '<i class="fa-solid fa-file-pdf"></i> تحميل الفاتورة الرقمية (PDF)', en: '<i class="fa-solid fa-file-pdf"></i> Download PDF Invoice' },
+
+            // Daily Report Headers
+            '#daily-review-modal h3': { ar: '<i class="fa-solid fa-file-invoice-dollar"></i> مراجعة الإيرادات وتأكيد إغلاق اليومية', en: '<i class="fa-solid fa-file-invoice-dollar"></i> Daily Closing Review & Confirmation' },
+            '#daily-review-modal .modal-body > p': { ar: 'يرجى مطابقة الأرقام أدناه مع النقد الفعلي والأرصدة بالدرج. في حال تأكيد العملية وتصفير الدرج، سيتم تصدير تقرير Z-Report وإشعار الإدارة.', en: 'Please match physical cash and terminals with the figures below. Once confirmed, a Z-Report will be generated and the dashboard resets.' },
+            '.financial-breakdown .breakdown-row:nth-child(1) span:first-child': { ar: '<i class="fa-solid fa-file-invoice"></i> إجمالي المبيعات (نظام):', en: '<i class="fa-solid fa-file-invoice"></i> Gross Sales (System):' },
+            '.financial-breakdown .breakdown-row:nth-child(2) span:first-child': { ar: '<i class="fa-solid fa-rotate-left"></i> مرتجعات وإلغاءات:', en: '<i class="fa-solid fa-rotate-left"></i> Refunds & Cancellations:' },
+            '.financial-breakdown .breakdown-row:nth-child(3) span:first-child': { ar: '<i class="fa-solid fa-money-bill-transfer"></i> المصاريف التشغيلية (مسحوبة):', en: '<i class="fa-solid fa-money-bill-transfer"></i> Operational Expenses (Withdrawn):' },
+            '.financial-breakdown .breakdown-row.total-row span:first-child': { ar: 'الصافي الفعلي المطلوب (بالدرج والشبكة):', en: 'Expected Net Revenue (Drawer & Terminals):' },
+            '#daily-review-modal .modal-footer button:last-child': { ar: '<i class="fa-solid fa-check"></i> اعتماد التقرير وتحميل (PDF)', en: '<i class="fa-solid fa-check"></i> Approve & Download Z-Report' },
+
+            // Empty States
+            '.empty-state h3': { ar: 'لا توجد بيانات للعرض', en: 'No data to display' },
+            '.empty-state p': { ar: 'لم يتم العثور على أي معلومات في هذا القسم حالياً.', en: 'No information was found in this section.' },
         };
 
-        for (const [selector, textObj] of Object.entries(dict)) {
-            const els = document.querySelectorAll(selector);
-            els.forEach(el => {
+        Object.entries(dict).forEach(([selector, textObj]) => {
+            const elements = document.querySelectorAll(selector);
+            elements.forEach(el => {
                 if (textObj.attr) el.setAttribute(textObj.attr, textObj[lang] || textObj['ar']);
                 else el.innerHTML = textObj[lang] || textObj['ar'];
             });
-        }
+        });
 
         // Advanced placeholders & adjacent labels
-        const nameInput = document.getElementById('setting-name');
-        if (nameInput && nameInput.previousElementSibling) nameInput.previousElementSibling.innerText = lang === 'en' ? 'Business Name' : 'اسم النشاط التجاري';
-
-        const phoneInput = document.getElementById('setting-phone');
-        if (phoneInput && phoneInput.previousElementSibling) phoneInput.previousElementSibling.innerText = lang === 'en' ? 'Manager Phone Number' : 'رقم الجوال';
-
-        const taxInput = document.getElementById('setting-tax');
-        if (taxInput && taxInput.previousElementSibling) taxInput.previousElementSibling.innerText = lang === 'en' ? 'VAT Number (Optional)' : 'الرقم الضريبي (اختياري)';
-
         const langSelect = document.getElementById('ui-language');
         if (langSelect && langSelect.previousElementSibling) langSelect.previousElementSibling.innerText = lang === 'en' ? 'App Language' : 'لغة التطبيق';
 
@@ -3824,6 +3888,11 @@ window.appLogic = {
             name, phone, taxNumber: tax 
         };
 
+        // Attach logo if uploaded
+        if (window._tempLogoBase64) {
+            window.tenantSettings.logo = window._tempLogoBase64;
+        }
+
         // Persist to Firebase using atomic multi-path update to prevent data destruction
         if (window.currentUID && typeof firebase !== 'undefined') {
             try {
@@ -3832,6 +3901,7 @@ window.appLogic = {
                 updates[`users/${window.currentUID}/settings/name`] = name;
                 updates[`users/${window.currentUID}/settings/phone`] = phone;
                 updates[`users/${window.currentUID}/settings/taxNumber`] = tax;
+                if (window._tempLogoBase64) updates[`users/${window.currentUID}/settings/logo`] = window._tempLogoBase64;
                 
                 // CRITICAL SYNC: Mirror updates to accountDetails so the Master Dashboard knows instantly
                 updates[`users/${window.currentUID}/accountDetails/laundryName`] = name;
@@ -3844,6 +3914,7 @@ window.appLogic = {
             }
         }
 
+        window._tempLogoBase64 = null; // reset temp
         this.applyBranding();
         this.closeSettingsModal();
         this.showToast('تم حفظ إعدادات المغسلة بنجاح ✓');
@@ -3935,7 +4006,7 @@ window.appLogic = {
 
                 <!-- ══ HEADER ══ -->
                 <div style="background: #1a1a2e; color: #fff; text-align: center; padding: 16px 20px; border-radius: 8px; margin-bottom: 16px;">
-                    <div style="font-size: 9px; letter-spacing: 2px; color: #fdb813; text-transform: uppercase; margin-bottom: 4px;">نظام سحاب POS</div>
+                    ${window.tenantSettings?.logo ? `<img src="${window.tenantSettings.logo}" style="width: 100%; max-width: 50px; height: auto; display: block; margin: 0 auto 10px auto; border-radius: 4px; background: #fff; padding: 2px;">` : `<div style="font-size: 9px; letter-spacing: 2px; color: #fdb813; text-transform: uppercase; margin-bottom: 4px;">نظام سحاب POS</div>`}
                     <h1 style="margin: 0; font-size: 20px; font-weight: 900; color: #fff; line-height: 1.3;">تقرير إغلاق اليومية</h1>
                     <div style="margin-top: 6px; font-size: 14px; font-weight: bold; color: #fdb813;">${bizName}</div>
                     <div style="margin-top: 4px; font-size: 11px; color: rgba(255,255,255,0.7);">بتاريخ: ${reportDate}</div>

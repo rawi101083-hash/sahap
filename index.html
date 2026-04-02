@@ -617,6 +617,13 @@
                     <input type="text" id="setting-name" placeholder="مثال: مغسلة الفيصل" style="width:100%; padding:12px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm); font-family:inherit; font-size:15px;">
                 </div>
                 <div class="selector-group">
+                    <label style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:13px; font-weight:700;">شعار الفاتورة (Logo)</label>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <img id="setting-logo-preview" src="" style="width: 45px; height: 45px; object-fit: contain; background: #fff; border-radius: var(--radius-sm); border: 1px solid var(--border); display: none;">
+                        <input type="file" id="setting-logo-file" accept="image/png, image/jpeg, image/jpg" onchange="appLogic.handleLogoUpload(this)" style="width:100%; padding:8px; background:var(--bg-body); border:1px solid var(--border); color:var(--text-muted); border-radius:var(--radius-sm); font-family:inherit; font-size:13px; cursor:pointer;">
+                    </div>
+                </div>
+                <div class="selector-group">
                     <label style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:13px; font-weight:700;">رقم الجوال</label>
                     <input type="text" id="setting-phone" placeholder="05xxxxxxxx" dir="ltr" style="width:100%; padding:12px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm); font-family:inherit; font-size:15px;">
                 </div>
