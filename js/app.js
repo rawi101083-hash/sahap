@@ -4198,18 +4198,15 @@ window.appLogic = {
             }
             
             // Native Browser Print Dialog (Handles A4 export perfectly)
-            window.print();
+            // استخدام تأخير بسيط لضمان قيام نظام iOS (Safari) بتحميل عناصر الطباعة قبل فتح نافذة الطباعة
+            setTimeout(() => {
+                window.print();
+                // تم إزالة مسح العنصر وتحديث الصفحة بشكل إجباري لأنها تقطع عملية الطباعة وتنتج صفحة بيضاء في نظام الجوال
+            }, 500);
             
-            // Cleanup after print dialog closes
-            if (zContainer) zContainer.innerHTML = '';
         } catch (printErr) {
             console.error('[Print Gen] Error:', printErr);
         }
-
-        // 🔥 الضربة القاضية: تحديث الصفحة لفرمتة الشاشة وتصفير الأرقام غصب 🔥
-        setTimeout(() => {
-            window.location.href = window.location.pathname;
-        }, 1500);
     },
 
     async showZReportPreview() {
