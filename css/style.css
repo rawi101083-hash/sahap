@@ -1000,6 +1000,10 @@ button:active {
         overflow: visible !important;
     }
 
+    .modal-overlay.hidden, .full-page-sheet.hidden {
+        display: none !important;
+    }
+
     .report-preview-card {
         height: auto !important;
         overflow: visible !important;
