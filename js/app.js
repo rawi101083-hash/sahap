@@ -2968,7 +2968,7 @@ window.appLogic = {
                 <p style="font-size:12px; color:var(--text-muted); margin:0;">اختر تاريخاً لمراجعة الأداء والعمليات المالية السابقة.</p>
             </div>
             <div style="display:flex; gap:10px; align-items:center;">
-                <input type="date" lang="en" dir="ltr" value="${currentTargetDate}" onchange="appLogic.filterReportsByDate(this.value)" style="color-scheme: dark; cursor: pointer; background:#000; color:#fff; border:1px solid var(--border); padding:10px; border-radius:8px; font-size:14px; outline:none; text-align:center;">
+                <input type="date" lang="en" dir="ltr" value="${currentTargetDate}" onchange="appLogic.filterReportsByDate(this.value)" style="color-scheme: dark; cursor: pointer; background:#000; color:#fff; border:1px solid var(--border); padding:10px; border-radius:8px; font-size:14px; outline:none; text-align:center; font-family: system-ui, -apple-system, Arial, sans-serif !important; font-variant-numeric: tabular-nums;">
                 <button class="btn" style="background:rgba(253,184,19,0.1); color:var(--primary); padding:10px 15px; font-size:12px; font-weight:bold; border:1px solid var(--primary); border-radius:8px;" onclick="appLogic.resetReportFilter()">${lang==='en'?'Today':'اليوم'} <i class="fa-solid fa-rotate-left"></i></button>
             </div>
         </div>
@@ -3651,9 +3651,9 @@ window.appLogic = {
             '#settings-logout-btn': { ar: '<i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج', en: '<i class="fa-solid fa-right-from-bracket"></i> Logout' },
 
             // View Titles
-            '#view-history h2:first-of-type': { ar: '<i class="fa-solid fa-clock-rotate-left"></i> سجل الفواتير السابقة', en: '<i class="fa-solid fa-clock-rotate-left"></i> Invoice History' },
-            '#view-history h2:last-of-type': { ar: '<i class="fa-solid fa-truck-fast"></i> إدارة رسوم التوصيل', en: '<i class="fa-solid fa-truck-fast"></i> Delivery Management' },
-            '#view-history p': { ar: 'تحكم في أسعار التوصيل المتاحة لموظفي الكاشير', en: 'Control delivery rates available to cashiers' },
+            '#view-history > div > div:first-child h2': { ar: '<i class="fa-solid fa-clock-rotate-left"></i> سجل الفواتير', en: '<i class="fa-solid fa-clock-rotate-left"></i> Invoice History' },
+            '.delivery-action-card h2': { ar: '<i class="fa-solid fa-truck-fast"></i> إدارة رسوم التوصيل', en: '<i class="fa-solid fa-truck-fast"></i> Delivery Management' },
+            '.delivery-action-card p': { ar: 'تحكم في أسعار التوصيل المتاحة لموظفي الكاشير', en: 'Control delivery rates available to cashiers' },
             '#view-customers h2': { ar: 'سجل العملاء', en: 'Customers Directory' },
             '#view-inventory h2': { ar: 'إدارة المخزون', en: 'Inventory Management' },
             '#view-expenses h2': { ar: 'إدارة المصروفات التشغيلية', en: 'Operational Expenses Management' },
@@ -4033,13 +4033,38 @@ window.appLogic = {
         // === إصدار ملف PDF ===
         try {
             const element = document.createElement('div');
+            // Force strict positioning that prevents culling but hides from user
+            element.style.position = 'absolute';
+            element.style.top = '0';
+            element.style.right = '200%'; // Push far right (RTL safe) to hide visually
+            element.style.width = '794px'; // A4 strict width
+            element.style.backgroundColor = '#ffffff';
+            
             element.innerHTML = reportContent;
-            html2pdf().from(element).set({
+            document.body.appendChild(element); // MUST BE IN DOM FOR RENDER!
+
+            // ⚠️ CRITICAL DOM TIMING FIX ⚠️
+            // Without waking for the next browser paint layout, html2canvas reads 0px dimensions!
+            await new Promise(resolve => setTimeout(resolve, 800));
+
+            await html2pdf().from(element).set({
                 margin: [5, 5, 5, 5],
                 filename: `Z-Report_${reportDate ? reportDate.replace(/\//g, '-') : 'Today'}.pdf`,
-                html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+                html2canvas: { 
+                    scale: 2, 
+                    useCORS: true, 
+                    letterRendering: true, 
+                    width: 794, 
+                    windowWidth: 794, 
+                    x: 0, 
+                    y: 0, 
+                    scrollX: 0, 
+                    scrollY: 0 
+                },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
             }).save();
+            
+            document.body.removeChild(element);
         } catch (pdfErr) {
             console.error('[PDF Gen] Error:', pdfErr);
         }
@@ -4047,7 +4072,7 @@ window.appLogic = {
         // 🔥 الضربة القاضية: تحديث الصفحة لفرمتة الشاشة وتصفير الأرقام غصب 🔥
         setTimeout(() => {
             window.location.href = window.location.pathname;
-        }, 1500);
+        }, 500);
     },
 
     async showZReportPreview() {
