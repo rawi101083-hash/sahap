@@ -1020,6 +1020,20 @@ button:active {
         top: 0;
     }
 
+    #z-report-print-container {
+        width: 100%;
+        max-width: 100%;
+        margin: 0 auto;
+        padding: 0;
+        direction: rtl;
+        background: #fff;
+        color: #000;
+        visibility: visible;
+        position: absolute;
+        left: 0;
+        top: 0;
+    }
+
     .thermal-receipt {
         padding: 10px;
     }

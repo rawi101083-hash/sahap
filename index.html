@@ -480,9 +480,9 @@
         <!-- Add Expense Modal -->
         <div class="modal-overlay hidden" id="add-expense-modal">
             <div class="modal" style="width: 450px;">
-                <div class="modal-header" style="background: linear-gradient(135deg, #826dea, #5743b1); border-color:#5743b1; color: white;">
-                    <h3 style="color: white;"><i class="fa-solid fa-hand-holding-dollar"></i> تقييد مصروف جديد</h3>
-                    <button class="close-modal" style="color: rgba(255,255,255,0.8);" onclick="appLogic.closeExpenseModal()"><i class="fa-solid fa-times"></i></button>
+                <div class="modal-header" style="background: linear-gradient(135deg, #fdb813, #e5a400); border-color:#e5a400; color: #1a1a2e;">
+                    <h3 style="color: #1a1a2e; font-weight: 800;"><i class="fa-solid fa-hand-holding-dollar"></i> تقييد مصروف جديد</h3>
+                    <button class="close-modal" style="color: rgba(26,26,46,0.8);" onclick="appLogic.closeExpenseModal()"><i class="fa-solid fa-times"></i></button>
                 </div>
                 <div class="modal-body" style="padding: 20px;">
                     <div class="form-group" style="margin-bottom: 15px;">
@@ -498,7 +498,7 @@
                     </div>
                     <div class="form-group" style="margin-bottom: 15px;">
                         <label style="display:block; margin-bottom:5px; color:var(--text-muted);">المبلغ (ر.س)</label>
-                        <input type="number" id="exp-amount" value="0" step="1" style="width:100%; padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm); font-size:20px; font-weight:bold; color:var(--primary);" dir="ltr">
+                        <input type="number" id="exp-amount" placeholder="مثلاً: 150" step="1" style="width:100%; padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm); font-size:20px; font-weight:bold; color:var(--primary); font-family: system-ui, -apple-system, Arial, sans-serif !important; font-variant-numeric: tabular-nums;" dir="ltr">
                     </div>
                     <div class="form-group" style="margin-bottom: 15px;">
                         <label style="display:block; margin-bottom:5px; color:var(--text-muted);">البيان / الوصف</label>
@@ -506,15 +506,16 @@
                     </div>
                     <div class="form-group" style="margin-bottom: 25px;">
                         <label style="display:block; margin-bottom:5px; color:var(--text-muted);">تاريخ المصروف</label>
-                        <input type="date" id="expense-date" lang="en" dir="ltr" required style="width:100%; padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm); font-family: system-ui, -apple-system, Arial, sans-serif !important; text-align: right;">
+                        <input type="date" id="expense-date" lang="en" dir="ltr" required style="width:100%; padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm); font-family: system-ui, -apple-system, Arial, sans-serif !important; font-variant-numeric: tabular-nums; text-align: center;">
                     </div>
-                    <button class="btn w-100 btn-purple" onclick="appLogic.saveExpense()"><i class="fa-solid fa-check"></i> حفظ القيد المحاسبي</button>
+                    <button class="btn w-100" style="background: linear-gradient(135deg, #fdb813, #e5a400); color: #1a1a2e; font-weight: bold; border: none; padding: 12px; font-size: 16px;" onclick="appLogic.saveExpense()"><i class="fa-solid fa-check"></i> حفظ القيد المحاسبي</button>
                 </div>
             </div>
         </div>
 
         <!-- Printable Invoice -->
         <div id="invoice-print-container" class="print-only"></div>
+        <div id="z-report-print-container" class="print-only"></div>
 
         <!-- Service Modal (Add/Edit Services) -->
         <div class="modal-overlay hidden" id="service-modal">

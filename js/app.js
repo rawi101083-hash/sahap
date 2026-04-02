@@ -3848,12 +3848,19 @@ window.appLogic = {
 
         const reportContent = `
             <style>
-                * { box-sizing: border-box; margin: 0; padding: 0; }
-                body { font-family: 'Tajawal', Arial, sans-serif; direction: rtl; background: #fff; color: #222; font-size: 12px; }
                 @media print {
                     @page { margin: 10mm; size: A4 portrait; }
-                    body, html { height: auto !important; overflow: visible !important; background: #fff; }
-                    .z-page { page-break-inside: avoid; }
+                    .z-page { 
+                        font-family: 'Tajawal', Arial, sans-serif; 
+                        direction: rtl; 
+                        color: #000; 
+                        font-size: 12px; 
+                        page-break-inside: avoid;
+                        width: 100%;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    .z-page * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
                     table { page-break-inside: auto; }
                     tr { page-break-inside: avoid; page-break-after: auto; }
                     .final-summary { page-break-inside: avoid !important; }
@@ -4030,49 +4037,30 @@ window.appLogic = {
         const msg = '✅ تم إغلاق اليومية بنجاح وتصفير السجل.';
         if (this.showToast) this.showToast(msg); else alert(msg);
 
-        // === إصدار ملف PDF ===
+        // === إصدار ملف PDF / طباعة التقرير (Native Print) ===
         try {
-            const element = document.createElement('div');
-            // Force strict positioning that prevents culling but hides from user
-            element.style.position = 'absolute';
-            element.style.top = '0';
-            element.style.right = '200%'; // Push far right (RTL safe) to hide visually
-            element.style.width = '794px'; // A4 strict width
-            element.style.backgroundColor = '#ffffff';
-            
-            element.innerHTML = reportContent;
-            document.body.appendChild(element); // MUST BE IN DOM FOR RENDER!
+            // Hide standard invoice container specifically just in case
+            const invContainer = document.getElementById('invoice-print-container');
+            if (invContainer) invContainer.innerHTML = ''; 
 
-            // ⚠️ CRITICAL DOM TIMING FIX ⚠️
-            // Without waking for the next browser paint layout, html2canvas reads 0px dimensions!
-            await new Promise(resolve => setTimeout(resolve, 800));
-
-            await html2pdf().from(element).set({
-                margin: [5, 5, 5, 5],
-                filename: `Z-Report_${reportDate ? reportDate.replace(/\//g, '-') : 'Today'}.pdf`,
-                html2canvas: { 
-                    scale: 2, 
-                    useCORS: true, 
-                    letterRendering: true, 
-                    width: 794, 
-                    windowWidth: 794, 
-                    x: 0, 
-                    y: 0, 
-                    scrollX: 0, 
-                    scrollY: 0 
-                },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            }).save();
+            const zContainer = document.getElementById('z-report-print-container');
+            if (zContainer) {
+                zContainer.innerHTML = reportContent;
+            }
             
-            document.body.removeChild(element);
-        } catch (pdfErr) {
-            console.error('[PDF Gen] Error:', pdfErr);
+            // Native Browser Print Dialog (Handles A4 export perfectly)
+            window.print();
+            
+            // Cleanup after print dialog closes
+            if (zContainer) zContainer.innerHTML = '';
+        } catch (printErr) {
+            console.error('[Print Gen] Error:', printErr);
         }
 
         // 🔥 الضربة القاضية: تحديث الصفحة لفرمتة الشاشة وتصفير الأرقام غصب 🔥
         setTimeout(() => {
             window.location.href = window.location.pathname;
-        }, 500);
+        }, 1500);
     },
 
     async showZReportPreview() {
