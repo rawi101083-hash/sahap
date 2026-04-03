@@ -6,6 +6,9 @@
     <meta name="google" content="notranslate">
     <title>سحاب POS | نظام سحاب</title>
     
+    <!-- PWA Installation -->
+    <link rel="manifest" href="manifest.json">
+    
     <!-- THEME INITIALIZATION: Prevents White Flash -->
     <script>
         (function() {
@@ -108,6 +111,8 @@
                 <button class="nav-btn" onclick="appLogic.switchView('expenses')"><i class="fa-solid fa-money-bill-transfer"></i> المصروفات</button>
                 <button class="nav-btn" onclick="appLogic.switchView('reports')"><i class="fa-solid fa-chart-line"></i> القوائم المالية</button>
                 <button class="nav-btn" id="settings-nav-btn" onclick="appLogic.openSettingsModal()"><i class="fa-solid fa-gear"></i> الإعدادات</button>
+                <!-- PWA Install Button (Hidden by default, revealed via JS) -->
+                <button class="nav-btn" id="pwa-install-btn" style="display: none; background: rgba(76, 175, 80, 0.1); color: #4CAF50; font-weight: bold; border: 1px solid #4CAF50;" title="تثبيت التطبيق على جهازك"><i class="fa-solid fa-mobile-screen"></i> تثبيت التطبيق 📱</button>
                 <!-- Admin Nav Removed for Smart Gate Security -->
             </nav>
         </header>
@@ -692,6 +697,19 @@
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-database-compat.js"></script>
+
+    <!-- PWA Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js').then((registration) => {
+                    console.log('PWA ServiceWorker registered with scope:', registration.scope);
+                }).catch((error) => {
+                    console.error('PWA ServiceWorker registration failed:', error);
+                });
+            });
+        }
+    </script>
 
     <script src="js/app.js?v=6.0.1-RECOVERY"></script>
 </body>

@@ -19,6 +19,57 @@
     }
 })();
 
+// ==========================================
+// PWA SMART INSTALLATION & AUTO-UPDATE LOGIC
+// ==========================================
+let deferredPrompt;
+
+// 1. Listen for the install prompt from the browser
+window.addEventListener('beforeinstallprompt', (e) => {
+    // Prevent the mini-infobar from appearing automatically
+    e.preventDefault();
+    // Stash the event so it can be triggered later via our custom button
+    deferredPrompt = e;
+    
+    // Reveal the Smart Install Button in the Navbar
+    const installBtn = document.getElementById('pwa-install-btn');
+    if (installBtn) {
+        installBtn.style.display = 'inline-flex'; // matching flex layout of nav buttons
+        
+        // Setup click handler
+        installBtn.onclick = async () => {
+            // Hide the button while waiting for user choice
+            installBtn.style.display = 'none';
+            
+            // Show the native browser install prompt
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                console.log(`[PWA] User response to the install prompt: ${outcome}`);
+                // Clear the deferredPrompt variable since it can only be used once
+                deferredPrompt = null;
+            }
+        };
+    }
+});
+
+// 2. Hide button if installation completes successfully
+window.addEventListener('appinstalled', () => {
+    const installBtn = document.getElementById('pwa-install-btn');
+    if (installBtn) installBtn.style.display = 'none';
+    deferredPrompt = null;
+    console.log('[PWA] Application was successfully installed.');
+});
+
+// 3. Guarantee button is hidden if already running in PWA standalone mode
+if (window.matchMedia('(display-mode: standalone)').matches) {
+    window.addEventListener('DOMContentLoaded', () => {
+        const installBtn = document.getElementById('pwa-install-btn');
+        if (installBtn) installBtn.style.display = 'none';
+        console.log('[PWA] Running in Standalone mode.');
+    });
+}
+
 const ADMIN_PIN = "456333";
 const DefaultDeliveryOptions = [
 
