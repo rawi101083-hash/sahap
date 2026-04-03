@@ -1539,6 +1539,7 @@ window.appLogic = {
         if (!t) {
             t = document.createElement('div');
             t.id = 'toast-msg';
+            t.classList.add('no-print');
             t.style.cssText = 'position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#4CAF50;color:#fff;padding:15px 30px;border-radius:30px;font-weight:bold;z-index:9999;box-shadow:0 10px 30px rgba(0,0,0,0.5);opacity:0;transition:opacity 0.3s; pointer-events:none; font-family:"Tajawal",sans-serif; text-align:center; min-width:300px;';
             document.body.appendChild(t);
         }
@@ -2900,12 +2901,16 @@ window.appLogic = {
             // DYNAMIC ROLLING TOTALS
             const isInRange = (rTime >= startBound && (endBound === Infinity || rTime <= endBound));
 
+            // Today's sales honors the Z-Report wipe (matchesShift) per user preference
             if (isInRange && matchesShift) {
                 salesToday += amt;
-                if (rTime >= weekAgo) salesWeek += amt;
-                if (rTime >= monthAgo) salesMonth += amt;
-                if (rTime >= yearAgo) salesYear += amt;
             }
+
+            // 7/30/365 metrics ignore Z-Report wipe and accumulate ALL historical data in range
+            const isBeforeOrOnEnd = (endBound === Infinity || rTime <= endBound);
+            if (rTime >= weekAgo && isBeforeOrOnEnd) salesWeek += amt;
+            if (rTime >= monthAgo && isBeforeOrOnEnd) salesMonth += amt;
+            if (rTime >= yearAgo && isBeforeOrOnEnd) salesYear += amt;
 
             // 🌟 EXCEPTION: MONTHLY SALES BREAKDOWN
             // DO NOT RESET: Must calculate sum of ALL invoices (historical + active) for calendar reporting
