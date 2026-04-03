@@ -30,33 +30,12 @@ window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     // Stash the event so it can be triggered later via our custom button
     deferredPrompt = e;
-    
-    // Reveal the Smart Install Button in the Navbar
-    const installBtn = document.getElementById('pwa-install-btn');
-    if (installBtn) {
-        installBtn.style.display = 'inline-flex'; // matching flex layout of nav buttons
-        
-        // Setup click handler
-        installBtn.onclick = async () => {
-            // Hide the button while waiting for user choice
-            installBtn.style.display = 'none';
-            
-            // Show the native browser install prompt
-            if (deferredPrompt) {
-                deferredPrompt.prompt();
-                const { outcome } = await deferredPrompt.userChoice;
-                console.log(`[PWA] User response to the install prompt: ${outcome}`);
-                // Clear the deferredPrompt variable since it can only be used once
-                deferredPrompt = null;
-            }
-        };
-    }
 });
 
 // 2. Hide button if installation completes successfully
 window.addEventListener('appinstalled', () => {
     const installBtn = document.getElementById('pwa-install-btn');
-    if (installBtn) installBtn.style.display = 'none';
+    if (installBtn) installBtn.classList.add('hidden');
     deferredPrompt = null;
     console.log('[PWA] Application was successfully installed.');
 });
@@ -67,7 +46,7 @@ const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
 if (isStandalone) {
     window.addEventListener('DOMContentLoaded', () => {
         const installBtn = document.getElementById('pwa-install-btn');
-        if (installBtn) installBtn.style.display = 'none';
+        if (installBtn) installBtn.classList.add('hidden');
         console.log('[PWA] Running in Standalone mode.');
     });
 } else {
@@ -78,12 +57,8 @@ if (isStandalone) {
         if (isIOS) {
             const installBtn = document.getElementById('pwa-install-btn');
             if (installBtn) {
-                // Change the button into an iOS Hint instead of a native installer
+                // Prepare the button as an iOS Hint instead of a native installer
                 installBtn.innerHTML = '<i class="fa-brands fa-apple"></i> للتثبيت: اضغط مشاركة 📤 ثم أضف للشاشة';
-                installBtn.style.display = 'inline-flex';
-                installBtn.style.border = '1px dashed #4CAF50';
-                installBtn.style.background = 'transparent';
-                installBtn.style.cursor = 'help';
                 installBtn.onclick = (e) => {
                     e.preventDefault();
                     if (typeof appLogic !== 'undefined' && appLogic.showToast) {
@@ -3340,12 +3315,15 @@ window.appLogic = {
                                 <button class="btn" style="background:${s.status !== 'expired' ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)'}; 
                                                           color:${s.status !== 'expired' ? '#ef4444' : '#22c55e'}; 
                                                           padding:5px 10px; border:1px solid ${s.status !== 'expired' ? 'rgba(239,68,68,0.2)' : 'rgba(34,197,94,0.2)'}; 
-                                                          border-radius:4px; font-size:11px; cursor:pointer;" 
+                                                          border-radius:4px; font-size:11px; cursor:pointer; margin-bottom:5px;" 
                                         onclick="appLogic.toggleStoreStatus('${pin}', '${s.status || 'active'}')">
                                     <i class="fa-solid ${s.status !== 'expired' ? 'fa-ban' : 'fa-check-circle'}"></i> 
                                     ${s.status !== 'expired' ? 'تعطيل' : 'تفعيل'}
                                 </button>
-                                <button class="btn" style="background:rgba(239,68,68,0.1); color:#ef4444; padding:5px 10px; border:1px solid rgba(239,68,68,0.2); border-radius:4px; font-size:11px; cursor:pointer; margin-right:5px;" onclick="appLogic.deleteStore('${pin}')">
+                                <button class="btn" style="background:${s.canInstallPWA ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)'}; color:${s.canInstallPWA ? '#22c55e' : '#f59e0b'}; padding:5px 10px; border:1px solid ${s.canInstallPWA ? 'rgba(34,197,94,0.2)' : 'rgba(245,158,11,0.2)'}; border-radius:4px; font-size:11px; cursor:pointer; margin-right:5px; margin-bottom:5px;" onclick="appLogic.togglePWAStatus('${pin}', ${!!s.canInstallPWA})">
+                                    <i class="fa-solid ${s.canInstallPWA ? 'fa-mobile-screen' : 'fa-mobile'}"></i> ${s.canInstallPWA ? 'منع PWA' : 'سماح PWA'}
+                                </button>
+                                <button class="btn" style="background:rgba(239,68,68,0.1); color:#ef4444; padding:5px 10px; border:1px solid rgba(239,68,68,0.2); border-radius:4px; font-size:11px; cursor:pointer; margin-right:5px; margin-bottom:5px;" onclick="appLogic.deleteStore('${pin}')">
                                     <i class="fa-solid fa-trash"></i>
                                 </button>
                             </td>
@@ -3381,7 +3359,8 @@ window.appLogic = {
             const storeData = {
                 name, phone, taxNumber: tax,
                 timestamp: Date.now(),
-                status: 'active'
+                status: 'active',
+                canInstallPWA: false
             };
             await firebase.database().ref(`admin/stores/${pin}`).set(storeData);
 
@@ -3411,6 +3390,18 @@ window.appLogic = {
         } catch (err) {
             console.error('[Admin-Sync] Synchronization failed:', err);
             alert('فشل تحديث الحالة في قاعدة البيانات');
+        }
+    },
+
+    async togglePWAStatus(pin, currentStatus) {
+        const newStatus = !currentStatus;
+        try {
+            await firebase.database().ref(`admin/stores/${pin}/canInstallPWA`).set(newStatus);
+            this.showToast(newStatus ? 'تم منح الإذن بتثبيت التطبيق 📱' : 'تم حجب الإذن بتثبيت التطبيق 🚫');
+            this.renderAdmin();
+        } catch (err) {
+            console.error('[Admin] PWA toggle failed:', err);
+            alert('فشل في تحديث إذن التثبيت.');
         }
     },
 
@@ -3675,6 +3666,33 @@ window.appLogic = {
         document.getElementById('setting-name').value = s.name || '';
         document.getElementById('setting-phone').value = s.phone || '';
         document.getElementById('setting-tax').value = s.taxNumber || '';
+        
+        // PWA Button Gatekeeper Logic
+        const installBtn = document.getElementById('pwa-install-btn');
+        if (installBtn) {
+            if (s.canInstallPWA && !isStandalone) {
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+                if (deferredPrompt || isIOS) {
+                    installBtn.classList.remove('hidden');
+                    
+                    // If Android/Chrome desktop, setup native install prompt
+                    if (!isIOS) {
+                        installBtn.onclick = async () => {
+                            installBtn.classList.add('hidden');
+                            if (deferredPrompt) {
+                                deferredPrompt.prompt();
+                                const { outcome } = await deferredPrompt.userChoice;
+                                deferredPrompt = null;
+                            }
+                        };
+                    }
+                } else {
+                    installBtn.classList.add('hidden');
+                }
+            } else {
+                installBtn.classList.add('hidden');
+            }
+        }
         
         // Load existing logo preview
         const logoPreview = document.getElementById('setting-logo-preview');

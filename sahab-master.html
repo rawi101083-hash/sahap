@@ -186,7 +186,8 @@
     </div>
 
 
-    <!-- Firebase SDKs -->
+    <!-- SweetAlert & Firebase SDKs -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-database-compat.js"></script>
@@ -322,7 +323,11 @@
                         : `<button class="btn-action btn-suspend" onclick="masterApp.toggleStatus('${uid}', false, '${pin}')"><i class="fa-solid fa-power-off"></i> Suspend</button>`;
                     const tr = document.createElement('tr');
                     tr.style.opacity = !isActivated ? '0.6' : '1';
-                    const deleteBtn = `<button style="background:var(--danger); border:none; color:white; padding:6px 12px; margin-right:8px; border-radius:4px; font-weight:bold; cursor:pointer;" onclick="masterApp.deleteStore('${uid}', '${pin}')" title="حذف نهائي"><i class="fa-solid fa-trash"></i></button>`;
+                    const storeInfo = storesData[pin] || {};
+                    const canInstallPWA = storeInfo.canInstallPWA === true;
+                    const pwaToggleBtn = `<button class="btn-action" style="background:${canInstallPWA ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)'}; color:${canInstallPWA ? '#22c55e' : '#f59e0b'}; margin-top:5px; border:1px solid ${canInstallPWA ? 'rgba(34,197,94,0.3)' : 'rgba(245,158,11,0.3)'}; display:block; width:100%; border-radius:4px; font-weight:bold; cursor:pointer;" onclick="masterApp.togglePWAStatus('${pin}', ${canInstallPWA})" title="Admin PWA Install Toggle"><i class="fa-solid ${canInstallPWA ? 'fa-mobile-screen' : 'fa-mobile'}"></i> PWA Toggle</button>`;
+                    
+                    const deleteBtn = `<button class="btn-action" style="background:var(--danger); border:none; color:white; display:block; width:100%; margin-top:5px; border-radius:4px; font-weight:bold; cursor:pointer;" onclick="masterApp.deleteStore('${uid}', '${pin}')" title="Factory reset and delete account"><i class="fa-solid fa-skull-crossbones"></i> Factory Reset</button>`;
                     const safeName = name.replace(/'/g,"\\'").replace(/"/g,'&quot;');
                     const safePhone = phone.replace(/'/g,"\\'").replace(/"/g,'&quot;');
                     const pinEditBtn = `<button class="btn-action" style="background:var(--primary); color:#000; padding:4px 8px; font-size:11px; margin-right:8px; border-radius:4px; font-weight:bold; cursor:pointer;" onclick="masterApp.changePin('${uid}', '${pin}', '${safeName}', '${safePhone}')" title="تغيير الرمز السري"><i class="fa-solid fa-pen"></i> تعديل</button>`;
@@ -342,7 +347,7 @@
                         </td>
                         <td>${badge}</td>
                         <td style="text-align: center;">${subToggleBtn}</td>
-                        <td style="text-align: center;">${actionBtn}${deleteBtn}</td>
+                        <td style="text-align: center;">${actionBtn}${deleteBtn}${pwaToggleBtn}</td>
                     `;
                     tbody.appendChild(tr);
                 });
@@ -425,7 +430,7 @@
                     };
                     // 2. Admin registry for metadata
                     updates[`admin/stores/${pin}`] = {
-                        uid: newID, name, phone, status: 'active', timestamp
+                        uid: newID, name, phone, status: 'active', timestamp, canInstallPWA: false
                     };
                     // 3. User activation node - specifically using laundryName
                     updates[`users/${newID}/accountDetails`] = {
@@ -485,45 +490,42 @@
             },
 
             async deleteStore(uid, pin) {
-                if (!confirm("هل أنت متأكد من حذف هذه المغسلة وجميع بياناتها نهائياً؟ لا يمكن التراجع عن هذا الإجراء.")) return;
+                const result = await Swal.fire({
+                    title: 'تأكيد إعادة ضبط المصنع ☠️',
+                    text: 'سيتم مسح كافة البيانات المالية (الفواتير، المصروفات، العملاء، التقارير) وتصفير العداد لتبدأ المغسلة من جديد. لن يتم حذف الحساب وسيبقى فعالاً. هل أنت متأكد؟',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#ef4444',
+                    cancelButtonColor: '#3f3f46',
+                    confirmButtonText: 'نعم، نفذ إعادة الضبط!',
+                    cancelButtonText: 'تراجع'
+                });
+
+                if (!result.isConfirmed) return;
 
                 try {
                     const updates = {};
                     
-                    // SWEEP: Dynamically find all PINs/auth nodes tied to this UID to prevent ghosts
                     if (uid && uid !== 'undefined') {
-                        const storesSnap = await db.ref('admin/stores').once('value');
-                        const stores = storesSnap.val() || {};
-                        Object.keys(stores).forEach(k => {
-                            if (stores[k].uid === uid) updates[`admin/stores/${k}`] = null;
-                        });
-
-                        const pinsSnap = await db.ref('pincodes').once('value');
-                        const pincodes = pinsSnap.val() || {};
-                        Object.keys(pincodes).forEach(k => {
-                            const pdata = pincodes[k];
-                            // Check if pdata is object with uid OR direct string
-                            if (pdata === uid || (pdata && pdata.uid === uid)) {
-                                updates[`pincodes/${k}`] = null;
-                            }
+                        // 1. Wipe Transactional Data
+                        const collectionsToWipe = ['invoices', 'expenses', 'customers', 'journal_entries', 'tax_records', 'zreports', 'reports'];
+                        collectionsToWipe.forEach(col => {
+                            updates[`users/${uid}/${col}`] = null;
                         });
                         
-                        updates[`users/${uid}`] = null;
-                    }
-
-                    // Fallback to literal pin if missing in sweep
-                    if (pin && pin !== '--' && pin !== 'غير محدد') {
-                        updates[`pincodes/${pin}`] = null;
-                        updates[`admin/stores/${pin}`] = null;
+                        // 2. Reset Invoice Counters to 0
+                        updates[`users/${uid}/settings/lastInvoice`] = 0;
+                        updates[`users/${uid}/settings/invoiceCount`] = 0;
+                        updates[`users/${uid}/settings/invoiceCounter`] = 0;
+                        updates[`users/${uid}/accountDetails/invoiceCounter`] = 0;
                     }
 
                     await db.ref().update(updates);
-                    console.log(`[Master-Sync] NUCLEAR DELETION successful for UID: ${uid}`);
-                    alert("تم حذف المغسلة نهائياً بنجاح وتم تحرير كافة سجلاتها والرمز الخاص بها.");
-                    this.fetchData(); // Dynamically remove row by refreshing list
+                    console.log(`[Master-Sync] FACTORY RESET successful for UID: ${uid}`);
+                    Swal.fire('تم التنفيذ!', 'تمت إعادة ضبط المصنع بنجاح ومسح البيانات المؤقتة. الحساب جاهز الآن.', 'success');
                 } catch (e) {
-                    console.error("Nuke failed:", e);
-                    alert("فشل حذف المغسلة. يرجى التأكد من الصلاحيات والمحاولة مرة أخرى.");
+                    console.error("Factory Reset failed:", e);
+                    Swal.fire('خطأ', 'فشل في التنفيذ. يرجى التأكد من الصلاحيات.', 'error');
                 }
             },
 
@@ -575,6 +577,18 @@
                 } catch (e) {
                     console.error("Failed to update subscription:", e);
                     alert("Update failed. Permission denied.");
+                }
+            },
+
+            async togglePWAStatus(pin, currentStatus) {
+                const nextStatus = !currentStatus;
+                try {
+                    await db.ref(`admin/stores/${pin}/canInstallPWA`).set(nextStatus);
+                    console.log(`[Master-Sync] PWA Access updated for PIN: ${pin} (${nextStatus})`);
+                    this.fetchData();
+                } catch (err) {
+                    console.error("Failed to toggle PWA:", err);
+                    alert("Failed to toggle PWA permission.");
                 }
             },
 

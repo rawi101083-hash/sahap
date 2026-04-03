@@ -111,8 +111,6 @@
                 <button class="nav-btn" onclick="appLogic.switchView('expenses')"><i class="fa-solid fa-money-bill-transfer"></i> المصروفات</button>
                 <button class="nav-btn" onclick="appLogic.switchView('reports')"><i class="fa-solid fa-chart-line"></i> القوائم المالية</button>
                 <button class="nav-btn" id="settings-nav-btn" onclick="appLogic.openSettingsModal()"><i class="fa-solid fa-gear"></i> الإعدادات</button>
-                <!-- PWA Install Button (Hidden by default, revealed via JS) -->
-                <button class="nav-btn" id="pwa-install-btn" style="display: none; background: rgba(76, 175, 80, 0.1); color: #4CAF50; font-weight: bold; border: 1px solid #4CAF50;" title="تثبيت التطبيق على جهازك"><i class="fa-solid fa-mobile-screen"></i> تثبيت التطبيق 📱</button>
                 <!-- Admin Nav Removed for Smart Gate Security -->
             </nav>
         </header>
@@ -653,6 +651,10 @@
                     </select>
                 </div>
                 
+                <button id="pwa-install-btn" class="btn w-100 hidden" style="margin-bottom:15px; font-size:16px; background: rgba(76, 175, 80, 0.1); color: #4CAF50; border: 1px dashed #4CAF50; padding:12px 18px; font-weight: 800;">
+                    <i class="fa-solid fa-mobile-screen"></i> تثبيت التطبيق على الجهاز (PWA)
+                </button>
+
                 <button id="settings-save-btn" class="btn btn-primary w-100" onclick="appLogic.saveTenantSettings()" style="margin-top:8px; font-size:16px;">
                     <i class="fa-solid fa-floppy-disk"></i> حفظ الإعدادات
                 </button>
