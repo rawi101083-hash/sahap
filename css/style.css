@@ -2008,3 +2008,32 @@ button:active {
     font-size: 18px;
     font-weight: 800;
 }
+
+/* =========================================
+   RESPONSIVE DESIGN (IPAD & TABLET FIXES)
+   ========================================= */
+@media (max-width: 1200px) {
+    .main-header {
+        height: auto;
+        min-height: 80px;
+        flex-direction: column;
+        padding: 15px 24px;
+        gap: 15px;
+    }
+    .logo-area {
+        align-self: center;
+    }
+    .main-nav {
+        flex-wrap: wrap;
+        justify-content: center;
+        width: 100%;
+        gap: 10px;
+    }
+    .nav-btn {
+        flex: 1 1 auto;
+        text-align: center;
+        justify-content: center;
+        padding: 10px 12px;
+        font-size: 14px;
+    }
+}

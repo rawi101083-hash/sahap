@@ -62,11 +62,38 @@ window.addEventListener('appinstalled', () => {
 });
 
 // 3. Guarantee button is hidden if already running in PWA standalone mode
-if (window.matchMedia('(display-mode: standalone)').matches) {
+const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+
+if (isStandalone) {
     window.addEventListener('DOMContentLoaded', () => {
         const installBtn = document.getElementById('pwa-install-btn');
         if (installBtn) installBtn.style.display = 'none';
         console.log('[PWA] Running in Standalone mode.');
+    });
+} else {
+    // 4. iOS Specific Workaround Details
+    // iOS Safari does not support beforeinstallprompt. We must show a manual instruction.
+    window.addEventListener('DOMContentLoaded', () => {
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        if (isIOS) {
+            const installBtn = document.getElementById('pwa-install-btn');
+            if (installBtn) {
+                // Change the button into an iOS Hint instead of a native installer
+                installBtn.innerHTML = '<i class="fa-brands fa-apple"></i> للتثبيت: اضغط مشاركة 📤 ثم أضف للشاشة';
+                installBtn.style.display = 'inline-flex';
+                installBtn.style.border = '1px dashed #4CAF50';
+                installBtn.style.background = 'transparent';
+                installBtn.style.cursor = 'help';
+                installBtn.onclick = (e) => {
+                    e.preventDefault();
+                    if (typeof appLogic !== 'undefined' && appLogic.showToast) {
+                        appLogic.showToast('في متصفح سفاري (Safari): اضغط على أيقونة المشاركة 📤 ثم اختر "إضافة إلى الصفحة الرئيسية"');
+                    } else {
+                        alert('في متصفح سفاري: اضغط على أيقونة المشاركة 📤 ثم اختر "إضافة إلى الصفحة الرئيسية"');
+                    }
+                };
+            }
+        }
     });
 }
 
