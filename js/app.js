@@ -2339,25 +2339,26 @@ window.appLogic = {
                 console.error('[UI] Error loading consumables:', e);
             }
 
+            const lang = this.currentLang || 'ar';
             let html = '';
 
             // Consumables Section
             html += `
             <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px; margin-bottom:20px;">
-                <h3 style="margin-bottom:15px; border-bottom:1px solid var(--border); padding-bottom:10px;">المواد الاستهلاكية (Consumables)</h3>
-                ${trackedInv.length === 0 ? '<p style="color:var(--text-muted); text-align:center;">لا توجد مواد استهلاكية مضافة حالياً. أضف الجِير، الأكياس، الشماعات ليتم خصمها آلياً يدوياً.</p>' : ''}
+                <h3 style="margin-bottom:15px; border-bottom:1px solid var(--border); padding-bottom:10px;">${lang === 'en' ? 'Consumables' : 'المواد الاستهلاكية (Consumables)'}</h3>
+                ${trackedInv.length === 0 ? `<p style="color:var(--text-muted); text-align:center;">${lang === 'en' ? 'No consumables added currently.' : 'لا توجد مواد استهلاكية مضافة حالياً. أضف الجِير، الأكياس، الشماعات ليتم خصمها آلياً يدوياً.'}</p>` : ''}
             `;
 
             if (trackedInv.length > 0) {
                 html += `<table style="width:100%; border-collapse:collapse; text-align:right; margin-bottom:20px;">
                     <thead>
                         <tr style="border-bottom:2px solid var(--border); color:var(--text-muted);">
-                            <th style="padding:10px;">SKU</th>
-                            <th style="padding:10px;">الاسم</th>
-                            <th style="padding:10px;">التكلفة</th>
-                            <th style="padding:10px;">الرصيد المتاح (Qty)</th>
-                            <th style="padding:10px;">إجمالي القيمة</th>
-                            <th style="padding:10px; text-align:center;">إجراءات</th>
+                            <th style="padding:10px;">${lang === 'en' ? 'SKU' : 'SKU'}</th>
+                            <th style="padding:10px;">${lang === 'en' ? 'Name' : 'الاسم'}</th>
+                            <th style="padding:10px;">${lang === 'en' ? 'Cost' : 'التكلفة'}</th>
+                            <th style="padding:10px;">${lang === 'en' ? 'Available Qty' : 'الرصيد المتاح (Qty)'}</th>
+                            <th style="padding:10px;">${lang === 'en' ? 'Total Value' : 'إجمالي القيمة'}</th>
+                            <th style="padding:10px; text-align:center;">${lang === 'en' ? 'Actions' : 'إجراءات'}</th>
                         </tr>
                     </thead>
                     <tbody>`;
@@ -2372,10 +2373,10 @@ window.appLogic = {
                         <td style="padding:12px; font-weight:bold; direction:ltr;">${((item.qty || 0) * (item.cost || 0)).toFixed(2)} SAR</td>
                         <td style="padding:12px; text-align:center;">
                             <button class="btn-edit-svc" onclick="appLogic.editConsumable('${item.id}')">
-                                <i class="fa-solid fa-edit"></i> تعديل
+                                <i class="fa-solid fa-edit"></i> ${lang === 'en' ? 'Edit' : 'تعديل'}
                             </button>
                             <button class="btn-delete-svc" onclick="appLogic.deleteConsumable('${item.id}')" style="margin-right: 5px;">
-                                <i class="fa-solid fa-trash"></i> حذف
+                                <i class="fa-solid fa-trash"></i> ${lang === 'en' ? 'Delete' : 'حذف'}
                             </button>
                         </td>
                     </tr>`;
@@ -2387,19 +2388,19 @@ window.appLogic = {
             // Laundry Services Section
             html += `
             <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px;">
-                <h3 style="margin-bottom:15px; border-bottom:1px solid var(--border); padding-bottom:10px;">خدمات المغسلة وأسعارها (Laundry Services)</h3>
+                <h3 style="margin-bottom:15px; border-bottom:1px solid var(--border); padding-bottom:10px;">${lang === 'en' ? 'Laundry Services & Prices' : 'خدمات المغسلة وأسعارها (Laundry Services)'}</h3>
                 <div style="overflow-x: auto;">
                     <table class="inventory-table">
                         <thead>
                             <tr>
-                                <th>الأيقونة</th>
-                                <th>اسم الخدمة</th>
-                                <th>الفئة</th>
-                                <th>كوي</th>
-                                <th>غسيل+كوي</th>
-                                <th>غسيل</th>
-                                <th>رسم السريع</th>
-                                <th style="text-align:center;">إجراءات</th>
+                                <th>${lang === 'en' ? 'Icon' : 'الأيقونة'}</th>
+                                <th>${lang === 'en' ? 'Service Name' : 'اسم الخدمة'}</th>
+                                <th>${lang === 'en' ? 'Category' : 'الفئة'}</th>
+                                <th>${lang === 'en' ? 'Iron' : 'كوي'}</th>
+                                <th>${lang === 'en' ? 'Wash+Iron' : 'غسيل+كوي'}</th>
+                                <th>${lang === 'en' ? 'Wash' : 'غسيل'}</th>
+                                <th>${lang === 'en' ? 'Express Fee' : 'رسم السريع'}</th>
+                                <th style="text-align:center;">${lang === 'en' ? 'Actions' : 'إجراءات'}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -2424,17 +2425,17 @@ window.appLogic = {
                         <tr style="border-bottom:1px solid var(--border);">
                             <td style="padding:12px;"><i class="fa-solid ${item.icon || 'fa-shirt'}" style="font-size:20px; color:var(--primary);"></i></td>
                             <td style="padding:12px; font-weight:bold;">${item.name || 'N/A'}</td>
-                            <td style="padding:12px;">${item.cat === 'men' ? 'رجالي' : (item.cat === 'women' ? 'نسائي' : 'أخرى')}</td>
+                            <td style="padding:12px;">${item.cat === 'men' ? (lang === 'en' ? 'Men' : 'رجالي') : (item.cat === 'women' ? (lang === 'en' ? 'Women' : 'نسائي') : (lang === 'en' ? 'Misc' : 'أخرى'))}</td>
                             <td style="padding:12px; color:var(--primary); font-weight:bold;">${iron.toFixed(2)}</td>
                             <td style="padding:12px; color:var(--primary); font-weight:bold;">${washIron.toFixed(2)}</td>
                             <td style="padding:12px; color:var(--primary); font-weight:bold;">${wash.toFixed(2)}</td>
                             <td style="padding:12px; color:#4CAF50; font-weight:bold;">${expLbl}</td>
                             <td style="padding:12px; text-align:center;">
                                 <button class="btn-edit-svc" onclick="appLogic.openEditServiceModal('${item.id}')">
-                                <i class="fa-solid fa-edit"></i> تعديل
+                                <i class="fa-solid fa-edit"></i> ${lang === 'en' ? 'Edit' : 'تعديل'}
                                 </button>
                                 <button class="btn-delete-svc" onclick="appLogic.deleteService('${item.id}')" style="margin-right: 5px;">
-                                <i class="fa-solid fa-trash"></i> حذف
+                                <i class="fa-solid fa-trash"></i> ${lang === 'en' ? 'Delete' : 'حذف'}
                                 </button>
                             </td>
                         </tr>`;
@@ -2932,6 +2933,7 @@ window.appLogic = {
 
         let salesToday = 0, salesWeek = 0, salesMonth = 0, salesYear = 0;
         const monthsAr = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+        const monthsEn = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
         const monthlyMap = {};
 
         // Active Dashboard Totals (Filtered by Selected Date)
@@ -2971,7 +2973,8 @@ window.appLogic = {
             const mIdx = d.getMonth();
             const year = d.getFullYear();
             const key = `${year}-${String(mIdx + 1).padStart(2, '0')}`;
-            const label = `${monthsAr[mIdx]} ${year.toString()}`;
+            const monthName = (this.currentLang === 'en') ? monthsEn[mIdx] : monthsAr[mIdx];
+            const label = `${monthName} ${year.toString()}`;
             if (!monthlyMap[key]) monthlyMap[key] = { label, total: 0, sortKey: key };
             monthlyMap[key].total += amt;
 
@@ -3023,17 +3026,17 @@ window.appLogic = {
         <div style="background: rgba(253,184,19,0.1); border:1px solid var(--primary); border-radius:var(--radius-md); padding:12px 18px; margin-bottom:18px; display:flex; align-items:center; gap:12px;">
             <i class="fa-solid fa-clock-rotate-left" style="color:var(--primary); font-size:20px;"></i>
             <div>
-                <div style="font-size:14px; font-weight:800; color:var(--primary);">وضع الاستعراض التاريخي</div>
-                <div style="font-size:12px; color:var(--text-muted);">تعرض الأرقام بيانات يوم ${currentTargetDate} فقط. لا يمكن إغلاق اليومية في هذا الوضع.</div>
+                <div style="font-size:14px; font-weight:800; color:var(--primary);">${lang === 'en' ? 'Historical View Mode' : 'وضع الاستعراض التاريخي'}</div>
+                <div style="font-size:12px; color:var(--text-muted);">${lang === 'en' ? `Showing data for ${currentTargetDate} only. Daily closure is disabled in this mode.` : `تعرض الأرقام بيانات يوم ${currentTargetDate} فقط. لا يمكن إغلاق اليومية في هذا الوضع.`}</div>
             </div>
             <button class="btn" onclick="appLogic.resetReportFilter()" style="margin-right:auto; background:var(--primary); color:#000; padding:8px 16px; font-size:12px; font-weight:800; border:none; border-radius:8px; cursor:pointer;">
-                <i class="fa-solid fa-rotate-left"></i> العودة لليوم الحالي
+                <i class="fa-solid fa-rotate-left"></i> ${lang === 'en' ? 'Back to Today' : 'العودة لليوم الحالي'}
             </button>
         </div>` : ''}
         <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:15px; margin-bottom:25px; display:flex; justify-content:space-between; align-items:center; box-shadow:var(--shadow-sm);">
             <div>
-                <h2 style="font-size:18px; color:var(--primary); margin-bottom:3px;"><i class="fa-solid fa-calendar-check"></i> عرض البيانات المالية لـ: ${currentTargetDate}</h2>
-                <p style="font-size:12px; color:var(--text-muted); margin:0;">اختر تاريخاً لمراجعة الأداء والعمليات المالية السابقة.</p>
+                <h2 style="font-size:18px; color:var(--primary); margin-bottom:3px;"><i class="fa-solid fa-calendar-check"></i> ${lang === 'en' ? 'Financial Data for Date:' : 'عرض البيانات المالية لـ:'} ${currentTargetDate}</h2>
+                <p style="font-size:12px; color:var(--text-muted); margin:0;">${lang === 'en' ? 'Select a date to review past financial operations and performance.' : 'اختر تاريخاً لمراجعة الأداء والعمليات المالية السابقة.'}</p>
             </div>
             <div style="display:flex; gap:10px; align-items:center;">
                 <input type="date" lang="en" dir="ltr" value="${currentTargetDate}" onchange="appLogic.filterReportsByDate(this.value)" style="color-scheme: dark; cursor: pointer; background:#000; color:#fff; border:1px solid var(--border); padding:10px; border-radius:8px; font-size:14px; outline:none; text-align:center; font-family: system-ui, -apple-system, Arial, sans-serif !important; font-variant-numeric: tabular-nums;">
@@ -3045,35 +3048,35 @@ window.appLogic = {
             
             <!-- 1. Gross Sales -->
             <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px; text-align:center; box-shadow:var(--shadow-sm);">
-                <h3 style="color:var(--text-muted); font-size:13px; margin-bottom:5px;">إجمالي المبيعات (Gross Sales)</h3>
+                <h3 style="color:var(--text-muted); font-size:13px; margin-bottom:5px;">${lang === 'en' ? 'Gross Sales' : 'إجمالي المبيعات (Gross Sales)'}</h3>
                 <div id="db-gross-sales" style="font-size:24px; font-weight:800; direction:ltr; color:var(--text-main);">${totalAllInvoices.toFixed(2)} ر.س</div>
             </div>
 
             <!-- 2. Refunds -->
             <div style="background:var(--bg-surface); border:1px solid rgba(255, 69, 58, 0.2); border-radius:var(--radius-md); padding:20px; text-align:center; box-shadow:var(--shadow-sm);">
-                <h3 style="color:var(--text-muted); font-size:13px; margin-bottom:5px;">إجمالي المرتجعات (Refunds)</h3>
+                <h3 style="color:var(--text-muted); font-size:13px; margin-bottom:5px;">${lang === 'en' ? 'Refunds' : 'إجمالي المرتجعات (Refunds)'}</h3>
                 <div id="db-refunds" style="font-size:24px; font-weight:800; direction:ltr; color:#ff453a;">- ${totalRefunds.toFixed(2)} ر.س</div>
             </div>
 
             <!-- 3. Net Revenue -->
             <div style="background:var(--bg-surface); border:1px solid rgba(76, 175, 80, 0.2); border-radius:var(--radius-md); padding:20px; text-align:center; box-shadow:var(--shadow-sm);">
-                <h3 style="color:var(--text-muted); font-size:13px; margin-bottom:5px;">صافي الإيرادات (Net Revenue)</h3>
+                <h3 style="color:var(--text-muted); font-size:13px; margin-bottom:5px;">${lang === 'en' ? 'Net Revenue' : 'صافي الإيرادات (Net Revenue)'}</h3>
                 <div id="db-net-revenue" style="font-size:24px; font-weight:800; direction:ltr; color:#4CAF50;">${totalNetRevenue.toFixed(2)} ر.س</div>
             </div>
 
             <!-- 4. Operating Expenses (NEW BOX) -->
             <div style="background:var(--bg-surface); border:1px solid rgba(255, 69, 58, 0.2); border-radius:var(--radius-md); padding:20px; text-align:center; box-shadow:var(--shadow-sm);">
-                <h3 style="color:var(--text-muted); font-size:13px; margin-bottom:5px;">إجمالي المصاريف التشغيلية</h3>
+                <h3 style="color:var(--text-muted); font-size:13px; margin-bottom:5px;">${lang === 'en' ? 'Total Operating Expenses' : 'إجمالي المصاريف التشغيلية'}</h3>
                 <div id="db-op-expenses-display" style="font-size:24px; font-weight:800; direction:ltr; color:#ff453a;">- ${totalOperatingExpenses.toFixed(2)} ر.س</div>
             </div>
 
             <!-- 6. FINAL NET PROFIT OVERLAY (Full Width) -->
             <div style="grid-column: 1 / -1; background:var(--bg-elevated); border:2px solid var(--primary); border-radius:var(--radius-md); padding:25px; text-align:center; box-shadow:var(--shadow-lg);">
-                <h3 style="color:var(--text-muted); font-size:15px; margin-bottom:10px;">صافي الربح النهائي (Net Profit)</h3>
+                <h3 style="color:var(--text-muted); font-size:15px; margin-bottom:10px;">${lang === 'en' ? 'Net Profit' : 'صافي الربح النهائي (Net Profit)'}</h3>
                 <div id="db-net-profit" style="font-size:42px; font-weight:900; color:${netProfit >= 0 ? 'var(--primary)' : '#ff453a'}; direction:ltr; text-shadow:0 0 20px rgba(253,184,19,0.1);">
                     ${netProfit.toFixed(2)} <span style="font-size:20px;"> ر.س</span>
                 </div>
-                <p style="margin-top:10px; font-size:12px; color:var(--text-muted); opacity:0.8;">[صافي الإيراد] - [إجمالي المصروفات والسداد]</p>
+                <p style="margin-top:10px; font-size:12px; color:var(--text-muted); opacity:0.8;">${lang === 'en' ? '[Net Revenue] - [Total Expenses]' : '[صافي الإيراد] - [إجمالي المصروفات والسداد]'}</p>
             </div>
             
             <!-- Hidden Sync Data (For 100% Reliable Z-Report Scrape) -->
@@ -3092,18 +3095,18 @@ window.appLogic = {
 
         <!-- End of Day Closure Button -->
         <div style="text-align: center; margin-bottom: 40px; background: rgba(87, 67, 177, 0.05); padding: 30px; border-radius: var(--radius-md); border: 2px dashed var(--primary);">
-            <h3 style="color: var(--text-main); margin-bottom: 10px;">إغلاق اليومية (Close Accounting Day)</h3>
-            <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 20px;">سيتم إصدار تقرير Z-Report وأرشفة العمليات الحالية لبدء يوم جديد.</p>
+            <h3 style="color: var(--text-main); margin-bottom: 10px;">${lang === 'en' ? 'Close Accounting Day' : 'إغلاق اليومية (Close Accounting Day)'}</h3>
+            <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 20px;">${lang === 'en' ? 'A Z-Report will be issued and operations archived to start a new day.' : 'سيتم إصدار تقرير Z-Report وأرشفة العمليات الحالية لبدء يوم جديد.'}</p>
             <button class="btn btn-primary" onclick="appLogic.showZReportPreview()" style="padding: 16px 50px; font-size: 18px; font-weight: 900; background: var(--primary); color: #000; box-shadow: 0 4px 15px rgba(253, 184, 19, 0.3);">
-                <i class="fa-solid fa-lock" style="margin-left: 10px;"></i> إغلاق اليومية (مراجعة الأرقام)
+                <i class="fa-solid fa-lock" style="margin-left: 10px;"></i> ${lang === 'en' ? 'Close Day (Review Figures)' : 'إغلاق اليومية (مراجعة الأرقام)'}
             </button>
         </div>
 
         <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px; margin-bottom: 30px;">
             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:15px; margin-bottom:20px;">
                 <div>
-                    <h3 style="margin-bottom:5px; color:var(--text-main); font-size: 18px;"><i class="fa-solid fa-calendar-days" style="color:var(--primary); margin-left:8px;"></i> مبيعات الأشهر (Monthly Sales Breakdown)</h3>
-                    <p style="color:var(--text-muted); font-size:13px;">تفصيل المبيعات الإيرادية مجمعة حسب الشهر والميلادي.</p>
+                    <h3 style="margin-bottom:5px; color:var(--text-main); font-size: 18px;"><i class="fa-solid fa-calendar-days" style="color:var(--primary); margin-left:8px;"></i> ${lang === 'en' ? 'Monthly Sales Breakdown' : 'مبيعات الأشهر (Monthly Sales Breakdown)'}</h3>
+                    <p style="color:var(--text-muted); font-size:13px;">${lang === 'en' ? 'Detailed revenue breakdown grouped by month.' : 'تفصيل المبيعات الإيرادية مجمعة حسب الشهر والميلادي.'}</p>
                 </div>
             </div>
             
@@ -3111,9 +3114,9 @@ window.appLogic = {
                 <table style="width:100%; border-collapse:collapse; text-align:right;">
                     <thead>
                         <tr style="border-bottom:2px solid var(--border); color:var(--text-muted); font-size: 14px;">
-                            <th style="padding:12px;">الشهر / السنة (Period)</th>
-                            <th style="padding:12px;">إجمالي المبيعات (Total Revenue)</th>
-                            <th style="padding:12px; text-align:center;">الحالة (Status)</th>
+                            <th style="padding:12px;">${lang === 'en' ? 'Period (Month / Year)' : 'الشهر / السنة (Period)'}</th>
+                            <th style="padding:12px;">${lang === 'en' ? 'Total Revenue' : 'إجمالي المبيعات (Total Revenue)'}</th>
+                            <th style="padding:12px; text-align:center;">${lang === 'en' ? 'Status' : 'الحالة (Status)'}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -3122,7 +3125,7 @@ window.appLogic = {
         const sortedMonths = Object.values(monthlyMap).sort((a, b) => b.sortKey.localeCompare(a.sortKey));
 
         if (sortedMonths.length === 0) {
-            html += `<tr><td colspan="3" style="padding:20px; text-align:center; color:var(--text-muted);">لا توجد مبيعات مسجلة حتى الآن</td></tr>`;
+            html += `<tr><td colspan="3" style="padding:20px; text-align:center; color:var(--text-muted);">${lang === 'en' ? 'No sales recorded yet' : 'لا توجد مبيعات مسجلة حتى الآن'}</td></tr>`;
         } else {
             sortedMonths.forEach(m => {
                 html += `
@@ -3130,7 +3133,7 @@ window.appLogic = {
                     <td style="padding:14px; font-weight:700; color:#fff;">${m.label}</td>
                     <td style="padding:14px; font-weight:900; color:var(--primary); direction:ltr;">${m.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR</td>
                     <td style="padding:14px; text-align:center;">
-                        <span style="background:rgba(76, 175, 80, 0.15); color:#4CAF50; padding:4px 10px; border-radius:12px; font-size:11px; font-weight:bold;">محقق</span>
+                        <span style="background:rgba(76, 175, 80, 0.15); color:#4CAF50; padding:4px 10px; border-radius:12px; font-size:11px; font-weight:bold;">${lang === 'en' ? 'Archived' : 'محقق'}</span>
                     </td>
                 </tr>`;
             });
@@ -3145,26 +3148,26 @@ window.appLogic = {
         <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px;">
             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:15px; margin-bottom:20px;">
                 <div>
-                    <h3 style="margin-bottom:5px; color:var(--text-main); font-size: 18px;"><i class="fa-solid fa-chart-bar" style="color:var(--primary); margin-left:8px;"></i> ملخص المبيعات (Sales Analytics)</h3>
-                    <p style="color:var(--text-muted); font-size:13px;">مقارنة سريعة لأداء المبيعات خلال فترات زمنية للنشاط.</p>
+                    <h3 style="margin-bottom:5px; color:var(--text-main); font-size: 18px;"><i class="fa-solid fa-chart-bar" style="color:var(--primary); margin-left:8px;"></i> ${lang === 'en' ? 'Sales Analytics' : 'ملخص المبيعات (Sales Analytics)'}</h3>
+                    <p style="color:var(--text-muted); font-size:13px;">${lang === 'en' ? 'Quick comparison of sales performance over time.' : 'مقارنة سريعة لأداء المبيعات خلال فترات زمنية للنشاط.'}</p>
                 </div>
             </div>
             
             <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:15px;">
                 <div style="background:linear-gradient(135deg, rgba(253,184,19,0.1), rgba(253,184,19,0.02)); border:1px solid rgba(253,184,19,0.2); border-radius:12px; padding:20px; text-align:center;">
-                    <div style="color:var(--text-muted); font-size:14px; margin-bottom:10px;">مبيعات اليوم</div>
+                    <div style="color:var(--text-muted); font-size:14px; margin-bottom:10px;">${lang === 'en' ? 'Today\'s Sales' : 'مبيعات اليوم'}</div>
                     <div style="font-size:24px; font-weight:800; color:var(--primary); direction:ltr;">${salesToday.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR</div>
                 </div>
                 <div style="background:linear-gradient(135deg, rgba(76,175,80,0.1), rgba(76,175,80,0.02)); border:1px solid rgba(76,175,80,0.2); border-radius:12px; padding:20px; text-align:center;">
-                    <div style="color:var(--text-muted); font-size:14px; margin-bottom:10px;">آخر 7 أيام</div>
+                    <div style="color:var(--text-muted); font-size:14px; margin-bottom:10px;">${lang === 'en' ? 'Last 7 Days' : 'آخر 7 أيام'}</div>
                     <div style="font-size:24px; font-weight:800; color:#4CAF50; direction:ltr;">${salesWeek.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR</div>
                 </div>
                 <div style="background:linear-gradient(135deg, rgba(33,150,243,0.1), rgba(33,150,243,0.02)); border:1px solid rgba(33,150,243,0.2); border-radius:12px; padding:20px; text-align:center;">
-                    <div style="color:var(--text-muted); font-size:14px; margin-bottom:10px;">آخر 30 يوم</div>
+                    <div style="color:var(--text-muted); font-size:14px; margin-bottom:10px;">${lang === 'en' ? 'Last 30 Days' : 'آخر 30 يوم'}</div>
                     <div style="font-size:24px; font-weight:800; color:#2196F3; direction:ltr;">${salesMonth.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR</div>
                 </div>
                 <div style="background:linear-gradient(135deg, rgba(156,39,176,0.1), rgba(156,39,176,0.02)); border:1px solid rgba(156,39,176,0.2); border-radius:12px; padding:20px; text-align:center;">
-                    <div style="color:var(--text-muted); font-size:14px; margin-bottom:10px;">آخر 365 يوم</div>
+                    <div style="color:var(--text-muted); font-size:14px; margin-bottom:10px;">${lang === 'en' ? 'Last 365 Days' : 'آخر 365 يوم'}</div>
                     <div style="font-size:24px; font-weight:800; color:#9c27b0; direction:ltr;">${salesYear.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR</div>
                 </div>
             </div>
@@ -3782,6 +3785,9 @@ window.appLogic = {
             'ثوب صوف': 'Wool Thobe',
             'شماغ': 'Shemagh',
             'غترة': 'Ghutra',
+            'عميل نقدي': 'Cash Customer',
+            'عميل دون اسم': 'Unnamed Customer',
+            'تسديد مغاسل': 'Laundry Settlement',
             'ايجار': 'Shop Rent',
             'رواتب': 'Salaries',
             'فواتير': 'Bills & Utilities',
@@ -3847,6 +3853,14 @@ window.appLogic = {
             '#settings-modal h3': { ar: '<i class="fa-solid fa-gear"></i> الإعدادات', en: '<i class="fa-solid fa-gear"></i> Settings' },
             '#theme-toggle-btn span:first-child': { ar: 'تبديل المظهر', en: 'Toggle Theme' },
             '#settings-save-btn': { ar: '<i class="fa-solid fa-floppy-disk"></i> حفظ الإعدادات', en: '<i class="fa-solid fa-floppy-disk"></i> Save Settings' },
+            '#pwa-install-btn': { ar: '<i class="fa-solid fa-mobile-screen"></i> تثبيت التطبيق على الجهاز (PWA)', en: '<i class="fa-solid fa-mobile-screen"></i> Install App on Device (PWA)' },
+            '#settings-modal .selector-group:nth-of-type(1) label': { ar: 'اسم النشاط التجاري', en: 'Business Name' },
+            '#settings-modal .selector-group:nth-of-type(2) label': { ar: 'شعار الفاتورة (Logo)', en: 'Invoice Logo' },
+            '#settings-modal .selector-group:nth-of-type(3) label': { ar: 'رقم الجوال', en: 'Phone Number' },
+            '#settings-modal .selector-group:nth-of-type(4) label': { ar: 'الرقم الضريبي (اختياري)', en: 'Tax Number (Optional)' },
+            '#settings-modal .selector-group:nth-of-type(5) label': { ar: 'مظهر النظام (Theme)', en: 'System Theme' },
+            '#trial-banner': { ar: 'نسخة تجريبية: متبقي <span id="trial-days">5</span> أيام', en: 'Trial version: <span id="trial-days">5</span> days left' },
+            '#initial-loader h2': { ar: 'جاري التحميل...', en: 'Loading...' },
 
             // Expense Modal Option Selectors (Deep Form Translation)
             '#exp-category option[value="ايجار"]': { ar: 'إيجار المحل', en: 'Shop Rent' },
@@ -3907,6 +3921,9 @@ window.appLogic = {
 
             // Daily Report Headers
             '#daily-review-modal h3': { ar: '<i class="fa-solid fa-file-invoice-dollar"></i> مراجعة الإيرادات وتأكيد إغلاق اليومية', en: '<i class="fa-solid fa-file-invoice-dollar"></i> Daily Closing Review & Confirmation' },
+            '#z-report-preview-modal h3': { ar: 'مراجعة إغلاق اليومية (Daily Review)', en: 'Daily Closing Review' },
+            '#z-report-preview-modal .btn-primary': { ar: '<i class="fa-solid fa-check-double" style="margin-left: 10px;"></i> اعتماد وتحميل التقرير (PDF)', en: '<i class="fa-solid fa-check-double" style="margin-left: 10px;"></i> Confirm & Download Report (PDF)' },
+            '#z-report-preview-modal .w-100:not(.btn-primary)': { ar: 'إلغاء المراجعة', en: 'Cancel Review' },
             '#daily-review-modal .modal-body > p': { ar: 'يرجى مطابقة الأرقام أدناه مع النقد الفعلي والأرصدة بالدرج. في حال تأكيد العملية وتصفير الدرج، سيتم تصدير تقرير Z-Report وإشعار الإدارة.', en: 'Please match physical cash and terminals with the figures below. Once confirmed, a Z-Report will be generated and the dashboard resets.' },
             '.financial-breakdown .breakdown-row:nth-child(1) span:first-child': { ar: '<i class="fa-solid fa-file-invoice"></i> إجمالي المبيعات (نظام):', en: '<i class="fa-solid fa-file-invoice"></i> Gross Sales (System):' },
             '.financial-breakdown .breakdown-row:nth-child(2) span:first-child': { ar: '<i class="fa-solid fa-rotate-left"></i> مرتجعات وإلغاءات:', en: '<i class="fa-solid fa-rotate-left"></i> Refunds & Cancellations:' },
@@ -4069,11 +4086,11 @@ window.appLogic = {
         // UI-Bound Synchronization
         const syncEl = document.getElementById('db-sync-data');
         if (!syncEl) {
-            alert('خطأ في مزامنة البيانات: يرجى التوجه لصفحة القوائم المالية أولاً.');
+            alert(this.currentLang === 'en' ? 'Data Sync Error: Please visit Financial Dashboard first.' : 'خطأ في مزامنة البيانات: يرجى التوجه لصفحة القوائم المالية أولاً.');
             return;
         }
 
-        if (!confirm('هل أنت متأكد من إغلاق اليومية وإصدار التقرير؟')) return;
+        if (!confirm(this.currentLang === 'en' ? 'Are you sure you want to close the day and issue the report?' : 'هل أنت متأكد من إغلاق اليومية وإصدار التقرير؟')) return;
 
         // Pull EXACT values from UI elements
         const gross = parseFloat(syncEl.dataset.gross) || 0;
@@ -4116,13 +4133,13 @@ window.appLogic = {
 
                 <!-- ══ HEADER ══ -->
                 <div style="background: #1a1a2e; color: #fff; text-align: center; padding: 16px 20px; border-radius: 8px; margin-bottom: 16px;">
-                    ${window.tenantSettings?.logo ? `<img src="${window.tenantSettings.logo}" style="width: 100%; max-width: 50px; height: auto; display: block; margin: 0 auto 10px auto; border-radius: 4px; background: #fff; padding: 2px;">` : `<div style="font-size: 9px; letter-spacing: 2px; color: #fdb813; text-transform: uppercase; margin-bottom: 4px;">نظام سحاب POS</div>`}
-                    <h1 style="margin: 0; font-size: 20px; font-weight: 900; color: #fff; line-height: 1.3;">تقرير إغلاق اليومية</h1>
+                    ${window.tenantSettings?.logo ? `<img src="${window.tenantSettings.logo}" style="width: 100%; max-width: 50px; height: auto; display: block; margin: 0 auto 10px auto; border-radius: 4px; background: #fff; padding: 2px;">` : `<div style="font-size: 9px; letter-spacing: 2px; color: #fdb813; text-transform: uppercase; margin-bottom: 4px;">${this.currentLang === 'en' ? 'Sahab POS System' : 'نظام سحاب POS'}</div>`}
+                    <h1 style="margin: 0; font-size: 20px; font-weight: 900; color: #fff; line-height: 1.3;">${this.currentLang === 'en' ? 'Daily Closure Report' : 'تقرير إغلاق اليومية'}</h1>
                     <div style="margin-top: 6px; font-size: 14px; font-weight: bold; color: #fdb813;">${bizName}</div>
                     <div style="margin-top: 4px; font-size: 11px; color: rgba(255,255,255,0.7);">
-                        <span>بتاريخ: ${reportDate}</span>
+                        <span>${this.currentLang === 'en' ? 'Date:' : 'بتاريخ:'} ${reportDate}</span>
                         &nbsp;|&nbsp;
-                        <span style="direction:ltr; display:inline-block;">وقت الطباعة: ${new Date().toLocaleTimeString('ar-SA', { hour: 'numeric', minute: '2-digit', hour12: true })}</span>
+                        <span style="direction:ltr; display:inline-block;">${this.currentLang === 'en' ? 'Print Time:' : 'وقت الطباعة:'} ${new Date().toLocaleTimeString(this.currentLang === 'en' ? 'en-US' : 'ar-SA', { hour: 'numeric', minute: '2-digit', hour12: true })}</span>
                     </div>
                 </div>
                 <hr style="border: 0; border-top: 2px solid #e0e0e0; margin-bottom: 14px;">
@@ -4132,33 +4149,33 @@ window.appLogic = {
                     <tr>
                         <!-- LEFT COLUMN: Payment Methods -->
                         <td style="width: 48%; vertical-align: top; padding-left: 8px;">
-                            <div style="font-size: 11px; font-weight: 800; color: #444; border-right: 3px solid #fdb813; padding-right: 8px; margin-bottom: 8px;">تفاصيل طرق الدفع</div>
+                            <div style="font-size: 11px; font-weight: 800; color: #444; border-right: 3px solid #fdb813; padding-right: 8px; margin-bottom: 8px;">${this.currentLang === 'en' ? 'Payment Breakdown' : 'تفاصيل طرق الدفع'}</div>
                             <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
                                 <thead>
                                     <tr style="background: #f5f5f5;">
-                                        <th style="padding: 7px 10px; text-align: right; color: #666; font-weight: 700;">طريقة الدفع</th>
-                                        <th style="padding: 7px 10px; text-align: left; color: #666; font-weight: 700;">المبلغ</th>
+                                        <th style="padding: 7px 10px; text-align: right; color: #666; font-weight: 700;">${this.currentLang === 'en' ? 'Payment Method' : 'طريقة الدفع'}</th>
+                                        <th style="padding: 7px 10px; text-align: left; color: #666; font-weight: 700;">${this.currentLang === 'en' ? 'Amount' : 'المبلغ'}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <tr style="border-bottom: 1px solid #f0f0f0; background: #fff;">
-                                        <td style="padding: 7px 10px; color: #333; font-weight: 600;">💵 نقدي (Cash)</td>
+                                        <td style="padding: 7px 10px; color: #333; font-weight: 600;">💵 ${this.currentLang === 'en' ? 'Cash' : 'نقدي (Cash)'}</td>
                                         <td style="padding: 7px 10px; text-align: left; font-weight: 900; direction: ltr; color: #000;">${cashTotal.toFixed(2)} ر.س</td>
                                     </tr>
                                     <tr style="border-bottom: 1px solid #f0f0f0; background: #fafafa;">
-                                        <td style="padding: 7px 10px; color: #333; font-weight: 600;">💳 مدى (Mada)</td>
+                                        <td style="padding: 7px 10px; color: #333; font-weight: 600;">💳 ${this.currentLang === 'en' ? 'Mada' : 'مدى (Mada)'}</td>
                                         <td style="padding: 7px 10px; text-align: left; font-weight: 900; direction: ltr; color: #000;">${madaTotal.toFixed(2)} ر.س</td>
                                     </tr>
                                     <tr style="border-bottom: 1px solid #f0f0f0; background: #fff;">
-                                        <td style="padding: 7px 10px; color: #333; font-weight: 600;">💳 فيزا (Visa)</td>
+                                        <td style="padding: 7px 10px; color: #333; font-weight: 600;">💳 ${this.currentLang === 'en' ? 'Visa' : 'فيزا (Visa)'}</td>
                                         <td style="padding: 7px 10px; text-align: left; font-weight: 900; direction: ltr; color: #000;">${visaTotal.toFixed(2)} ر.س</td>
                                     </tr>
                                     <tr style="border-bottom: 1px solid #f0f0f0; background: #fafafa;">
-                                        <td style="padding: 7px 10px; color: #333; font-weight: 600;">💳 ماستركارد</td>
+                                        <td style="padding: 7px 10px; color: #333; font-weight: 600;">💳 ${this.currentLang === 'en' ? 'Mastercard' : 'ماستركارد'}</td>
                                         <td style="padding: 7px 10px; text-align: left; font-weight: 900; direction: ltr; color: #000;">${mastercardTotal.toFixed(2)} ر.س</td>
                                     </tr>
                                     <tr style="background: #fffbea; border-top: 2px solid #fdb813;">
-                                        <td style="padding: 8px 10px; font-weight: 900; color: #333;">إجمالي المقبوضات</td>
+                                        <td style="padding: 8px 10px; font-weight: 900; color: #333;">${this.currentLang === 'en' ? 'Total Received' : 'إجمالي المقبوضات'}</td>
                                         <td style="padding: 8px 10px; text-align: left; font-weight: 900; direction: ltr; color: #000; font-size: 13px;">${(cashTotal + madaTotal + visaTotal + mastercardTotal).toFixed(2)} ر.س</td>
                                     </tr>
                                 </tbody>
@@ -4171,28 +4188,28 @@ window.appLogic = {
                         <!-- RIGHT COLUMN: Financial Summary -->
                         <td style="width: 48%; vertical-align: top; padding-right: 8px;">
                             <div class="final-summary">
-                                <div style="font-size: 11px; font-weight: 800; color: #444; border-right: 3px solid #2e7d32; padding-right: 8px; margin-bottom: 8px;">ملخص القوائم المالية</div>
+                                <div style="font-size: 11px; font-weight: 800; color: #444; border-right: 3px solid #2e7d32; padding-right: 8px; margin-bottom: 8px;">${this.currentLang === 'en' ? 'Financial Summary' : 'ملخص القوائم المالية'}</div>
                                 <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
                                     <tbody>
                                         <tr style="background: #fff; border-bottom: 1px solid #eee;">
-                                            <td style="padding: 8px 10px; color: #444; font-weight: 700;">إجمالي المبيعات</td>
+                                            <td style="padding: 8px 10px; color: #444; font-weight: 700;">${this.currentLang === 'en' ? 'Gross Sales' : 'إجمالي المبيعات'}</td>
                                             <td style="padding: 8px 10px; text-align: left; font-weight: 900; direction: ltr; color: #000; font-size: 13px;">${gross.toFixed(2)} ر.س</td>
                                         </tr>
                                         <tr style="background: #fff8f8; border-bottom: 1px solid #eee;">
-                                            <td style="padding: 8px 10px; color: #c62828; font-weight: 700;">إجمالي المرتجعات</td>
+                                            <td style="padding: 8px 10px; color: #c62828; font-weight: 700;">${this.currentLang === 'en' ? 'Total Refunds' : 'إجمالي المرتجعات'}</td>
                                             <td style="padding: 8px 10px; text-align: left; font-weight: 900; direction: ltr; color: #c62828; font-size: 13px;">- ${refunds.toFixed(2)} ر.س</td>
                                         </tr>
                                         <tr style="background: #f1f8e9; border-bottom: 1px solid #a5d6a7;">
-                                            <td style="padding: 8px 10px; color: #2e7d32; font-weight: 700;">صافي الإيرادات</td>
+                                            <td style="padding: 8px 10px; color: #2e7d32; font-weight: 700;">${this.currentLang === 'en' ? 'Net Revenue' : 'صافي الإيرادات'}</td>
                                             <td style="padding: 8px 10px; text-align: left; font-weight: 900; direction: ltr; color: #2e7d32; font-size: 13px;">${netRev.toFixed(2)} ر.س</td>
                                         </tr>
                                         <tr style="background: #fff8f8; border-bottom: 2px solid #e0e0e0;">
-                                            <td style="padding: 8px 10px; color: #c62828; font-weight: 700;">إجمالي المصاريف</td>
+                                            <td style="padding: 8px 10px; color: #c62828; font-weight: 700;">${this.currentLang === 'en' ? 'Total Expenses' : 'إجمالي المصاريف'}</td>
                                             <td style="padding: 8px 10px; text-align: left; font-weight: 900; direction: ltr; color: #c62828; font-size: 13px;">- ${opExps.toFixed(2)} ر.س</td>
                                         </tr>
                                         <!-- FINAL NET PROFIT - BOLD STANDOUT ROW -->
                                         <tr style="background: #1b5e20; border-top: 3px double #a5d6a7;">
-                                            <td style="padding: 10px 10px; font-size: 13px; font-weight: 900; color: #fff;">🏆 صافي الربح النهائي</td>
+                                            <td style="padding: 10px 10px; font-size: 13px; font-weight: 900; color: #fff;">🏆 ${this.currentLang === 'en' ? 'Final Net Profit' : 'صافي الربح النهائي'}</td>
                                             <td style="padding: 10px 10px; text-align: left; font-weight: 900; direction: ltr; color: #fff; font-size: 16px;">${netProfit.toFixed(2)} ر.س</td>
                                         </tr>
                                     </tbody>
@@ -4204,7 +4221,7 @@ window.appLogic = {
 
                 <!-- ══ FOOTER ══ -->
                 <div style="text-align: center; margin-top: 16px; padding-top: 10px; border-top: 1px solid #eee; color: #aaa; font-size: 10px;">
-                    <span>تم توليد هذا التقرير بواسطة <strong>نظام سحاب POS</strong></span>
+                    <span>${this.currentLang === 'en' ? 'Report generated by <strong>Sahab POS System</strong>' : 'تم توليد هذا التقرير بواسطة <strong>نظام سحاب POS</strong>'}</span>
                     &nbsp;|&nbsp;
                     <span style="direction: ltr; display: inline-block;">${new Date().toLocaleString('en-US')}</span>
                 </div>
@@ -4284,7 +4301,7 @@ window.appLogic = {
         localStorage.setItem('expenses', '[]');
 
         // === رسالة النجاح ===
-        const msg = '✅ تم إغلاق اليومية بنجاح وتصفير السجل.';
+        const msg = this.currentLang === 'en' ? '✅ Day closed successfully. Records zeroed.' : '✅ تم إغلاق اليومية بنجاح وتصفير السجل.';
         if (this.showToast) this.showToast(msg); else alert(msg);
 
         // === إصدار ملف PDF / طباعة التقرير (Native Print) ===
@@ -4331,27 +4348,28 @@ window.appLogic = {
 
         const format = (num) => num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+        const lang = this.currentLang || 'ar';
         const content = `
             <!-- Payment Breakdown Section -->
             <div style="background: rgba(253, 184, 19, 0.05); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 25px;">
                 <h4 style="margin: 0 0 15px 0; color: var(--primary); font-size: 15px; border-bottom: 1px solid rgba(253,184,19,0.2); padding-bottom: 10px; display: flex; align-items: center;">
-                    <i class="fa-solid fa-receipt" style="margin-left: 10px;"></i> تفاصيل الدفع
+                    <i class="fa-solid fa-receipt" style="margin-left: 10px;"></i> ${lang === 'en' ? 'Payment Details' : 'تفاصيل الدفع'}
                 </h4>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-body); padding: 12px 15px; border-radius: 8px; border: 1px solid var(--border);">
-                        <span style="color: var(--text-muted); font-size: 13px;">نقدي (Cash)</span>
+                        <span style="color: var(--text-muted); font-size: 13px;">${lang === 'en' ? 'Cash' : 'نقدي (Cash)'}</span>
                         <span style="font-weight: 800; color: #fff; direction: ltr; font-size: 15px;">${format(cashTotal)}</span>
                     </div>
                     <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-body); padding: 12px 15px; border-radius: 8px; border: 1px solid var(--border);">
-                        <span style="color: var(--text-muted); font-size: 13px;">مدى (Mada)</span>
+                        <span style="color: var(--text-muted); font-size: 13px;">${lang === 'en' ? 'Mada' : 'مدى (Mada)'}</span>
                         <span style="font-weight: 800; color: #fff; direction: ltr; font-size: 15px;">${format(madaTotal)}</span>
                     </div>
                     <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-body); padding: 12px 15px; border-radius: 8px; border: 1px solid var(--border);">
-                        <span style="color: var(--text-muted); font-size: 13px;">فيزا (Visa)</span>
+                        <span style="color: var(--text-muted); font-size: 13px;">${lang === 'en' ? 'Visa' : 'فيزا (Visa)'}</span>
                         <span style="font-weight: 800; color: #fff; direction: ltr; font-size: 15px;">${format(visaTotal)}</span>
                     </div>
                     <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-body); padding: 12px 15px; border-radius: 8px; border: 1px solid var(--border);">
-                        <span style="color: var(--text-muted); font-size: 13px;">ماستركارد</span>
+                        <span style="color: var(--text-muted); font-size: 13px;">${lang === 'en' ? 'Mastercard' : 'ماستركارد'}</span>
                         <span style="font-weight: 800; color: #fff; direction: ltr; font-size: 15px;">${format(mastercardTotal)}</span>
                     </div>
                 </div>
@@ -4361,28 +4379,28 @@ window.appLogic = {
                 <div class="z-report-item">
                     <div class="info">
                         <i class="fa-solid fa-cart-shopping" style="color:var(--primary); margin-left:10px;"></i>
-                        <span class="label">إجمالي المبيعات</span>
+                        <span class="label">${lang === 'en' ? 'Gross Sales' : 'إجمالي المبيعات'}</span>
                     </div>
                     <span class="value">${format(gross)} ر.س</span>
                 </div>
                 <div class="z-report-item">
                     <div class="info">
                         <i class="fa-solid fa-rotate-left" style="color:var(--danger); margin-left:10px;"></i>
-                        <span class="label">إجمالي المرتجعات</span>
+                        <span class="label">${lang === 'en' ? 'Total Refunds' : 'إجمالي المرتجعات'}</span>
                     </div>
                     <span class="value" style="color:var(--danger)">- ${format(refunds)} ر.س</span>
                 </div>
                 <div class="z-report-item" style="background: rgba(46, 125, 50, 0.1); border-color: rgba(46, 125, 50, 0.3);">
                     <div class="info">
                         <i class="fa-solid fa-money-bill-trend-up" style="color:#4caf50; margin-left:10px;"></i>
-                        <span class="label" style="color:#4caf50">صافي الإيرادات</span>
+                        <span class="label" style="color:#4caf50">${lang === 'en' ? 'Net Revenue' : 'صافي الإيرادات'}</span>
                     </div>
                     <span class="value" style="color:#4caf50">${format(netRev)} ر.س</span>
                 </div>
                 <div class="z-report-item">
                     <div class="info">
                         <i class="fa-solid fa-file-invoice-dollar" style="color:var(--danger); margin-left:10px;"></i>
-                        <span class="label">إجمالي المصاريف التشغيلية</span>
+                        <span class="label">${lang === 'en' ? 'Operating Expenses' : 'إجمالي المصاريف التشغيلية'}</span>
                     </div>
                     <span class="value" style="color:var(--danger)">- ${format(opExps)} ر.س</span>
                 </div>
@@ -4390,7 +4408,7 @@ window.appLogic = {
                     <div class="info">
                         <i class="fa-solid fa-wallet" style="color:var(--primary); margin-left:10px; font-size: 24px;"></i>
                         <div style="display:flex; flex-direction:column;">
-                            <span class="label">صافي الربح النهائي</span>
+                            <span class="label">${lang === 'en' ? 'Net Profit' : 'صافي الربح النهائي'}</span>
                         </div>
                     </div>
                     <span class="value">${format(netProfit)} ر.س</span>
@@ -4399,7 +4417,7 @@ window.appLogic = {
             <div style="margin-top:25px; padding:15px; background:rgba(253,184,19,0.05); border-radius:12px; text-align:center;">
                 <p style="font-size:13px; color:var(--text-muted); line-height:1.6; margin:0;">
                     <i class="fa-solid fa-triangle-exclamation" style="color:var(--primary); margin-left:5px;"></i>
-                    عند الاعتماد، سيتم تصفير جميع العمليات الحالية وأرشفتها.
+                    ${lang === 'en' ? 'Upon approval, all current operations will be zeroed and archived.' : 'عند الاعتماد، سيتم تصفير جميع العمليات الحالية وأرشفتها.'}
                 </p>
             </div>
         `;
