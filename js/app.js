@@ -3607,7 +3607,43 @@ window.appLogic = {
                 return;
             }
 
-            // 2. TRIAL BANNER & LOCK
+            // 2. Proactive Expiration Warning (Nag Screen)
+            // Use Math.max to ensure we always pick the most future date, bypassing legacy frozen dates.
+            const targetEndDate = Math.max(data.expiryDate || 0, data.trialEndDate || 0);
+            if (targetEndDate > 0) {
+                const daysLeftExact = Math.round((targetEndDate - Date.now()) / (1000 * 60 * 60 * 24));
+                
+                // Only show if strictly <= 3 days left and > 0, and ensure we only pop up ONCE per session.
+                if (daysLeftExact <= 3 && daysLeftExact > 0 && !window.hasShownExpiryWarning) {
+                    window.hasShownExpiryWarning = true; // Mark to avoid racing
+
+                    const triggerNag = () => {
+                        if (typeof Swal === 'undefined') {
+                            setTimeout(triggerNag, 500); // Wait for CDN
+                            return;
+                        }
+                        
+                        const lang = localStorage.getItem('sahab-lang') || 'ar';
+                        Swal.fire({
+                            title: lang === 'en' ? 'Warning: Renewal approaching ⚠️' : 'تنبيه: اقترب موعد التجديد ⚠️',
+                            text: lang === 'en' ? `Your subscription expires in ${daysLeftExact} days. Please renew to avoid system interruption.` : `اشتراكك سينتهي خلال ${daysLeftExact} أيام. يرجى التجديد لتجنب توقف النظام.`,
+                            icon: 'warning',
+                            showCancelButton: true,
+                            confirmButtonText: lang === 'en' ? 'Renew Now 💳' : 'تجديد الآن 💳',
+                            cancelButtonText: lang === 'en' ? 'Later' : 'لاحقاً',
+                            allowOutsideClick: false
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                window.open('https://www.google.com/?q=payment+link+placeholder', '_blank');
+                            }
+                        });
+                    };
+                    
+                    triggerNag();
+                }
+            }
+
+            // 3. TRIAL BANNER & LOCK
             const banner = document.getElementById('trial-banner');
             const trialDays = document.getElementById('trial-days');
             const expiredOverlay = document.getElementById('trial-expired-overlay');
@@ -3620,7 +3656,7 @@ window.appLogic = {
                 }
                 if (banner) banner.classList.add('hidden');
             } else if (data.isTrial === true && data.trialEndDate) {
-                const daysLeft = Math.ceil((data.trialEndDate - Date.now()) / (1000 * 60 * 60 * 24));
+                const daysLeft = Math.round((data.trialEndDate - Date.now()) / (1000 * 60 * 60 * 24));
 
                 if (daysLeft <= 0) {
                     // Trial expired - HARD LOCK

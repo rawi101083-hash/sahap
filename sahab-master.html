@@ -78,20 +78,7 @@
 </head>
 <body>
 
-    <!-- 1. LOGIN OVERLAY (Gated Access) -->
-    <div id="login-screen">
-        <div style="margin-bottom: 30px; text-align: center;">
-            <h1 style="color: var(--primary); font-size: 32px; font-weight: 900; letter-spacing: 2px;">SAHAB MASTER</h1>
-            <p style="color: var(--text-muted); font-size: 14px; margin-top: 5px;">Classified Access Panel</p>
-        </div>
-        <div class="login-box">
-            <h3 style="margin-bottom: 25px; color: #fff;"><i class="fa-solid fa-fingerprint"></i> Authentication Required</h3>
-            <input type="password" id="master-pin" placeholder="••••••••" autocomplete="new-password">
-            <button class="btn-gold" onclick="masterApp.login()"><i class="fa-solid fa-unlock-keyhole"></i> AUTHORIZE</button>
-            <p id="login-error" style="color: var(--danger); font-size: 13px; margin-top: 15px; font-weight: bold; display: none;">Access Denied. Incorrect Signature.</p>
-        </div>
-    </div>
-
+    <!-- Login screen removed by user request -->
     <!-- 2. MAIN DASHBOARD CONTENT -->
     <div id="dashboard" class="hidden">
         <div class="header">
@@ -211,27 +198,11 @@
 
         const masterApp = {
             init() {
-                // AUTO-RESUME: If already authorized by Smart Gate
-                const isAuth = localStorage.getItem('sahab_master_authorized') || localStorage.getItem('radix_master_authorized');
-                if (isAuth === 'true') {
-                    console.log("[Master-Auth] Session detected. Resuming...");
-                    this.showDashboard();
-                }
-            },
-
-            login() {
-                const pin = document.getElementById('master-pin').value;
-                if (pin === MASTER_PASSWORD) {
-                    localStorage.setItem('sahab_master_authorized', 'true');
-                    this.showDashboard();
-                } else {
-                    document.getElementById('login-error').style.display = 'block';
-                    document.getElementById('master-pin').value = '';
-                }
+                // Auto-load dashboard per user request, bypassing login
+                this.showDashboard();
             },
 
             showDashboard() {
-                document.getElementById('login-screen').classList.add('hidden');
                 document.getElementById('dashboard').classList.remove('hidden');
                 this.fetchData();
             },
@@ -306,7 +277,7 @@
                         : '<span class="status-badge status-expired"><i class="fa-solid fa-ban"></i> Suspended</span>';
                     
                     if (isActivated && account.isTrial === true) {
-                        let daysLeft = Math.ceil((account.trialEndDate - Date.now()) / (1000 * 60 * 60 * 24));
+                        let daysLeft = Math.round((account.trialEndDate - Date.now()) / (1000 * 60 * 60 * 24));
                         badge = `<span class="status-badge" style="background:#ff9800; color:#fff"><i class="fa-solid fa-clock"></i> Trial (${daysLeft}d)</span>`;
                     }
 
@@ -580,13 +551,17 @@
                     const updates = {};
                     updates[`users/${uid}/accountDetails/isTrial`] = true;
                     updates[`users/${uid}/accountDetails/trialEndDate`] = newExpiry;
+                    // Also wipe out any legacy expiryDate so it doesn't conflict
+                    updates[`users/${uid}/accountDetails/expiryDate`] = null;
                     updates[`users/${uid}/accountDetails/isActivated`] = true;
                     updates[`users/${uid}/settings/status`] = 'active';
                     updates[`admin/stores/${pin}/status`] = 'active';
 
                     await db.ref().update(updates);
                     alert(`تم تجديد المغسلة بنجاح! تنتهي في: ${new Date(newExpiry).toLocaleDateString('en-GB')}`);
-                    daysInput.value = '';
+                    if(document.getElementById(`renew-${uid}`)) {
+                        document.getElementById(`renew-${uid}`).value = '';
+                    }
                     this.fetchData();
                 } catch (e) {
                     console.error("Renewal failed:", e);
@@ -729,10 +704,6 @@
         // Initialize
         masterApp.init();
 
-        // Listen for Enter key on login
-        document.getElementById('master-pin').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') masterApp.login();
-        });
     </script>
 </body>
 </html>
