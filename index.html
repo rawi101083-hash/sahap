@@ -1,17 +1,18 @@
 <!DOCTYPE html>
 <html lang="en" dir="rtl" class="notranslate" translate="no">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google" content="notranslate">
     <title>سحاب POS | نظام سحاب</title>
-    
+
     <!-- PWA Installation -->
     <link rel="manifest" href="manifest.json">
-    
+
     <!-- THEME INITIALIZATION: Prevents White Flash -->
     <script>
-        (function() {
+        (function () {
             try {
                 const theme = localStorage.getItem('sahab-theme') || 'dark';
                 if (theme === 'light') {
@@ -19,10 +20,10 @@
                 } else {
                     document.documentElement.setAttribute('data-theme', 'dark');
                 }
-            } catch (e) {}
+            } catch (e) { }
         })();
     </script>
-    
+
     <!-- Meta -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -31,58 +32,78 @@
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
-    
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap"
+        rel="stylesheet">
+
     <!-- Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+
     <!-- Styles -->
     <link rel="stylesheet" href="css/style.css">
 </head>
+
 <body>
     <!-- ===== INITIAL LOADER (Professional Rendering Guard) ===== -->
-    <div id="initial-loader" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0a0a0a; display: flex; justify-content: center; align-items: center; z-index: 10001; transition: opacity 0.6s ease, visibility 0.6s;">
+    <div id="initial-loader"
+        style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0a0a0a; display: flex; justify-content: center; align-items: center; z-index: 10001; transition: opacity 0.6s ease, visibility 0.6s;">
         <div style="text-align: center;">
-            <i class="fa-solid fa-cloud fa-fade" style="font-size: 50px; color: #FDB813; margin-bottom: 25px; filter: drop-shadow(0 0 15px rgba(253, 184, 19, 0.3));"></i>
-            <h2 style="color: #FDB813; font-family: 'Tajawal', sans-serif; font-weight: 800; font-size: 24px; margin: 0; letter-spacing: 1px;">جاري التحميل...</h2>
+            <i class="fa-solid fa-cloud fa-fade"
+                style="font-size: 50px; color: #FDB813; margin-bottom: 25px; filter: drop-shadow(0 0 15px rgba(253, 184, 19, 0.3));"></i>
+            <h2
+                style="color: #FDB813; font-family: 'Tajawal', sans-serif; font-weight: 800; font-size: 24px; margin: 0; letter-spacing: 1px;">
+                جاري التحميل...</h2>
         </div>
     </div>
 
     <!-- ===== LOGIN OVERLAY (Hidden by default to prevent flash) ===== -->
     <div id="login-overlay" style="display: none;">
         <div class="login-card">
-            <div class="login-logo" style="display: flex; flex-direction: column; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding: 32px 28px 20px;">
-                <div style="width: 170px; height: 170px; border-radius: 50%; border: 5px solid var(--primary); box-shadow: 0 0 50px rgba(253,184,19,0.25); background-color: #000; display: flex; justify-content: center; align-items: center; overflow: hidden; margin-bottom: 24px;">
-                    <img src="sahap%20Logo.jpeg" onerror="this.onerror=null; this.src='sahap%20logo.jpeg';" alt="Sahab Logo" style="width: 110px; height: auto; mix-blend-mode: screen; object-fit: contain; background: transparent;">
+            <div class="login-logo"
+                style="display: flex; flex-direction: column; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding: 32px 28px 20px;">
+                <div
+                    style="width: 170px; height: 170px; border-radius: 50%; border: 5px solid var(--primary); box-shadow: 0 0 50px rgba(253,184,19,0.25); background-color: #000; display: flex; justify-content: center; align-items: center; overflow: hidden; margin-bottom: 24px;">
+                    <img src="sahap%20Logo.jpeg" onerror="this.onerror=null; this.src='sahap%20logo.jpeg';"
+                        alt="Sahab Logo"
+                        style="width: 110px; height: auto; mix-blend-mode: screen; object-fit: contain; background: transparent;">
                 </div>
-                <h2 id="login-brand-name" style="font-size: 28px; font-weight: 900; color: #fff; letter-spacing: 1px; margin: 0;">Sahab POS</h2>
+                <h2 id="login-brand-name"
+                    style="font-size: 28px; font-weight: 900; color: #fff; letter-spacing: 1px; margin: 0;">Sahab POS
+                </h2>
             </div>
             <div class="login-body">
                 <label>الرمز السري (PIN)</label>
-                <input type="password" id="pin-input" placeholder="••••••" maxlength="6" inputmode="numeric" 
+                <input type="password" id="pin-input" placeholder="••••••" maxlength="6" inputmode="numeric"
                     oninput="this.value = this.value.replace(/[^0-9]/g, ''); appLogic.validatePinInput(this)"
                     onkeydown="if(event.key==='Enter') appLogic.loginWithPIN()">
-                <p id="login-error" class="login-error hidden" style="line-height: 1.5; min-height: 40px; margin-top: 10px;"></p>
-                <button id="login-btn" class="btn btn-primary w-100" onclick="appLogic.loginWithPIN()" disabled style="opacity: 0.5; cursor: not-allowed;">
+                <p id="login-error" class="login-error hidden"
+                    style="line-height: 1.5; min-height: 40px; margin-top: 10px;"></p>
+                <button id="login-btn" class="btn btn-primary w-100" onclick="appLogic.loginWithPIN()" disabled
+                    style="opacity: 0.5; cursor: not-allowed;">
                     <i class="fa-solid fa-right-to-bracket"></i> دخول
                 </button>
             </div>
         </div>
     </div>
-    
+
     <!-- ===== TRIAL EXPIRED OVERLAY (HARD LOCK) ===== -->
-    <div id="trial-expired-overlay" class="hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:10000; display:flex; justify-content:center; align-items:center; flex-direction:column; text-align:center; padding:20px; backdrop-filter:blur(10px);">
-        <div style="background:#1a1a1a; padding:40px; border-radius:20px; border:1px solid #f59e0b; box-shadow:0 0 50px rgba(245,158,11,0.2); max-width:500px; width:100%;">
+    <div id="trial-expired-overlay" class="hidden"
+        style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:10000; display:flex; justify-content:center; align-items:center; flex-direction:column; text-align:center; padding:20px; backdrop-filter:blur(10px);">
+        <div
+            style="background:#1a1a1a; padding:40px; border-radius:20px; border:1px solid #f59e0b; box-shadow:0 0 50px rgba(245,158,11,0.2); max-width:500px; width:100%;">
             <i class="fa-solid fa-hourglass-end" style="font-size:60px; color:#f59e0b; margin-bottom:20px;"></i>
             <h2 style="color:#fff; font-size:24px; margin-bottom:15px; font-weight:900;">انتهت الفترة التجريبية</h2>
             <p style="color:#9ca3af; font-size:16px; line-height:1.6; margin-bottom:30px;">
-                نشكركم على تجربة نظام سحاب. لقد انتهت الفترة المخصصة للتجربة، يرجى التواصل مع الإدارة لتفعيل الاشتراك الدائم أو تمديد الفترة.
+                نشكركم على تجربة نظام سحاب. لقد انتهت الفترة المخصصة للتجربة، يرجى التواصل مع الإدارة لتفعيل الاشتراك
+                الدائم أو تمديد الفترة.
             </p>
-            <div style="background:rgba(245,158,11,0.1); padding:15px; border-radius:12px; border:1px solid rgba(245,158,11,0.3); margin-bottom:30px;">
+            <div
+                style="background:rgba(245,158,11,0.1); padding:15px; border-radius:12px; border:1px solid rgba(245,158,11,0.3); margin-bottom:30px;">
                 <p style="color:#f59e0b; font-weight:bold; font-size:14px; margin:0;">للتواصل والدعم الفني:</p>
-                <p style="color:#fff; font-size:18px; font-weight:bold; margin-top:5px; direction:ltr;">SAHAB-ADMIN-SUPPORT</p>
+                <p style="color:#fff; font-size:18px; font-weight:bold; margin-top:5px; direction:ltr;">
+                    SAHAB-ADMIN-SUPPORT</p>
             </div>
-            <button onclick="appLogic.logoutUser()" style="background:#ef4444; color:#fff; border:none; padding:12px 30px; border-radius:10px; font-weight:bold; cursor:pointer; width:100%;">
+            <button onclick="appLogic.logoutUser()"
+                style="background:#ef4444; color:#fff; border:none; padding:12px 30px; border-radius:10px; font-weight:bold; cursor:pointer; width:100%;">
                 <i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج
             </button>
         </div>
@@ -91,26 +112,39 @@
     <!-- ===== APP DASHBOARD (Hidden by default to prevent flash) ===== -->
     <div id="app" style="display: none;">
         <!-- Trial Banner -->
-        <div id="trial-banner" class="hidden no-print" style="background:#ff9800; color:#fff; text-align:center; padding:10px 20px; font-weight:bold; font-size:14px; z-index:9000; position:relative;">
-            نسخة تجريبية: متبقي <span id="trial-days">5</span> أيام
+        <div id="trial-banner" class="hidden no-print"
+            style="background:#ff9800; color:#fff; text-align:center; padding:10px 20px; font-weight:bold; font-size:14px; z-index:9000; position:relative;">
+            نسخة تجريبية: متبقي <span id="trial-days"></span> أيام
         </div>
         <!-- Header -->
         <header class="main-header no-print">
             <div class="logo-area" style="display: flex; align-items: center; gap: 15px;">
-                <img src="sahap%20Logo.jpeg" onerror="this.onerror=null; this.src='sahap%20logo.jpeg'; this.style.display=''" alt="Sahab Logo" class="logo-icon" style="width: 50px; height: 50px; border-radius: 50% !important; border: 2px solid var(--primary); object-fit: cover !important; background-color: transparent !important;">
+                <img src="sahap%20Logo.jpeg"
+                    onerror="this.onerror=null; this.src='sahap%20logo.jpeg'; this.style.display=''" alt="Sahab Logo"
+                    class="logo-icon"
+                    style="width: 50px; height: 50px; border-radius: 50% !important; border: 2px solid var(--primary); object-fit: cover !important; background-color: transparent !important;">
                 <div class="brand-text" style="display: flex; flex-direction: column; align-items: flex-start;">
-                    <h1 id="header-store-name" style="color: #ffffff; font-weight: 900; font-size: 20px; margin: 0; line-height: 1.2;"></h1>
-                    <p style="color: var(--primary); font-weight: 800; font-size: 14px; margin: 0; line-height: 1.2;">Sahab POS</p>
+                    <h1 id="header-store-name"
+                        style="color: #ffffff; font-weight: 900; font-size: 20px; margin: 0; line-height: 1.2;"></h1>
+                    <p style="color: var(--primary); font-weight: 800; font-size: 14px; margin: 0; line-height: 1.2;">
+                        Sahab POS</p>
                 </div>
             </div>
             <nav class="main-nav">
-                <button class="nav-btn active" onclick="appLogic.switchView('pos')"><i class="fa-solid fa-cash-register"></i> الكاشير</button>
-                <button class="nav-btn" onclick="appLogic.switchView('history')"><i class="fa-solid fa-clock-rotate-left"></i> الفواتير</button>
-                <button class="nav-btn" onclick="appLogic.switchView('customers')"><i class="fa-solid fa-users"></i> العملاء</button>
-                <button class="nav-btn" onclick="appLogic.switchView('inventory')"><i class="fa-solid fa-boxes-stacked"></i> المخزون</button>
-                <button class="nav-btn" onclick="appLogic.switchView('expenses')"><i class="fa-solid fa-money-bill-transfer"></i> المصروفات</button>
-                <button class="nav-btn" onclick="appLogic.switchView('reports')"><i class="fa-solid fa-chart-line"></i> القوائم المالية</button>
-                <button class="nav-btn" id="settings-nav-btn" onclick="appLogic.openSettingsModal()"><i class="fa-solid fa-gear"></i> الإعدادات</button>
+                <button class="nav-btn active" onclick="appLogic.switchView('pos')"><i
+                        class="fa-solid fa-cash-register"></i> الكاشير</button>
+                <button class="nav-btn" onclick="appLogic.switchView('history')"><i
+                        class="fa-solid fa-clock-rotate-left"></i> الفواتير</button>
+                <button class="nav-btn" onclick="appLogic.switchView('customers')"><i class="fa-solid fa-users"></i>
+                    العملاء</button>
+                <button class="nav-btn" onclick="appLogic.switchView('inventory')"><i
+                        class="fa-solid fa-boxes-stacked"></i> المخزون</button>
+                <button class="nav-btn" onclick="appLogic.switchView('expenses')"><i
+                        class="fa-solid fa-money-bill-transfer"></i> المصروفات</button>
+                <button class="nav-btn" onclick="appLogic.switchView('reports')"><i class="fa-solid fa-chart-line"></i>
+                    القوائم المالية</button>
+                <button class="nav-btn" id="settings-nav-btn" onclick="appLogic.openSettingsModal()"><i
+                        class="fa-solid fa-gear"></i> الإعدادات</button>
                 <!-- Admin Nav Removed for Smart Gate Security -->
             </nav>
         </header>
@@ -119,17 +153,18 @@
         <main class="main-content no-print">
             <!-- POS View -->
             <div id="view-pos" class="view-section active view-layout">
-                
+
                 <!-- Right/Main side (Items Grid) - Cart on Left -->
                 <section class="items-section">
                     <div class="items-header">
                         <h2>الخدمات</h2>
                         <div class="search-bar">
                             <i class="fa-solid fa-search"></i>
-                            <input type="text" placeholder="ابحث عن صنف..." id="item-search" oninput="appLogic.filterItems()">
+                            <input type="text" placeholder="ابحث عن صنف..." id="item-search"
+                                oninput="appLogic.filterItems()">
                         </div>
                     </div>
-                    
+
                     <div class="category-filter" id="category-filter">
                         <button class="btn-cat active" onclick="appLogic.setCategory('all', this)">الكل</button>
                         <button class="btn-cat" onclick="appLogic.setCategory('men', this)">رجالي</button>
@@ -139,21 +174,46 @@
 
                     <!-- Fast Batch Controls (Bypass Popup) -->
                     <style>
-                        #fb-speed-normal { border: 1px solid rgba(0, 255, 0, 0.4) !important; color: #00ff00 !important; font-weight: normal !important; }
-                        #fb-speed-normal.active { background: #00ff00 !important; color: #000 !important; border-color: #00ff00 !important; font-weight: bold !important; }
-                        
-                        #fb-speed-express { border: 1px solid rgba(255, 69, 0, 0.4) !important; color: #ff4500 !important; font-weight: bold !important; }
-                        #fb-speed-express.active { background: #ff4500 !important; color: #fff !important; border-color: #ff4500 !important; font-weight: bold !important; }
+                        #fb-speed-normal {
+                            border: 1px solid rgba(0, 255, 0, 0.4) !important;
+                            color: #00ff00 !important;
+                            font-weight: normal !important;
+                        }
+
+                        #fb-speed-normal.active {
+                            background: #00ff00 !important;
+                            color: #000 !important;
+                            border-color: #00ff00 !important;
+                            font-weight: bold !important;
+                        }
+
+                        #fb-speed-express {
+                            border: 1px solid rgba(255, 69, 0, 0.4) !important;
+                            color: #ff4500 !important;
+                            font-weight: bold !important;
+                        }
+
+                        #fb-speed-express.active {
+                            background: #ff4500 !important;
+                            color: #fff !important;
+                            border-color: #ff4500 !important;
+                            font-weight: bold !important;
+                        }
                     </style>
                     <div id="fast-batch-controls" class="no-print fb-container">
                         <div class="fb-group group-types">
-                            <button class="btn-toggle active" id="fb-type-wash_iron" onclick="appLogic.setFastBatchType('wash_iron', this)">غسيل وكوي</button>
-                            <button class="btn-toggle" id="fb-type-iron" onclick="appLogic.setFastBatchType('iron', this)">كوي فقط</button>
-                            <button class="btn-toggle" id="fb-type-wash" onclick="appLogic.setFastBatchType('wash', this)">غسيل فقط</button>
+                            <button class="btn-toggle active" id="fb-type-wash_iron"
+                                onclick="appLogic.setFastBatchType('wash_iron', this)">غسيل وكوي</button>
+                            <button class="btn-toggle" id="fb-type-iron"
+                                onclick="appLogic.setFastBatchType('iron', this)">كوي فقط</button>
+                            <button class="btn-toggle" id="fb-type-wash"
+                                onclick="appLogic.setFastBatchType('wash', this)">غسيل فقط</button>
                         </div>
                         <div class="fb-group group-speeds">
-                            <button class="btn-toggle btn-speed-normal active" id="fb-speed-normal" onclick="appLogic.setFastBatchSpeed('normal', this)">عادي</button>
-                            <button class="btn-toggle btn-speed-express" id="fb-speed-express" onclick="appLogic.setFastBatchSpeed('express', this)">مستعجل</button>
+                            <button class="btn-toggle btn-speed-normal active" id="fb-speed-normal"
+                                onclick="appLogic.setFastBatchSpeed('normal', this)">عادي</button>
+                            <button class="btn-toggle btn-speed-express" id="fb-speed-express"
+                                onclick="appLogic.setFastBatchSpeed('express', this)">مستعجل</button>
                         </div>
                     </div>
 
@@ -166,18 +226,19 @@
                 <section class="cart-section" id="cart-section">
                     <!-- Mobile Toggle Handle (THE GOLDEN TRIGGER) -->
                     <div class="cart-mobile-handle no-print golden-bar" onclick="appLogic.toggleMobileCart()">
-                        <span class="trigger-text">الفاتورة <i class="fa-solid fa-chevron-up" id="mobile-cart-icon"></i></span>
+                        <span class="trigger-text">الفاتورة <i class="fa-solid fa-chevron-up"
+                                id="mobile-cart-icon"></i></span>
                         <span class="trigger-total" id="mobile-grand-total">0.00 ر.س</span>
                     </div>
 
                     <div class="cart-header" style="border-bottom: 1px solid var(--border); padding-bottom: 10px;">
                         <h2 style="font-size: 16px; margin: 0; color: var(--text-muted); opacity: 0.8;">الفاتورة</h2>
                     </div>
-                    
+
                     <div class="cart-items" id="cart-items">
                         <div class="empty-cart-msg">السلة فارغة، يرجى اختيار أصناف.</div>
                     </div>
-                    
+
                     <div class="cart-footer" id="cart-footer" style="padding: 10px 16px;">
                         <div class="cart-modern-actions">
                             <!-- Trash Button -->
@@ -191,43 +252,55 @@
                         </div>
                     </div>
                 </section>
-                
+
             </div>
 
             <!-- History View -->
-            <div id="view-history" class="view-section" style="padding: 30px; overflow-y: auto; background: var(--bg-body);">
+            <div id="view-history" class="view-section"
+                style="padding: 30px; overflow-y: auto; background: var(--bg-body);">
                 <div style="max-width:900px; margin:0 auto;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                        <h2 style="font-size: 24px; font-weight: 800; color: var(--primary);"><i class="fa-solid fa-clock-rotate-left"></i> سجل الفواتير</h2>
+                        <h2 style="font-size: 24px; font-weight: 800; color: var(--primary);"><i
+                                class="fa-solid fa-clock-rotate-left"></i> سجل الفواتير</h2>
                         <div class="search-bar" style="width: 300px;">
                             <i class="fa-solid fa-search"></i>
-                            <input type="text" placeholder="بحث بالرقم، العميل أو الجوال..." id="history-search" oninput="appLogic.filterHistory()">
+                            <input type="text" placeholder="بحث بالرقم، العميل أو الجوال..." id="history-search"
+                                oninput="appLogic.filterHistory()">
                         </div>
                     </div>
                     <div id="history-content"></div>
 
                     <!-- Sleek Delivery Fee Management Card -->
-                    <div class="delivery-action-card" style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 25px; margin-top: 50px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; box-shadow: var(--shadow-md);">
+                    <div class="delivery-action-card"
+                        style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 25px; margin-top: 50px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; box-shadow: var(--shadow-md);">
                         <div>
-                            <h2 style="font-size: 20px; font-weight: 800; color: var(--primary); margin:0;"><i class="fa-solid fa-truck-fast"></i> إدارة رسوم التوصيل</h2>
-                            <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px; margin-bottom:0;">تحكم في أسعار التوصيل المتاحة لموظفي الكاشير</p>
+                            <h2 style="font-size: 20px; font-weight: 800; color: var(--primary); margin:0;"><i
+                                    class="fa-solid fa-truck-fast"></i> إدارة رسوم التوصيل</h2>
+                            <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px; margin-bottom:0;">تحكم
+                                في أسعار التوصيل المتاحة لموظفي الكاشير</p>
                         </div>
                         <div style="display:flex; gap:10px;">
-                            <button class="btn btn-primary" style="padding: 12px 24px; font-size: 15px;" onclick="appLogic.openAddDeliveryModal()"><i class="fa-solid fa-plus"></i> إضافة خيار توصيل</button>
+                            <button class="btn btn-primary" style="padding: 12px 24px; font-size: 15px;"
+                                onclick="appLogic.openAddDeliveryModal()"><i class="fa-solid fa-plus"></i> إضافة خيار
+                                توصيل</button>
                         </div>
                     </div>
-                    <div id="delivery-manager-content" style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 5px; height: auto; overflow: visible; box-shadow: var(--shadow-sm);"></div>
+                    <div id="delivery-manager-content"
+                        style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 5px; height: auto; overflow: visible; box-shadow: var(--shadow-sm);">
+                    </div>
                 </div>
             </div>
 
             <!-- Customers View -->
-            <div id="view-customers" class="view-section" style="padding: 30px; overflow-y: auto; background: var(--bg-body);">
+            <div id="view-customers" class="view-section"
+                style="padding: 30px; overflow-y: auto; background: var(--bg-body);">
                 <div style="max-width:900px; margin:0 auto;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
                         <h2>سجل العملاء</h2>
                         <div class="search-bar" style="width: 300px;">
                             <i class="fa-solid fa-search"></i>
-                            <input type="text" placeholder="بحث باسم العميل أو الجوال..." id="customer-search" oninput="appLogic.filterCustomers()">
+                            <input type="text" placeholder="بحث باسم العميل أو الجوال..." id="customer-search"
+                                oninput="appLogic.filterCustomers()">
                         </div>
                     </div>
                     <div id="customers-content"></div>
@@ -235,441 +308,588 @@
             </div>
 
             <!-- Inventory View -->
-            <div id="view-inventory" class="view-section" style="padding: 30px; overflow-y: auto; background: var(--bg-body);">
+            <div id="view-inventory" class="view-section"
+                style="padding: 30px; overflow-y: auto; background: var(--bg-body);">
                 <div style="max-width:900px; margin:0 auto;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
                         <h2>إدارة المخزون</h2>
                         <div style="display: flex; gap: 10px;">
-                            <button class="btn btn-primary" onclick="appLogic.openAddInventoryModal()"><i class="fa-solid fa-box"></i> إضافة صنف استهلاكي</button>
-                            <button class="btn btn-success" onclick="appLogic.openAddServiceModal()"><i class="fa-solid fa-shirt"></i> إضافة خدمة جديدة</button>
+                            <button class="btn btn-primary" onclick="appLogic.openAddInventoryModal()"><i
+                                    class="fa-solid fa-box"></i> إضافة صنف استهلاكي</button>
+                            <button class="btn btn-success" onclick="appLogic.openAddServiceModal()"><i
+                                    class="fa-solid fa-shirt"></i> إضافة خدمة جديدة</button>
                         </div>
                     </div>
                     <div id="inventory-content">
                         <div style="text-align:center; padding:50px; color:var(--text-muted);">
-                            <i class="fa-solid fa-spinner fa-spin fa-3x" style="margin-bottom:20px; color:var(--primary);"></i>
+                            <i class="fa-solid fa-spinner fa-spin fa-3x"
+                                style="margin-bottom:20px; color:var(--primary);"></i>
                             <h2 style="color:var(--text-main); margin-bottom:10px;">جاري تحضير قائمة الخدمات...</h2>
                             <p>إذا استغرق هذا وقتاً طويلاً، يرجى تحديث الصفحة.</p>
                         </div>
                     </div>
 
-        <!-- Delivery Management relocated to History -->
+                    <!-- Delivery Management relocated to History -->
                 </div>
             </div>
 
             <!-- Expenses View -->
-            <div id="view-expenses" class="view-section" style="padding: 30px; overflow-y: auto; background: var(--bg-body);">
+            <div id="view-expenses" class="view-section"
+                style="padding: 30px; overflow-y: auto; background: var(--bg-body);">
                 <div style="max-width:900px; margin:0 auto;">
-                    <div class="expense-action-card" style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 25px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; box-shadow: var(--shadow-md);">
+                    <div class="expense-action-card"
+                        style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 25px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; box-shadow: var(--shadow-md);">
                         <div>
-                            <h2 style="font-size: 20px; font-weight: 800; color: var(--primary); margin:0;">إدارة المصروفات التشغيلية</h2>
-                            <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px; margin-bottom:0;">سجل وراجع جميع المصروفات اليومية للمغسلة</p>
+                            <h2 style="font-size: 20px; font-weight: 800; color: var(--primary); margin:0;">إدارة
+                                المصروفات التشغيلية</h2>
+                            <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px; margin-bottom:0;">سجل
+                                وراجع جميع المصروفات اليومية للمغسلة</p>
                         </div>
                         <div style="display:flex; gap:10px;">
-                            <button class="btn btn-primary" style="padding: 12px 24px; font-size: 15px;" onclick="appLogic.openAddExpenseModal()"><i class="fa-solid fa-plus"></i> تقييد مصروف جديد</button>
-                            <button class="btn btn-danger" onclick="appLogic.clearExpenses()" style="background-color: transparent; border: 1px solid var(--danger); color: var(--danger); font-size: 14px; padding: 10px 18px;"><i class="fa-solid fa-trash-can"></i> تصفير</button>
+                            <button class="btn btn-primary" style="padding: 12px 24px; font-size: 15px;"
+                                onclick="appLogic.openAddExpenseModal()"><i class="fa-solid fa-plus"></i> تقييد مصروف
+                                جديد</button>
+                            <button class="btn btn-danger" onclick="appLogic.clearExpenses()"
+                                style="background-color: transparent; border: 1px solid var(--danger); color: var(--danger); font-size: 14px; padding: 10px 18px;"><i
+                                    class="fa-solid fa-trash-can"></i> تصفير</button>
                         </div>
                     </div>
-                    <div id="expenses-content" style="min-height: 400px; height: auto !important; overflow: visible !important;"></div>
+                    <div id="expenses-content"
+                        style="min-height: 400px; height: auto !important; overflow: visible !important;"></div>
                 </div>
             </div>
 
             <!-- Financial Reports View -->
-            <div id="view-reports" class="view-section" style="padding: 30px; overflow-y: auto; background: var(--bg-body);">
+            <div id="view-reports" class="view-section"
+                style="padding: 30px; overflow-y: auto; background: var(--bg-body);">
                 <div style="max-width:900px; margin:0 auto;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
                         <h2>القوائم المالية وإقرارات الزكاة</h2>
                     </div>
                     <div id="reports-content"></div>
-                    
-                    </div>
+
                 </div>
             </div>
+    </div>
 
-            <!-- Admin View Removed: All management now happens in sahab-master.html -->
-        </main>
+    <!-- Admin View Removed: All management now happens in sahab-master.html -->
+    </main>
 
-        <!-- Modals -->
-        <div class="modal-overlay hidden" id="item-modal">
-            <div class="modal">
-                <div class="modal-header">
-                    <h3 id="modal-item-name">اسم الصنف</h3>
-                    <button class="close-modal" onclick="appLogic.closeModal()"><i class="fa-solid fa-times"></i></button>
-                </div>
-                <div class="modal-body">
-                    <div class="selector-group">
-                        <h4>نوع الخدمة</h4>
-                        <div class="btn-group">
-                            <button class="btn-toggle active" id="btn-type-iron" onclick="appLogic.setModalType('iron', this)">كوي فقط</button>
-                            <button class="btn-toggle" id="btn-type-wash_iron" onclick="appLogic.setModalType('wash_iron', this)">غسيل وكوي</button>
-                            <button class="btn-toggle" id="btn-type-wash" onclick="appLogic.setModalType('wash', this)">غسيل فقط</button>
-                        </div>
-                    </div>
-                    <div class="selector-group">
-                        <h4>سرعة الخدمة</h4>
-                        <div class="btn-group">
-                            <button class="btn-toggle active" id="btn-speed-normal" onclick="appLogic.setModalSpeed('normal', this)">عادية</button>
-                            <button class="btn-toggle" id="btn-speed-express" onclick="appLogic.setModalSpeed('express', this)">سريعة</button>
-                        </div>
-                    </div>
-                    <div class="quantity-selector">
-                        <h4>الكمية</h4>
-                        <div class="qty-controls">
-                            <button class="btn-qty" onclick="appLogic.changeQty(-1)"><i class="fa-solid fa-minus"></i></button>
-                            <input type="number" id="qty-input" value="1" onchange="appLogic.setQty(this.value)">
-                            <button class="btn-qty" onclick="appLogic.changeQty(1)"><i class="fa-solid fa-plus"></i></button>
-                        </div>
-                    </div>
-                    <div class="price-preview">
-                        السعر الإفرادي: <span id="modal-unit-price">0</span> ر.س
+    <!-- Modals -->
+    <div class="modal-overlay hidden" id="item-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="modal-item-name">اسم الصنف</h3>
+                <button class="close-modal" onclick="appLogic.closeModal()"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="selector-group">
+                    <h4>نوع الخدمة</h4>
+                    <div class="btn-group">
+                        <button class="btn-toggle active" id="btn-type-iron"
+                            onclick="appLogic.setModalType('iron', this)">كوي فقط</button>
+                        <button class="btn-toggle" id="btn-type-wash_iron"
+                            onclick="appLogic.setModalType('wash_iron', this)">غسيل وكوي</button>
+                        <button class="btn-toggle" id="btn-type-wash" onclick="appLogic.setModalType('wash', this)">غسيل
+                            فقط</button>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button class="btn btn-primary w-100" id="btn-add-to-cart" onclick="appLogic.addToCart()">إضافة للسلة <strong id="modal-total-price" style="margin-right: 5px;">(0 ر.س)</strong></button>
+                <div class="selector-group">
+                    <h4>سرعة الخدمة</h4>
+                    <div class="btn-group">
+                        <button class="btn-toggle active" id="btn-speed-normal"
+                            onclick="appLogic.setModalSpeed('normal', this)">عادية</button>
+                        <button class="btn-toggle" id="btn-speed-express"
+                            onclick="appLogic.setModalSpeed('express', this)">سريعة</button>
+                    </div>
+                </div>
+                <div class="quantity-selector">
+                    <h4>الكمية</h4>
+                    <div class="qty-controls">
+                        <button class="btn-qty" onclick="appLogic.changeQty(-1)"><i
+                                class="fa-solid fa-minus"></i></button>
+                        <input type="number" id="qty-input" value="1" onchange="appLogic.setQty(this.value)">
+                        <button class="btn-qty" onclick="appLogic.changeQty(1)"><i
+                                class="fa-solid fa-plus"></i></button>
+                    </div>
+                </div>
+                <div class="price-preview">
+                    السعر الإفرادي: <span id="modal-unit-price">0</span> ر.س
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary w-100" id="btn-add-to-cart" onclick="appLogic.addToCart()">إضافة للسلة
+                    <strong id="modal-total-price" style="margin-right: 5px;">(0 ر.س)</strong></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Invoice Preview Modal -->
+    <div class="modal-overlay hidden" id="invoice-preview-modal">
+        <div class="modal"
+            style="width: 800px; max-width: 95%; max-height: 90vh; display: flex; flex-direction: column;">
+            <div class="modal-header"
+                style="justify-content: space-between; align-items: center; background: #1a1a1a; padding: 20px;">
+                <h3 style="color: var(--primary); font-size: 20px;"><i class="fa-solid fa-eye"></i> معاينة الفاتورة:
+                    <span id="preview-invoice-id" style="color:#fff;"></span></h3>
+                <button class="close-modal" onclick="appLogic.closeInvoicePreview()"><i
+                        class="fa-solid fa-arrow-right"></i></button>
+            </div>
+
+            <div class="modal-body"
+                style="flex: 1; overflow-y: auto; background: #222; display: flex; gap: 30px; padding: 30px;">
+
+                <!-- Preview Area -->
+                <div style="flex: 1; display: flex; justify-content: center; align-items: flex-start;">
+                    <div id="invoice-preview-container"
+                        style="background: #fff; color: #000; box-shadow: 0 10px 30px rgba(0,0,0,0.5); padding: 15px; width: 330px; transform: scale(0.9); transform-origin: top center;">
+                        <!-- Thermal HTML injected here -->
+                    </div>
+                </div>
+
+                <!-- Actions Area -->
+                <div style="width: 300px; display: flex; flex-direction: column; gap: 15px;">
+                    <!-- Preview State Actions -->
+                    <div id="modal-actions-preview">
+                        <div
+                            style="background: rgba(253,184,19,0.1); padding: 15px; border-radius: var(--radius-md); border: 1px solid var(--primary); text-align: center; margin-bottom: 15px;">
+                            <i class="fa-solid fa-circle-info"
+                                style="color: var(--primary); font-size: 30px; margin-bottom: 10px;"></i>
+                            <h4 style="font-size: 16px; margin-bottom: 5px; color: var(--primary);">مراجعة الفاتورة</h4>
+                            <p style="color: var(--text-muted); font-size: 12px; line-height: 1.4;">يرجى التأكد من صحة
+                                البيانات قبل الإصدار النهائي. سيتم تحميل نسخة PDF تلقائياً بعد التأكيد.</p>
+                        </div>
+                        <button class="btn btn-primary w-100" onclick="appLogic.confirmCheckout()"
+                            style="font-size: 18px; padding: 15px; margin-bottom: 10px; font-weight: bold;"><i
+                                class="fa-solid fa-check-double"></i> تأكيد وإصدار الفاتورة</button>
+                        <button class="btn w-100"
+                            style="background-color: transparent; color: var(--text-muted); border: 1px solid var(--border);"
+                            onclick="appLogic.closeInvoicePreview()"><i class="fa-solid fa-arrow-right"></i> رجوع لتعديل
+                            الطلب</button>
+                    </div>
+
+
+                    <!-- Z-Report Preview Modal Removed from here -->
+
+
+                    <!-- Success State Actions -->
+                    <div id="modal-actions-success" class="hidden">
+                        <div
+                            style="background: var(--bg-surface); padding: 20px; border-radius: var(--radius-md); border: 1px solid var(--border); text-align: center;">
+                            <i class="fa-solid fa-check-circle"
+                                style="color: #4CAF50; font-size: 40px; margin-bottom: 10px;"></i>
+                            <h4 style="font-size: 18px; margin-bottom: 5px;">تم تسجيل الفاتورة بنجاح</h4>
+                            <p style="color: var(--text-muted); font-size: 13px;">العملية مقيدة بالمرجع <span
+                                    id="success-invoice-ref"></span></p>
+                        </div>
+
+                        <h4
+                            style="margin-top: 15px; margin-bottom: 10px; color: var(--text-muted); font-size: 14px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+                            إجراءات الفاتورة:</h4>
+
+                        <button class="btn btn-primary w-100" onclick="appLogic.printThermalReceipt()"
+                            style="font-size: 16px; padding: 15px; margin-bottom: 10px;"><i
+                                class="fa-solid fa-print"></i> <span>طباعة إيصال حراري (80mm)</span></button>
+                        <button class="btn w-100"
+                            style="background-color: var(--bg-elevated); color: var(--text-main); border: 1px solid var(--border); font-size: 15px; margin-bottom: 10px;"
+                            onclick="appLogic.downloadDigitalPDF(event)"><i class="fa-solid fa-file-pdf"></i> تحميل
+                            الفاتورة الرقمية (PDF)</button>
+                        <button id="btn-whatsapp-share" class="btn w-100"
+                            style="background-color: transparent; color: #25D366; border: 1px solid #25D366; font-size: 15px; display:none;"
+                            onclick="appLogic.shareInvoiceWhatsApp()"><i class="fa-brands fa-whatsapp"
+                                style="font-size:18px;"></i> مشاركة عبر WhatsApp</button>
+                    </div>
                 </div>
             </div>
         </div>
+    </div>
+    </div>
 
-        <!-- Invoice Preview Modal -->
-        <div class="modal-overlay hidden" id="invoice-preview-modal">
-            <div class="modal" style="width: 800px; max-width: 95%; max-height: 90vh; display: flex; flex-direction: column;">
-                <div class="modal-header" style="justify-content: space-between; align-items: center; background: #1a1a1a; padding: 20px;">
-                    <h3 style="color: var(--primary); font-size: 20px;"><i class="fa-solid fa-eye"></i> معاينة الفاتورة: <span id="preview-invoice-id" style="color:#fff;"></span></h3>
-                    <button class="close-modal" onclick="appLogic.closeInvoicePreview()"><i class="fa-solid fa-arrow-right"></i></button>
-                </div>
-                
-                <div class="modal-body" style="flex: 1; overflow-y: auto; background: #222; display: flex; gap: 30px; padding: 30px;">
-                    
-                    <!-- Preview Area -->
-                    <div style="flex: 1; display: flex; justify-content: center; align-items: flex-start;">
-                        <div id="invoice-preview-container" style="background: #fff; color: #000; box-shadow: 0 10px 30px rgba(0,0,0,0.5); padding: 15px; width: 330px; transform: scale(0.9); transform-origin: top center;">
-                            <!-- Thermal HTML injected here -->
-                        </div>
-                    </div>
-
-                    <!-- Actions Area -->
-                    <div style="width: 300px; display: flex; flex-direction: column; gap: 15px;">
-                        <!-- Preview State Actions -->
-                        <div id="modal-actions-preview">
-                            <div style="background: rgba(253,184,19,0.1); padding: 15px; border-radius: var(--radius-md); border: 1px solid var(--primary); text-align: center; margin-bottom: 15px;">
-                                <i class="fa-solid fa-circle-info" style="color: var(--primary); font-size: 30px; margin-bottom: 10px;"></i>
-                                <h4 style="font-size: 16px; margin-bottom: 5px; color: var(--primary);">مراجعة الفاتورة</h4>
-                                <p style="color: var(--text-muted); font-size: 12px; line-height: 1.4;">يرجى التأكد من صحة البيانات قبل الإصدار النهائي. سيتم تحميل نسخة PDF تلقائياً بعد التأكيد.</p>
-                            </div>
-                            <button class="btn btn-primary w-100" onclick="appLogic.confirmCheckout()" style="font-size: 18px; padding: 15px; margin-bottom: 10px; font-weight: bold;"><i class="fa-solid fa-check-double"></i> تأكيد وإصدار الفاتورة</button>
-                            <button class="btn w-100" style="background-color: transparent; color: var(--text-muted); border: 1px solid var(--border);" onclick="appLogic.closeInvoicePreview()"><i class="fa-solid fa-arrow-right"></i> رجوع لتعديل الطلب</button>
-                        </div>
-
-
-                        <!-- Z-Report Preview Modal Removed from here -->
-
-
-                        <!-- Success State Actions -->
-                        <div id="modal-actions-success" class="hidden">
-                            <div style="background: var(--bg-surface); padding: 20px; border-radius: var(--radius-md); border: 1px solid var(--border); text-align: center;">
-                                <i class="fa-solid fa-check-circle" style="color: #4CAF50; font-size: 40px; margin-bottom: 10px;"></i>
-                                <h4 style="font-size: 18px; margin-bottom: 5px;">تم تسجيل الفاتورة بنجاح</h4>
-                                <p style="color: var(--text-muted); font-size: 13px;">العملية مقيدة بالمرجع <span id="success-invoice-ref"></span></p>
-                            </div>
-                            
-                            <h4 style="margin-top: 15px; margin-bottom: 10px; color: var(--text-muted); font-size: 14px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">إجراءات الفاتورة:</h4>
-                            
-                            <button class="btn btn-primary w-100" onclick="appLogic.printThermalReceipt()" style="font-size: 16px; padding: 15px; margin-bottom: 10px;"><i class="fa-solid fa-print"></i> <span>طباعة إيصال حراري (80mm)</span></button>
-                            <button class="btn w-100" style="background-color: var(--bg-elevated); color: var(--text-main); border: 1px solid var(--border); font-size: 15px; margin-bottom: 10px;" onclick="appLogic.downloadDigitalPDF(event)"><i class="fa-solid fa-file-pdf"></i> تحميل الفاتورة الرقمية (PDF)</button>
-                            <button id="btn-whatsapp-share" class="btn w-100" style="background-color: transparent; color: #25D366; border: 1px solid #25D366; font-size: 15px; display:none;" onclick="appLogic.shareInvoiceWhatsApp()"><i class="fa-brands fa-whatsapp" style="font-size:18px;"></i> مشاركة عبر WhatsApp</button>
-                        </div>
-                    </div>
-                </div>
+    <!-- Add Inventory Modal -->
+    <div class="modal-overlay hidden" id="add-inventory-modal">
+        <div class="modal" style="width: 400px;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-box-open"></i> إضافة صنف استهلاكي</h3>
+                <button class="close-modal" onclick="appLogic.closeInventoryModal()"><i
+                        class="fa-solid fa-times"></i></button>
             </div>
+            <div class="modal-body" style="padding: 20px;">
+                <input type="hidden" id="inv-id">
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label style="display:block; margin-bottom:5px; color:var(--text-muted);">اسم الصنف (مثل: شماعات،
+                        أكياس، صابون)</label>
+                    <input type="text" id="inv-name"
+                        style="width:100%; padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm);"
+                        placeholder="اسم الصنف">
+                </div>
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label style="display:block; margin-bottom:5px; color:var(--text-muted);">رقم الصنف (SKU)</label>
+                    <input type="text" id="inv-sku"
+                        style="width:100%; padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm);"
+                        placeholder="رقم أو رمز تعريفي">
+                </div>
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label style="display:block; margin-bottom:5px; color:var(--text-muted);">الكمية الحالية</label>
+                    <input type="number" id="inv-qty" value="0"
+                        style="width:100%; padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm);">
+                </div>
+                <div class="form-group" style="margin-bottom: 25px;">
+                    <label style="display:block; margin-bottom:5px; color:var(--text-muted);">تكلفة الصنف
+                        (للوحدة)</label>
+                    <input type="number" id="inv-cost" value="0.00" step="0.5"
+                        style="width:100%; padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm);"
+                        dir="ltr">
+                </div>
+                <button class="btn btn-primary w-100" onclick="appLogic.saveInventoryItem()"><i
+                        class="fa-solid fa-save"></i> حفظ في المخزون</button>
             </div>
         </div>
+    </div>
 
-        <!-- Add Inventory Modal -->
-        <div class="modal-overlay hidden" id="add-inventory-modal">
-            <div class="modal" style="width: 400px;">
-                <div class="modal-header">
-                    <h3><i class="fa-solid fa-box-open"></i> إضافة صنف استهلاكي</h3>
-                    <button class="close-modal" onclick="appLogic.closeInventoryModal()"><i class="fa-solid fa-times"></i></button>
+    <!-- Checkout Step Modal (Step 2) -->
+    <div class="modal-overlay hidden" id="checkout-modal">
+        <div class="modal" style="width: 500px; max-width: 95%;">
+            <div class="modal-header"
+                style="background: linear-gradient(135deg, var(--bg-surface), var(--bg-elevated)); border-bottom: 2px solid var(--primary); padding: 15px 24px; display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; font-size: 18px; color: var(--primary);"><i class="fa-solid fa-cart-check"></i>
+                    إكمال الطلب</h3>
+                <button class="close-modal" onclick="appLogic.closeCheckoutModal()"
+                    style="color: var(--text-muted); font-size: 18px; padding: 5px;"><i
+                        class="fa-solid fa-arrow-left"></i></button>
+            </div>
+            <div class="modal-body" style="padding: 24px;">
+                <div class="customer-info-checkout" style="margin-bottom: 24px;">
+                    <h4
+                        style="color:var(--text-muted); font-size:13px; margin-bottom:12px; text-transform:uppercase; font-weight:800;">
+                        بيانات العميل</h4>
+                    <input type="text" placeholder="اسم العميل (اختياري)" id="checkout-customer-name"
+                        style="width:100%; padding:14px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-md); font-size:15px; margin-bottom:12px; text-align: right; direction: rtl;">
+                    <input type="tel" placeholder="رقم الجوال (اختياري)" id="checkout-customer-phone"
+                        style="width:100%; padding:14px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-md); font-size:15px; text-align: right; direction: rtl;"
+                        maxlength="10">
+                    <span id="checkout-phone-error"
+                        style="display:none; color:var(--danger); font-size:12px; margin-top:6px; font-weight:600;"></span>
                 </div>
-                <div class="modal-body" style="padding: 20px;">
-                    <input type="hidden" id="inv-id">
-                    <div class="form-group" style="margin-bottom: 15px;">
-                        <label style="display:block; margin-bottom:5px; color:var(--text-muted);">اسم الصنف (مثل: شماعات، أكياس، صابون)</label>
-                        <input type="text" id="inv-name" style="width:100%; padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm);" placeholder="اسم الصنف">
+
+                <div class="delivery-info-checkout"
+                    style="margin-bottom: 24px; padding-top: 20px; border-top: 1px solid var(--border);">
+                    <h4
+                        style="color:var(--text-muted); font-size:13px; margin-bottom:12px; text-transform:uppercase; font-weight:800;">
+                        خيارات التوصيل</h4>
+                    <div class="delivery-buttons" id="checkout-delivery-buttons">
+                        <!-- Injected by JS -->
                     </div>
-                    <div class="form-group" style="margin-bottom: 15px;">
-                        <label style="display:block; margin-bottom:5px; color:var(--text-muted);">رقم الصنف (SKU)</label>
-                        <input type="text" id="inv-sku" style="width:100%; padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm);" placeholder="رقم أو رمز تعريفي">
-                    </div>
-                    <div class="form-group" style="margin-bottom: 15px;">
-                        <label style="display:block; margin-bottom:5px; color:var(--text-muted);">الكمية الحالية</label>
-                        <input type="number" id="inv-qty" value="0" style="width:100%; padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm);">
-                    </div>
-                    <div class="form-group" style="margin-bottom: 25px;">
-                        <label style="display:block; margin-bottom:5px; color:var(--text-muted);">تكلفة الصنف (للوحدة)</label>
-                        <input type="number" id="inv-cost" value="0.00" step="0.5" style="width:100%; padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm);" dir="ltr">
-                    </div>
-                    <button class="btn btn-primary w-100" onclick="appLogic.saveInventoryItem()"><i class="fa-solid fa-save"></i> حفظ في المخزون</button>
                 </div>
+
+                <!-- Payment Toggle removed from here - moved to Step 2 Modal -->
+
+                <div class="final-total-checkout"
+                    style="background:var(--bg-elevated); padding:20px; border-radius:var(--radius-md); text-align:center; border:1px solid var(--primary); margin-bottom: 24px;">
+                    <span style="display:block; font-size:14px; color:var(--text-muted); margin-bottom:5px;">الإجمالي
+                        النهائي المستحق:</span>
+                    <h2 id="checkout-grand-total" style="font-size:32px; font-weight:900; color:var(--primary);">0.00
+                        ر.س</h2>
+                </div>
+
+                <button class="btn btn-primary w-100" onclick="appLogic.previewCheckout()"
+                    style="padding:18px; font-size:18px;">
+                    تأكيد إنشاء الفاتورة <i class="fa-solid fa-check-double"></i>
+                </button>
             </div>
         </div>
+    </div>
 
-        <!-- Checkout Step Modal (Step 2) -->
-        <div class="modal-overlay hidden" id="checkout-modal">
-            <div class="modal" style="width: 500px; max-width: 95%;">
-                <div class="modal-header" style="background: linear-gradient(135deg, var(--bg-surface), var(--bg-elevated)); border-bottom: 2px solid var(--primary); padding: 15px 24px; display: flex; justify-content: space-between; align-items: center;">
-                    <h3 style="margin: 0; font-size: 18px; color: var(--primary);"><i class="fa-solid fa-cart-check"></i> إكمال الطلب</h3>
-                    <button class="close-modal" onclick="appLogic.closeCheckoutModal()" style="color: var(--text-muted); font-size: 18px; padding: 5px;"><i class="fa-solid fa-arrow-left"></i></button>
-                </div>
-                <div class="modal-body" style="padding: 24px;">
-                    <div class="customer-info-checkout" style="margin-bottom: 24px;">
-                        <h4 style="color:var(--text-muted); font-size:13px; margin-bottom:12px; text-transform:uppercase; font-weight:800;">بيانات العميل</h4>
-                        <input type="text" placeholder="اسم العميل (اختياري)" id="checkout-customer-name" style="width:100%; padding:14px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-md); font-size:15px; margin-bottom:12px; text-align: right; direction: rtl;">
-                        <input type="tel" placeholder="رقم الجوال (اختياري)" id="checkout-customer-phone" style="width:100%; padding:14px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-md); font-size:15px; text-align: right; direction: rtl;" maxlength="10">
-                        <span id="checkout-phone-error" style="display:none; color:var(--danger); font-size:12px; margin-top:6px; font-weight:600;"></span>
-                    </div>
 
-                    <div class="delivery-info-checkout" style="margin-bottom: 24px; padding-top: 20px; border-top: 1px solid var(--border);">
-                        <h4 style="color:var(--text-muted); font-size:13px; margin-bottom:12px; text-transform:uppercase; font-weight:800;">خيارات التوصيل</h4>
-                        <div class="delivery-buttons" id="checkout-delivery-buttons">
-                            <!-- Injected by JS -->
-                        </div>
-                    </div>
-
-                    <!-- Payment Toggle removed from here - moved to Step 2 Modal -->
-
-                    <div class="final-total-checkout" style="background:var(--bg-elevated); padding:20px; border-radius:var(--radius-md); text-align:center; border:1px solid var(--primary); margin-bottom: 24px;">
-                        <span style="display:block; font-size:14px; color:var(--text-muted); margin-bottom:5px;">الإجمالي النهائي المستحق:</span>
-                        <h2 id="checkout-grand-total" style="font-size:32px; font-weight:900; color:var(--primary);">0.00 ر.س</h2>
-                    </div>
-
-                    <button class="btn btn-primary w-100" onclick="appLogic.previewCheckout()" style="padding:18px; font-size:18px;">
-                        تأكيد إنشاء الفاتورة <i class="fa-solid fa-check-double"></i>
+    <!-- Payment Method Modal (New Step 2) -->
+    <div class="modal-overlay hidden" id="payment-method-modal">
+        <div class="modal" style="width: 450px; max-width: 95%;">
+            <div class="modal-header"
+                style="background: linear-gradient(135deg, var(--bg-surface), var(--bg-elevated)); border-bottom: 2px solid var(--primary); padding: 15px 24px; display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; font-size: 18px; color: var(--primary);"><i class="fa-solid fa-wallet"></i> اختر
+                    طريقة الدفع</h3>
+                <button class="close-modal" onclick="appLogic.closePaymentModal()"
+                    style="color: var(--text-muted); font-size: 18px; padding: 5px;"><i
+                        class="fa-solid fa-arrow-left"></i></button>
+            </div>
+            <div class="modal-body" style="padding: 24px;">
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <button class="btn w-100" id="method-cash" onclick="appLogic.finalizeWithPayment('cash')"
+                        style="background: #1e1e1e; color: #fff; padding: 20px; border: 1px solid var(--border); font-size: 18px; display: flex; justify-content: space-between; align-items: center;">
+                        <span><i class="fa-solid fa-money-bill-1-wave" style="margin-left:10px;"></i> كاش (Cash)</span>
+                        <i class="fa-solid fa-chevron-left" style="font-size:12px; opacity:0.5;"></i>
                     </button>
-                </div>
-            </div>
-        </div>
-
-
-        <!-- Payment Method Modal (New Step 2) -->
-        <div class="modal-overlay hidden" id="payment-method-modal">
-            <div class="modal" style="width: 450px; max-width: 95%;">
-                <div class="modal-header" style="background: linear-gradient(135deg, var(--bg-surface), var(--bg-elevated)); border-bottom: 2px solid var(--primary); padding: 15px 24px; display: flex; justify-content: space-between; align-items: center;">
-                    <h3 style="margin: 0; font-size: 18px; color: var(--primary);"><i class="fa-solid fa-wallet"></i> اختر طريقة الدفع</h3>
-                    <button class="close-modal" onclick="appLogic.closePaymentModal()" style="color: var(--text-muted); font-size: 18px; padding: 5px;"><i class="fa-solid fa-arrow-left"></i></button>
-                </div>
-                <div class="modal-body" style="padding: 24px;">
-                    <div style="display: flex; flex-direction: column; gap: 12px;">
-                        <button class="btn w-100" id="method-cash" onclick="appLogic.finalizeWithPayment('cash')" style="background: #1e1e1e; color: #fff; padding: 20px; border: 1px solid var(--border); font-size: 18px; display: flex; justify-content: space-between; align-items: center;">
-                            <span><i class="fa-solid fa-money-bill-1-wave" style="margin-left:10px;"></i> كاش (Cash)</span>
-                            <i class="fa-solid fa-chevron-left" style="font-size:12px; opacity:0.5;"></i>
-                        </button>
-                        <button class="btn w-100" id="method-mada" onclick="appLogic.finalizeWithPayment('mada')" style="background: #1e1e1e; color: #fff; padding: 20px; border: 1px solid var(--border); font-size: 18px; display: flex; justify-content: space-between; align-items: center;">
-                            <span><i class="fa-solid fa-credit-card" style="margin-left:10px;"></i> مدى (Mada)</span>
-                            <i class="fa-solid fa-chevron-left" style="font-size:12px; opacity:0.5;"></i>
-                        </button>
-                        <button class="btn w-100" id="method-visa" onclick="appLogic.finalizeWithPayment('visa')" style="background: #1e1e1e; color: #fff; padding: 20px; border: 1px solid var(--border); font-size: 18px; display: flex; justify-content: space-between; align-items: center;">
-                            <span><i class="fa-brands fa-cc-visa" style="margin-left:10px; color: #1A1F71;"></i> فيزا (Visa)</span>
-                            <i class="fa-solid fa-chevron-left" style="font-size:12px; opacity:0.5;"></i>
-                        </button>
-                        <button class="btn w-100" id="method-mastercard" onclick="appLogic.finalizeWithPayment('mastercard')" style="background: #1e1e1e; color: #fff; padding: 20px; border: 1px solid var(--border); font-size: 18px; display: flex; justify-content: space-between; align-items: center;">
-                            <span><i class="fa-brands fa-cc-mastercard" style="margin-left:10px; color: #EB001B;"></i> ماستركارد (Mastercard)</span>
-                            <i class="fa-solid fa-chevron-left" style="font-size:12px; opacity:0.5;"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Add Expense Modal -->
-        <div class="modal-overlay hidden" id="add-expense-modal">
-            <div class="modal" style="width: 450px;">
-                <div class="modal-header" style="background: linear-gradient(135deg, #fdb813, #e5a400); border-color:#e5a400; color: #1a1a2e;">
-                    <h3 style="color: #1a1a2e; font-weight: 800;"><i class="fa-solid fa-hand-holding-dollar"></i> تقييد مصروف جديد</h3>
-                    <button class="close-modal" style="color: rgba(26,26,46,0.8);" onclick="appLogic.closeExpenseModal()"><i class="fa-solid fa-times"></i></button>
-                </div>
-                <div class="modal-body" style="padding: 20px;">
-                    <div class="form-group" style="margin-bottom: 15px;">
-                        <label style="display:block; margin-bottom:5px; color:var(--text-muted);">التصنيف</label>
-                        <select id="exp-category" style="width:100%; padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm);">
-                            <option value="ايجار">إيجار المحل</option>
-                            <option value="رواتب">رواتب عمالة</option>
-                            <option value="فواتير">فواتير ومنافع (كهرباء/ماء)</option>
-                            <option value="صيانة">صيانة دورية</option>
-                            <option value="مشتريات">مشتريات تشغيلية</option>
-                            <option value="أخرى">أخرى / مصاريف نثرية</option>
-                        </select>
-                    </div>
-                    <div class="form-group" style="margin-bottom: 15px;">
-                        <label style="display:block; margin-bottom:5px; color:var(--text-muted);">المبلغ (ر.س)</label>
-                        <input type="number" id="exp-amount" placeholder="مثلاً: 150" step="1" style="width:100%; padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm); font-size:20px; font-weight:bold; color:var(--primary); font-family: system-ui, -apple-system, Arial, sans-serif !important; font-variant-numeric: tabular-nums;" dir="ltr">
-                    </div>
-                    <div class="form-group" style="margin-bottom: 15px;">
-                        <label style="display:block; margin-bottom:5px; color:var(--text-muted);">البيان / الوصف</label>
-                        <input type="text" id="exp-desc" style="width:100%; padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm);" placeholder="مثال: فاتورة كهرباء شهر فبراير">
-                    </div>
-                    <div class="form-group" style="margin-bottom: 25px;">
-                        <label style="display:block; margin-bottom:5px; color:var(--text-muted);">تاريخ المصروف</label>
-                        <input type="date" id="expense-date" lang="en" dir="ltr" required style="width:100%; padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm); font-family: system-ui, -apple-system, Arial, sans-serif !important; font-variant-numeric: tabular-nums; text-align: center;">
-                    </div>
-                    <button class="btn w-100" style="background: linear-gradient(135deg, #fdb813, #e5a400); color: #1a1a2e; font-weight: bold; border: none; padding: 12px; font-size: 16px;" onclick="appLogic.saveExpense()"><i class="fa-solid fa-check"></i> حفظ القيد المحاسبي</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Printable Invoice -->
-        <div id="invoice-print-container" class="print-only"></div>
-        <div id="z-report-print-container" class="print-only"></div>
-
-        <!-- Service Modal (Add/Edit Services) -->
-        <div class="modal-overlay hidden" id="service-modal">
-            <div class="modal" style="width: 550px;">
-                <div class="modal-header" style="background: linear-gradient(135deg, #66bb6a, #43a047); border-color: #4CAF50; color: white;">
-                    <h3 id="service-modal-title" style="color: white;"><i class="fa-solid fa-shirt"></i> إضافة/تعديل خدمة</h3>
-                    <button class="close-modal" style="color: rgba(255,255,255,0.8);" onclick="appLogic.closeServiceModal()"><i class="fa-solid fa-arrow-right"></i></button>
-                </div>
-                <div class="modal-body">
-                    <input type="hidden" id="service-id">
-                    
-                    <div class="pricing-grid" style="margin-bottom: 20px;">
-                        <div class="form-group">
-                            <label class="form-field-label">اسم الخدمة (مثل: ثوب)</label>
-                            <input type="text" id="service-name" class="w-100" style="padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm);">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-field-label">الفئة</label>
-                            <select id="service-cat" class="w-100" style="padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm);">
-                                <option value="men">رجالي</option>
-                                <option value="women">نسائي</option>
-                                <option value="misc">أقسام أخرى</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="form-group" style="margin-bottom: 20px;">
-                        <label class="form-field-label">اختر الأيقونة</label>
-                        <div id="icon-picker-grid" class="icon-picker-grid">
-                            <!-- Icons injected by JS -->
-                        </div>
-                        <input type="hidden" id="service-icon" value="fa-shirt">
-                    </div>
-
-                    <h4 style="color:var(--primary); font-size:14px; margin-bottom:12px; border-bottom:1px solid #333; padding-bottom:5px;">هيكل الأسعار (Pricing Structure)</h4>
-                    
-                    <div class="pricing-grid" style="margin-bottom: 15px;">
-                        <div class="form-group">
-                            <label class="form-field-label">سعر كوي فقط</label>
-                            <input type="number" id="price-iron" value="0.00" step="0.5" class="w-100" style="padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm);" dir="ltr">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-field-label">سعر غسيل وكوي</label>
-                            <input type="number" id="price-wash-iron" value="0.00" step="0.5" class="w-100" style="padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm);" dir="ltr">
-                        </div>
-                    </div>
-
-                    <div class="pricing-grid" style="margin-bottom: 25px;">
-                        <div class="form-group">
-                            <label class="form-field-label">سعر غسيل فقط</label>
-                            <input type="number" id="price-wash" value="0.00" step="0.5" class="w-100" style="padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm);" dir="ltr">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-field-label">رسوم الخدمة السريعة (إضافة)</label>
-                            <input type="number" id="price-express-fee" value="0.00" step="0.5" class="w-100" style="padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm);" dir="ltr">
-                        </div>
-                    </div>
-
-                    <button class="btn btn-success w-100" onclick="appLogic.saveService()"><i class="fa-solid fa-save"></i> حفظ الخدمة</button>
+                    <button class="btn w-100" id="method-mada" onclick="appLogic.finalizeWithPayment('mada')"
+                        style="background: #1e1e1e; color: #fff; padding: 20px; border: 1px solid var(--border); font-size: 18px; display: flex; justify-content: space-between; align-items: center;">
+                        <span><i class="fa-solid fa-credit-card" style="margin-left:10px;"></i> مدى (Mada)</span>
+                        <i class="fa-solid fa-chevron-left" style="font-size:12px; opacity:0.5;"></i>
+                    </button>
+                    <button class="btn w-100" id="method-visa" onclick="appLogic.finalizeWithPayment('visa')"
+                        style="background: #1e1e1e; color: #fff; padding: 20px; border: 1px solid var(--border); font-size: 18px; display: flex; justify-content: space-between; align-items: center;">
+                        <span><i class="fa-brands fa-cc-visa" style="margin-left:10px; color: #1A1F71;"></i> فيزا
+                            (Visa)</span>
+                        <i class="fa-solid fa-chevron-left" style="font-size:12px; opacity:0.5;"></i>
+                    </button>
+                    <button class="btn w-100" id="method-mastercard"
+                        onclick="appLogic.finalizeWithPayment('mastercard')"
+                        style="background: #1e1e1e; color: #fff; padding: 20px; border: 1px solid var(--border); font-size: 18px; display: flex; justify-content: space-between; align-items: center;">
+                        <span><i class="fa-brands fa-cc-mastercard" style="margin-left:10px; color: #EB001B;"></i>
+                            ماستركارد (Mastercard)</span>
+                        <i class="fa-solid fa-chevron-left" style="font-size:12px; opacity:0.5;"></i>
+                    </button>
                 </div>
             </div>
         </div>
     </div>
 
-        <!-- Add Delivery Modal -->
-        <div class="modal-overlay hidden" id="delivery-modal">
-            <div class="modal" style="width: 400px;">
-                <div class="modal-header">
-                    <h3 id="delivery-modal-title">إضافة خيار توصيل</h3>
-                    <button class="close-modal" onclick="appLogic.closeDeliveryModal()"><i class="fa-solid fa-arrow-right"></i></button>
+    <!-- Add Expense Modal -->
+    <div class="modal-overlay hidden" id="add-expense-modal">
+        <div class="modal" style="width: 450px;">
+            <div class="modal-header"
+                style="background: linear-gradient(135deg, #fdb813, #e5a400); border-color:#e5a400; color: #1a1a2e;">
+                <h3 style="color: #1a1a2e; font-weight: 800;"><i class="fa-solid fa-hand-holding-dollar"></i> تقييد
+                    مصروف جديد</h3>
+                <button class="close-modal" style="color: rgba(26,26,46,0.8);" onclick="appLogic.closeExpenseModal()"><i
+                        class="fa-solid fa-times"></i></button>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label style="display:block; margin-bottom:5px; color:var(--text-muted);">التصنيف</label>
+                    <select id="exp-category"
+                        style="width:100%; padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm);">
+                        <option value="ايجار">إيجار المحل</option>
+                        <option value="رواتب">رواتب عمالة</option>
+                        <option value="فواتير">فواتير ومنافع (كهرباء/ماء)</option>
+                        <option value="صيانة">صيانة دورية</option>
+                        <option value="مشتريات">مشتريات تشغيلية</option>
+                        <option value="أخرى">أخرى / مصاريف نثرية</option>
+                    </select>
                 </div>
-                <div class="modal-body">
-                    <input type="hidden" id="delivery-id">
-                    <div class="selector-group">
-                        <label style="display:block; margin-bottom:10px; color:var(--text-muted);">اسم الخيار (مثل: توصيل VIP)</label>
-                        <input type="text" id="delivery-name" class="w-100" style="padding:14px; background:var(--bg-body); color:#fff; border:1px solid var(--border); border-radius:var(--radius-md); font-family:inherit;">
-                    </div>
-                    <div class="selector-group">
-                        <label style="display:block; margin-bottom:10px; color:var(--text-muted);">المبلغ (ر.س)</label>
-                        <input type="number" id="delivery-amount" class="w-100" style="padding:14px; background:var(--bg-body); color:#fff; border:1px solid var(--border); border-radius:var(--radius-md); font-family:inherit;">
-                    </div>
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label style="display:block; margin-bottom:5px; color:var(--text-muted);">المبلغ (ر.س)</label>
+                    <input type="number" id="exp-amount" placeholder="مثلاً: 150" step="1"
+                        style="width:100%; padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm); font-size:20px; font-weight:bold; color:var(--primary); font-family: system-ui, -apple-system, Arial, sans-serif !important; font-variant-numeric: tabular-nums;"
+                        dir="ltr">
                 </div>
-                <div class="modal-footer">
-                    <button class="btn btn-primary w-100" onclick="appLogic.saveDeliveryOption()">حفظ البيانات</button>
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label style="display:block; margin-bottom:5px; color:var(--text-muted);">البيان / الوصف</label>
+                    <input type="text" id="exp-desc"
+                        style="width:100%; padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm);"
+                        placeholder="مثال: فاتورة كهرباء شهر فبراير">
                 </div>
+                <div class="form-group" style="margin-bottom: 25px;">
+                    <label style="display:block; margin-bottom:5px; color:var(--text-muted);">تاريخ المصروف</label>
+                    <input type="date" id="expense-date" lang="en" dir="ltr" required
+                        style="width:100%; padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm); font-family: system-ui, -apple-system, Arial, sans-serif !important; font-variant-numeric: tabular-nums; text-align: center;">
+                </div>
+                <button class="btn w-100"
+                    style="background: linear-gradient(135deg, #fdb813, #e5a400); color: #1a1a2e; font-weight: bold; border: none; padding: 12px; font-size: 16px;"
+                    onclick="appLogic.saveExpense()"><i class="fa-solid fa-check"></i> حفظ القيد المحاسبي</button>
             </div>
         </div>
+    </div>
+
+    <!-- Printable Invoice -->
+    <div id="invoice-print-container" class="print-only"></div>
+    <div id="z-report-print-container" class="print-only"></div>
+
+    <!-- Service Modal (Add/Edit Services) -->
+    <div class="modal-overlay hidden" id="service-modal">
+        <div class="modal" style="width: 550px;">
+            <div class="modal-header"
+                style="background: linear-gradient(135deg, #66bb6a, #43a047); border-color: #4CAF50; color: white;">
+                <h3 id="service-modal-title" style="color: white;"><i class="fa-solid fa-shirt"></i> إضافة/تعديل خدمة
+                </h3>
+                <button class="close-modal" style="color: rgba(255,255,255,0.8);"
+                    onclick="appLogic.closeServiceModal()"><i class="fa-solid fa-arrow-right"></i></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="service-id">
+
+                <div class="pricing-grid" style="margin-bottom: 20px;">
+                    <div class="form-group">
+                        <label class="form-field-label">اسم الخدمة (مثل: ثوب)</label>
+                        <input type="text" id="service-name" class="w-100"
+                            style="padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm);">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-field-label">الفئة</label>
+                        <select id="service-cat" class="w-100"
+                            style="padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm);">
+                            <option value="men">رجالي</option>
+                            <option value="women">نسائي</option>
+                            <option value="misc">أقسام أخرى</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label class="form-field-label">اختر الأيقونة</label>
+                    <div id="icon-picker-grid" class="icon-picker-grid">
+                        <!-- Icons injected by JS -->
+                    </div>
+                    <input type="hidden" id="service-icon" value="fa-shirt">
+                </div>
+
+                <h4
+                    style="color:var(--primary); font-size:14px; margin-bottom:12px; border-bottom:1px solid #333; padding-bottom:5px;">
+                    هيكل الأسعار (Pricing Structure)</h4>
+
+                <div class="pricing-grid" style="margin-bottom: 15px;">
+                    <div class="form-group">
+                        <label class="form-field-label">سعر كوي فقط</label>
+                        <input type="number" id="price-iron" value="0.00" step="0.5" class="w-100"
+                            style="padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm);"
+                            dir="ltr">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-field-label">سعر غسيل وكوي</label>
+                        <input type="number" id="price-wash-iron" value="0.00" step="0.5" class="w-100"
+                            style="padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm);"
+                            dir="ltr">
+                    </div>
+                </div>
+
+                <div class="pricing-grid" style="margin-bottom: 25px;">
+                    <div class="form-group">
+                        <label class="form-field-label">سعر غسيل فقط</label>
+                        <input type="number" id="price-wash" value="0.00" step="0.5" class="w-100"
+                            style="padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm);"
+                            dir="ltr">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-field-label">رسوم الخدمة السريعة (إضافة)</label>
+                        <input type="number" id="price-express-fee" value="0.00" step="0.5" class="w-100"
+                            style="padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm);"
+                            dir="ltr">
+                    </div>
+                </div>
+
+                <button class="btn btn-success w-100" onclick="appLogic.saveService()"><i class="fa-solid fa-save"></i>
+                    حفظ الخدمة</button>
+            </div>
+        </div>
+    </div>
+    </div>
+
+    <!-- Add Delivery Modal -->
+    <div class="modal-overlay hidden" id="delivery-modal">
+        <div class="modal" style="width: 400px;">
+            <div class="modal-header">
+                <h3 id="delivery-modal-title">إضافة خيار توصيل</h3>
+                <button class="close-modal" onclick="appLogic.closeDeliveryModal()"><i
+                        class="fa-solid fa-arrow-right"></i></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="delivery-id">
+                <div class="selector-group">
+                    <label style="display:block; margin-bottom:10px; color:var(--text-muted);">اسم الخيار (مثل: توصيل
+                        VIP)</label>
+                    <input type="text" id="delivery-name" class="w-100"
+                        style="padding:14px; background:var(--bg-body); color:#fff; border:1px solid var(--border); border-radius:var(--radius-md); font-family:inherit;">
+                </div>
+                <div class="selector-group">
+                    <label style="display:block; margin-bottom:10px; color:var(--text-muted);">المبلغ (ر.س)</label>
+                    <input type="number" id="delivery-amount" class="w-100"
+                        style="padding:14px; background:var(--bg-body); color:#fff; border:1px solid var(--border); border-radius:var(--radius-md); font-family:inherit;">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary w-100" onclick="appLogic.saveDeliveryOption()">حفظ البيانات</button>
+            </div>
+        </div>
+    </div>
 
     <!-- ===== TENANT SETTINGS MODAL ===== -->
     <div class="modal-overlay hidden" id="settings-modal">
         <div class="modal" style="width: 100%; max-width: 400px; max-height: 85vh; overflow-y: auto;">
-            <div class="modal-header" style="background: linear-gradient(135deg, #1a1a1a, #2a2a2a); border-bottom: 2px solid var(--primary);">
+            <div class="modal-header"
+                style="background: linear-gradient(135deg, #1a1a1a, #2a2a2a); border-bottom: 2px solid var(--primary);">
                 <h3 style="color: var(--primary);"><i class="fa-solid fa-gear"></i> الإعدادات</h3>
-                <button class="close-modal" onclick="appLogic.closeSettingsModal()"><i class="fa-solid fa-times"></i></button>
+                <button class="close-modal" onclick="appLogic.closeSettingsModal()"><i
+                        class="fa-solid fa-times"></i></button>
             </div>
             <div class="modal-body" style="padding: 20px;">
                 <div class="selector-group">
-                    <label style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:13px; font-weight:700;">اسم النشاط التجاري</label>
-                    <input type="text" id="setting-name" placeholder="مثال: مغسلة الفيصل" style="width:100%; padding:12px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm); font-family:inherit; font-size:15px;">
+                    <label
+                        style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:13px; font-weight:700;">اسم
+                        النشاط التجاري</label>
+                    <input type="text" id="setting-name" placeholder="مثال: مغسلة الفيصل"
+                        style="width:100%; padding:12px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm); font-family:inherit; font-size:15px;">
                 </div>
                 <div class="selector-group">
-                    <label style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:13px; font-weight:700;">شعار الفاتورة (Logo)</label>
+                    <label
+                        style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:13px; font-weight:700;">شعار
+                        الفاتورة (Logo)</label>
                     <div style="display:flex; align-items:center; gap:10px;">
-                        <img id="setting-logo-preview" src="" style="width: 45px; height: 45px; object-fit: contain; background: #fff; border-radius: var(--radius-sm); border: 1px solid var(--border); display: none;">
-                        <input type="file" id="setting-logo-file" accept="image/png, image/jpeg, image/jpg" onchange="appLogic.handleLogoUpload(this)" style="width:100%; padding:8px; background:var(--bg-body); border:1px solid var(--border); color:var(--text-muted); border-radius:var(--radius-sm); font-family:inherit; font-size:13px; cursor:pointer;">
+                        <img id="setting-logo-preview" src=""
+                            style="width: 45px; height: 45px; object-fit: contain; background: #fff; border-radius: var(--radius-sm); border: 1px solid var(--border); display: none;">
+                        <input type="file" id="setting-logo-file" accept="image/png, image/jpeg, image/jpg"
+                            onchange="appLogic.handleLogoUpload(this)"
+                            style="width:100%; padding:8px; background:var(--bg-body); border:1px solid var(--border); color:var(--text-muted); border-radius:var(--radius-sm); font-family:inherit; font-size:13px; cursor:pointer;">
                     </div>
                 </div>
                 <div class="selector-group">
-                    <label style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:13px; font-weight:700;">رقم الجوال</label>
-                    <input type="text" id="setting-phone" placeholder="05xxxxxxxx" dir="ltr" style="width:100%; padding:12px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm); font-family:inherit; font-size:15px;">
+                    <label
+                        style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:13px; font-weight:700;">رقم
+                        الجوال</label>
+                    <input type="text" id="setting-phone" placeholder="05xxxxxxxx" dir="ltr"
+                        style="width:100%; padding:12px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm); font-family:inherit; font-size:15px;">
                 </div>
                 <div class="selector-group">
-                    <label style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:13px; font-weight:700;">الرقم الضريبي (اختياري)</label>
-                    <input type="text" id="setting-tax" placeholder="300xxxxxxxxx" dir="ltr" maxlength="15" style="width:100%; padding:12px; background:var(--bg-body); border:1px solid var(--border); color:var(--text-main); border-radius:var(--radius-sm); font-family:inherit; font-size:15px;">
+                    <label
+                        style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:13px; font-weight:700;">الرقم
+                        الضريبي (اختياري)</label>
+                    <input type="text" id="setting-tax" placeholder="300xxxxxxxxx" dir="ltr" maxlength="15"
+                        style="width:100%; padding:12px; background:var(--bg-body); border:1px solid var(--border); color:var(--text-main); border-radius:var(--radius-sm); font-family:inherit; font-size:15px;">
                 </div>
                 <!-- Theme Toggle -->
-                <div class="selector-group" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border);">
-                    <label style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:13px; font-weight:700;">مظهر النظام (Theme)</label>
-                    <button class="btn w-100" id="theme-toggle-btn" onclick="appLogic.toggleTheme()" style="background:var(--bg-elevated); color:var(--text-main); border:1px solid var(--border); transition:0.3s; display:flex; justify-content:space-between; align-items:center; padding: 12px 18px;">
+                <div class="selector-group"
+                    style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border);">
+                    <label
+                        style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:13px; font-weight:700;">مظهر
+                        النظام (Theme)</label>
+                    <button class="btn w-100" id="theme-toggle-btn" onclick="appLogic.toggleTheme()"
+                        style="background:var(--bg-elevated); color:var(--text-main); border:1px solid var(--border); transition:0.3s; display:flex; justify-content:space-between; align-items:center; padding: 12px 18px;">
                         <span>تبديل المظهر</span>
                         <span id="theme-status-icon"><i class="fa-solid fa-sun"></i></span>
                     </button>
                 </div>
                 <!-- Language Toggle -->
-                <div class="selector-group" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border); margin-bottom: 25px;">
-                    <label style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:13px; font-weight:700;">اللغة / Language</label>
-                    <select id="ui-language" onchange="appLogic.changeLanguage(this.value)" class="w-100" style="padding:12px 18px; background:var(--bg-elevated); border:1px solid var(--border); color:var(--text-main); border-radius:var(--radius-sm); font-family:inherit;">
+                <div class="selector-group"
+                    style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border); margin-bottom: 25px;">
+                    <label
+                        style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:13px; font-weight:700;">اللغة
+                        / Language</label>
+                    <select id="ui-language" onchange="appLogic.changeLanguage(this.value)" class="w-100"
+                        style="padding:12px 18px; background:var(--bg-elevated); border:1px solid var(--border); color:var(--text-main); border-radius:var(--radius-sm); font-family:inherit;">
                         <option value="ar">العربية (Arabic)</option>
                         <option value="en">English</option>
                     </select>
                 </div>
-                
-                <button id="pwa-install-btn" class="btn w-100 hidden" style="margin-bottom:15px; font-size:16px; background: rgba(76, 175, 80, 0.1); color: #4CAF50; border: 1px dashed #4CAF50; padding:12px 18px; font-weight: 800;">
+
+                <button id="pwa-install-btn" class="btn w-100 hidden"
+                    style="margin-bottom:15px; font-size:16px; background: rgba(76, 175, 80, 0.1); color: #4CAF50; border: 1px dashed #4CAF50; padding:12px 18px; font-weight: 800;">
                     <i class="fa-solid fa-mobile-screen"></i> تثبيت التطبيق على الجهاز (PWA)
                 </button>
 
-                <button id="settings-save-btn" class="btn btn-primary w-100" onclick="appLogic.saveTenantSettings()" style="margin-top:8px; font-size:16px;">
+                <button id="settings-save-btn" class="btn btn-primary w-100" onclick="appLogic.saveTenantSettings()"
+                    style="margin-top:8px; font-size:16px;">
                     <i class="fa-solid fa-floppy-disk"></i> حفظ الإعدادات
                 </button>
-                <button id="settings-logout-btn" class="btn w-100" onclick="appLogic.logoutUser()" style="margin-top:10px; background:rgba(255,69,58,0.1); color:var(--danger); border:1px solid rgba(255,69,58,0.3);">
+                <button id="settings-logout-btn" class="btn w-100" onclick="appLogic.logoutUser()"
+                    style="margin-top:10px; background:rgba(255,69,58,0.1); color:var(--danger); border:1px solid rgba(255,69,58,0.3);">
                     <i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج
                 </button>
             </div>
         </div>
-        </div>
+    </div>
     </div>
 
     <!-- Z-Report Preview Modal (Standalone) -->
     <div id="z-report-preview-modal" class="full-page-sheet hidden">
         <div class="sheet-header">
-            <button class="back-btn" onclick="document.getElementById('z-report-preview-modal').classList.add('hidden')">
+            <button class="back-btn"
+                onclick="document.getElementById('z-report-preview-modal').classList.add('hidden')">
                 <i class="fa-solid fa-arrow-right"></i>
             </button>
             <h3>مراجعة إغلاق اليومية (Daily Review)</h3>
@@ -680,10 +900,15 @@
                 <!-- Premium Content Injected by JS -->
             </div>
             <div style="margin-top: 30px;">
-                <button class="btn btn-primary" style="width: 100%; padding: 20px; font-size: 20px; font-weight: 900; background: var(--primary); color: #000; box-shadow: 0 4px 15px rgba(253, 184, 19, 0.4);" onclick="appLogic.confirmCloseDay()">
+                <button class="btn btn-primary"
+                    style="width: 100%; padding: 20px; font-size: 20px; font-weight: 900; background: var(--primary); color: #000; box-shadow: 0 4px 15px rgba(253, 184, 19, 0.4);"
+                    onclick="appLogic.confirmCloseDay()">
                     <i class="fa-solid fa-check-double" style="margin-left: 10px;"></i> اعتماد وتحميل التقرير (PDF)
                 </button>
-                <button class="btn w-100" style="margin-top: 15px; background: rgba(255,255,255,0.05); color: var(--text-muted); border: 1px solid var(--border);" onclick="document.getElementById('z-report-preview-modal').classList.add('hidden')">إلغاء المراجعة</button>
+                <button class="btn w-100"
+                    style="margin-top: 15px; background: rgba(255,255,255,0.05); color: var(--text-muted); border: 1px solid var(--border);"
+                    onclick="document.getElementById('z-report-preview-modal').classList.add('hidden')">إلغاء
+                    المراجعة</button>
             </div>
         </div>
     </div>
@@ -715,5 +940,5 @@
 
     <script src="js/app.js?v=6.0.1-RECOVERY"></script>
 </body>
-</html>
 
+</html>

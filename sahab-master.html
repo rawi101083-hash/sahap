@@ -538,11 +538,21 @@
                 const daysInput = document.getElementById(`renew-${uid}`);
                 const days = parseInt(daysInput.value);
                 if (!days || days < 1) {
-                    alert("يرجى إدخال عدد أيام صحيح (1 أو أكثر).");
+                    Swal.fire('خطأ', 'يرجى إدخال عدد أيام صحيح (1 أو أكثر).', 'error');
                     return;
                 }
 
-                if (!confirm(`هل أنت متأكد من تجديد/تنشيط المغسلة لمدة ${days} يوم؟`)) return;
+                const result = await Swal.fire({
+                    title: 'تأكيد التجديد ⏱️',
+                    text: `هل أنت متأكد من تجديد أو تنشيط المغسلة لمدة ${days} يوم كامل؟`,
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonText: 'نعم، قم بالتجديد 🚀',
+                    cancelButtonText: 'إلغاء',
+                    confirmButtonColor: '#10b981'
+                });
+
+                if (!result.isConfirmed) return;
 
                 try {
                     const timestamp = Date.now();
@@ -557,8 +567,11 @@
                     updates[`users/${uid}/settings/status`] = 'active';
                     updates[`admin/stores/${pin}/status`] = 'active';
 
+                    // Save directly to localStorage as specifically requested for persistence
+                    localStorage.setItem(`sahab_trial_expiry_${uid}`, newExpiry.toString());
+
                     await db.ref().update(updates);
-                    alert(`تم تجديد المغسلة بنجاح! تنتهي في: ${new Date(newExpiry).toLocaleDateString('en-GB')}`);
+                    await Swal.fire('تم التجديد بنجاح! 🚀', `تنتهي في: ${new Date(newExpiry).toLocaleDateString('en-GB')}`, 'success');
                     if(document.getElementById(`renew-${uid}`)) {
                         document.getElementById(`renew-${uid}`).value = '';
                     }

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sahab-pos-dynamic-v2';
+const CACHE_NAME = 'sahab-pos-dynamic-v5';
 
 self.addEventListener('install', (event) => {
     // Aggressive auto-update: force the waiting service worker to become the active service worker.

@@ -7,10 +7,35 @@
     const appEl = document.getElementById('app');
 
     if (sessionUID) {
-        // Assume valid session -> Show App immediately
         if (appEl) appEl.style.display = 'block';
         if (loginOverlay) loginOverlay.style.display = 'none';
         console.log("[Fast-Guard] Session hint found. Showing App.");
+
+        // --- ⚡ INSTANT TRIAL BANNER INIT (No Flash/Flicker) ---
+        const isSubscribedLocal = localStorage.getItem(`sahab_is_subscribed_${sessionUID}`);
+        const trialExpiryLocal = localStorage.getItem(`sahab_trial_expiry_${sessionUID}`);
+        const banner = document.getElementById('trial-banner');
+        const trialDays = document.getElementById('trial-days');
+
+        if (isSubscribedLocal === 'true') {
+            if (banner) banner.classList.add('hidden');
+        } else if (trialExpiryLocal) {
+            const exactDaysLeft = (parseInt(trialExpiryLocal) - Date.now()) / (1000 * 60 * 60 * 24);
+            const daysLeft = Math.ceil(exactDaysLeft);
+            if (exactDaysLeft > 0) {
+                if (trialDays) trialDays.innerText = daysLeft;
+                if (banner) banner.classList.remove('hidden');
+            } else {
+                // Hard visual lock on start if localstorage knows it's expired
+                console.warn("[Fast-Guard] Trial Expired.");
+                const expiredOverlay = document.getElementById('trial-expired-overlay');
+                if (expiredOverlay) {
+                    expiredOverlay.classList.remove('hidden');
+                    expiredOverlay.style.display = 'flex';
+                }
+                if (banner) banner.classList.add('hidden');
+            }
+        }
     } else {
         // No session -> Show Login immediately
         if (appEl) appEl.style.display = 'none';
@@ -1860,9 +1885,9 @@ window.appLogic = {
                         <td style="padding:15px; font-weight:bold; color:${isCancelled ? '#f44336' : 'var(--primary)'}">${totalDisplay}</td>
                         <td style="padding:15px;">${dateStr}</td>
                         <td style="padding:15px; text-align:center;">
-                            ${isCancelled ? '' : `<button class="btn-action-icon btn-action-info" type="button" data-action="partner_info" data-id="${i.id}" title="${lang==='en'?'Partner Laundry Details':'تفاصيل المغسلة الشريكة'}"><i class="fa-solid fa-truck-ramp-box" style="pointer-events:none;"></i></button>`}
-                            <button class="btn-action-icon btn-action-print" type="button" data-action="print_inv" data-id="${i.id}" title="${lang==='en'?'Preview & Reprint':'معاينة وإعادة طباعة'}"><i class="fa-solid fa-print" style="pointer-events:none;"></i></button>
-                            ${isCancelled ? '' : `<button class="btn-action-icon btn-action-edit" type="button" data-action="edit_inv" data-id="${i.id}" title="${lang==='en'?'Edit':'تعديل'}"><i class="fa-solid fa-edit" style="pointer-events:none;"></i></button>`}
+                            ${isCancelled ? '' : `<button class="btn-action-icon btn-action-info" type="button" data-action="partner_info" data-id="${i.id}" title="${lang === 'en' ? 'Partner Laundry Details' : 'تفاصيل المغسلة الشريكة'}"><i class="fa-solid fa-truck-ramp-box" style="pointer-events:none;"></i></button>`}
+                            <button class="btn-action-icon btn-action-print" type="button" data-action="print_inv" data-id="${i.id}" title="${lang === 'en' ? 'Preview & Reprint' : 'معاينة وإعادة طباعة'}"><i class="fa-solid fa-print" style="pointer-events:none;"></i></button>
+                            ${isCancelled ? '' : `<button class="btn-action-icon btn-action-edit" type="button" data-action="edit_inv" data-id="${i.id}" title="${lang === 'en' ? 'Edit' : 'تعديل'}"><i class="fa-solid fa-edit" style="pointer-events:none;"></i></button>`}
                             ${cancelBtn}
                         </td>
                     </tr>
@@ -1870,19 +1895,19 @@ window.appLogic = {
                         <td colspan="5" style="padding:20px;">
                             <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:15px; align-items:end;">
                                 <div>
-                                    <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px;">${lang==='en'?'Laundry Name':'اسم المغسلة'}</label>
+                                    <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px;">${lang === 'en' ? 'Laundry Name' : 'اسم المغسلة'}</label>
                                     <input type="text" id="partner-name-${i.id}" value="${i.partnerLaundryName || ''}" list="saved-laundries" style="width:100%; background:#000; color:#fff; border:1px solid var(--border); padding:8px; border-radius:4px;">
                                 </div>
                                 <div>
-                                    <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px;">${lang==='en'?'Cost (SAR)':'حساب المغاسل (ر.س)'}</label>
+                                    <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px;">${lang === 'en' ? 'Cost (SAR)' : 'حساب المغاسل (ر.س)'}</label>
                                     <input type="number" id="partner-cost-${i.id}" value="${i.laundryCost || i.partnerLaundryCost || 0}" style="width:100%; background:#000; color:#fff; border:1px solid var(--border); padding:8px; border-radius:4px;">
                                 </div>
                                 <div>
-                                    <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px;">${lang==='en'?'Neighborhood':'الحي'}</label>
+                                    <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px;">${lang === 'en' ? 'Neighborhood' : 'الحي'}</label>
                                     <input type="text" id="partner-hood-${i.id}" value="${i.partnerLaundryNeighborhood || ''}" list="saved-neighborhoods" style="width:100%; background:#000; color:#fff; border:1px solid var(--border); padding:8px; border-radius:4px;">
                                 </div>
                                 <div>
-                                    <button class="btn btn-primary" style="width:100%; padding:9px;" onclick="appLogic.savePartnerInfo('${i.id}')">${lang==='en'?'Save Details':'حفظ التفاصيل'}</button>
+                                    <button class="btn btn-primary" style="width:100%; padding:9px;" onclick="appLogic.savePartnerInfo('${i.id}')">${lang === 'en' ? 'Save Details' : 'حفظ التفاصيل'}</button>
                                 </div>
                             </div>
                         </td>
@@ -1897,7 +1922,7 @@ window.appLogic = {
             console.error('Render History Error:', err);
             const lang = this.currentLang || 'ar';
             const container = document.getElementById('history-content');
-            if (container) container.innerHTML = `<p style="color:red; text-align:center; padding:20px;">${lang==='en'?'Error loading invoice history: ':'خطأ في تحميل سجل الفواتير: '}${err.message}</p>`;
+            if (container) container.innerHTML = `<p style="color:red; text-align:center; padding:20px;">${lang === 'en' ? 'Error loading invoice history: ' : 'خطأ في تحميل سجل الفواتير: '}${err.message}</p>`;
         }
 
         // Render delivery settings table which conceptually lives on the History screen
@@ -2049,7 +2074,7 @@ window.appLogic = {
 
         let invs = await localforage.getItem('invoices') || [];
         const invoiceData = invs.find(i => i.id === id);
-        
+
         if (!invoiceData) {
             alert('لا يمكن تعديل هذه الفاتورة لأنها في يومية مغلقة (مؤرشفة) أو غير موجودة.');
             return;
@@ -2064,7 +2089,7 @@ window.appLogic = {
         // Safely map customer logic to the correct DOM nodes 
         const cPhone = this.customer.phone === '0000000000' ? '' : this.customer.phone;
         const cName = this.customer.name === 'عميل نقدي' ? '' : this.customer.name;
-        
+
         if (document.getElementById('checkout-customer-phone')) document.getElementById('checkout-customer-phone').value = cPhone;
         if (document.getElementById('checkout-customer-name')) document.getElementById('checkout-customer-name').value = cName;
 
@@ -2661,7 +2686,7 @@ window.appLogic = {
         }
 
         await localforage.setItem('delivery_options', this.deliveryOptions);
-        
+
         // Non-blocking background sync
         manualSyncToCloud('delivery_options', this.deliveryOptions);
 
@@ -2676,9 +2701,9 @@ window.appLogic = {
         if (!confirm('هل أنت متأكد من حذف خيار التوصيل؟')) return;
 
         this.deliveryOptions = this.deliveryOptions.filter(o => o.id !== id);
-        
+
         await localforage.setItem('delivery_options', this.deliveryOptions);
-        
+
         // Non-blocking background sync
         manualSyncToCloud('delivery_options', this.deliveryOptions);
 
@@ -3040,7 +3065,7 @@ window.appLogic = {
             </div>
             <div style="display:flex; gap:10px; align-items:center;">
                 <input type="date" lang="en" dir="ltr" value="${currentTargetDate}" onchange="appLogic.filterReportsByDate(this.value)" style="color-scheme: dark; cursor: pointer; background:#000; color:#fff; border:1px solid var(--border); padding:10px; border-radius:8px; font-size:14px; outline:none; text-align:center; font-family: system-ui, -apple-system, Arial, sans-serif !important; font-variant-numeric: tabular-nums;">
-                <button class="btn" style="background:rgba(253,184,19,0.1); color:var(--primary); padding:10px 15px; font-size:12px; font-weight:bold; border:1px solid var(--primary); border-radius:8px;" onclick="appLogic.resetReportFilter()">${lang==='en'?'Today':'اليوم'} <i class="fa-solid fa-rotate-left"></i></button>
+                <button class="btn" style="background:rgba(253,184,19,0.1); color:var(--primary); padding:10px 15px; font-size:12px; font-weight:bold; border:1px solid var(--primary); border-radius:8px;" onclick="appLogic.resetReportFilter()">${lang === 'en' ? 'Today' : 'اليوم'} <i class="fa-solid fa-rotate-left"></i></button>
             </div>
         </div>
 
@@ -3612,7 +3637,7 @@ window.appLogic = {
             const targetEndDate = Math.max(data.expiryDate || 0, data.trialEndDate || 0);
             if (targetEndDate > 0) {
                 const daysLeftExact = Math.round((targetEndDate - Date.now()) / (1000 * 60 * 60 * 24));
-                
+
                 // Only show if strictly <= 3 days left and > 0, and ensure we only pop up ONCE per session.
                 if (daysLeftExact <= 3 && daysLeftExact > 0 && !window.hasShownExpiryWarning) {
                     window.hasShownExpiryWarning = true; // Mark to avoid racing
@@ -3622,7 +3647,7 @@ window.appLogic = {
                             setTimeout(triggerNag, 500); // Wait for CDN
                             return;
                         }
-                        
+
                         const lang = localStorage.getItem('sahab-lang') || 'ar';
                         Swal.fire({
                             title: lang === 'en' ? 'Warning: Renewal approaching ⚠️' : 'تنبيه: اقترب موعد التجديد ⚠️',
@@ -3638,7 +3663,7 @@ window.appLogic = {
                             }
                         });
                     };
-                    
+
                     triggerNag();
                 }
             }
@@ -3648,6 +3673,16 @@ window.appLogic = {
             const trialDays = document.getElementById('trial-days');
             const expiredOverlay = document.getElementById('trial-expired-overlay');
 
+            // Save actual state strictly to localStorage to guarantee instant rendering on refresh as requested
+            localStorage.setItem(`sahab_is_subscribed_${uid}`, data.isSubscribed === true ? 'true' : 'false');
+            if (data.trialEndDate) {
+                localStorage.setItem(`sahab_trial_expiry_${uid}`, data.trialEndDate.toString());
+            }
+
+            // Prioritize localStorage to ensure states persist across hard reloads synchronously
+            const storedExpiry = localStorage.getItem(`sahab_trial_expiry_${uid}`);
+            const effectiveTrialEndDate = storedExpiry ? parseInt(storedExpiry) : data.trialEndDate;
+
             if (data.isSubscribed === true) {
                 // PAID SUBSCRIPTION: Hide trial visuals immediately & permanently
                 if (expiredOverlay) {
@@ -3655,28 +3690,37 @@ window.appLogic = {
                     expiredOverlay.style.display = 'none';
                 }
                 if (banner) banner.classList.add('hidden');
-            } else if (data.isTrial === true && data.trialEndDate) {
-                const daysLeft = Math.round((data.trialEndDate - Date.now()) / (1000 * 60 * 60 * 24));
+            } else if (data.isTrial === true && effectiveTrialEndDate) {
+                const checkTrialExpiry = () => {
+                    const exactDaysLeft = (effectiveTrialEndDate - Date.now()) / (1000 * 60 * 60 * 24);
+                    const displayDays = Math.ceil(exactDaysLeft);
 
-                if (daysLeft <= 0) {
-                    // Trial expired - HARD LOCK
-                    console.warn("[SECURITY] Trial Expired! Locking POS.");
-                    if (expiredOverlay) {
-                        expiredOverlay.classList.remove('hidden');
-                        expiredOverlay.style.display = 'flex'; // Ensure flex display for centering
+                    if (exactDaysLeft <= 0) {
+                        // Trial expired - HARD LOCK
+                        console.warn("[SECURITY] Trial Expired! Locking POS.");
+                        if (expiredOverlay) {
+                            expiredOverlay.classList.remove('hidden');
+                            expiredOverlay.style.display = 'flex'; // Ensure flex display for centering
+                        }
+                        if (banner) banner.classList.add('hidden');
+                    } else {
+                        // Trial Active - Show Banner & Unlock
+                        if (expiredOverlay) {
+                            expiredOverlay.classList.add('hidden');
+                            expiredOverlay.style.display = 'none';
+                        }
+                        if (banner && trialDays) {
+                            trialDays.innerText = displayDays;
+                            banner.classList.remove('hidden');
+                        }
                     }
-                    if (banner) banner.classList.add('hidden');
-                } else {
-                    // Trial Active - Show Banner & Unlock
-                    if (expiredOverlay) {
-                        expiredOverlay.classList.add('hidden');
-                        expiredOverlay.style.display = 'none';
-                    }
-                    if (banner && trialDays) {
-                        trialDays.innerText = daysLeft;
-                        banner.classList.remove('hidden');
-                    }
-                }
+                };
+
+                checkTrialExpiry();
+
+                // Ensure real-time eviction if app remains open and midnight passes
+                if (window.trialCheckInterval) clearInterval(window.trialCheckInterval);
+                window.trialCheckInterval = setInterval(checkTrialExpiry, 60000); // Check every minute
             } else {
                 // Unlimited account - Unlock & Hide Everything
                 if (expiredOverlay) {
@@ -3705,7 +3749,7 @@ window.appLogic = {
         document.getElementById('setting-name').value = s.name || '';
         document.getElementById('setting-phone').value = s.phone || '';
         document.getElementById('setting-tax').value = s.taxNumber || '';
-        
+
         // PWA Button Gatekeeper Logic
         const installBtn = document.getElementById('pwa-install-btn');
         if (installBtn) {
@@ -3713,7 +3757,7 @@ window.appLogic = {
                 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
                 if (deferredPrompt || isIOS) {
                     installBtn.classList.remove('hidden');
-                    
+
                     // If Android/Chrome desktop, setup native install prompt
                     if (!isIOS) {
                         installBtn.onclick = async () => {
@@ -3732,7 +3776,7 @@ window.appLogic = {
                 installBtn.classList.add('hidden');
             }
         }
-        
+
         // Load existing logo preview
         const logoPreview = document.getElementById('setting-logo-preview');
         if (s.logo) {
@@ -3741,10 +3785,10 @@ window.appLogic = {
         } else {
             logoPreview.style.display = 'none';
         }
-        
+
         document.getElementById('settings-modal').classList.remove('hidden');
     },
-    handleLogoUpload: function(input) {
+    handleLogoUpload: function (input) {
         if (!input.files || input.files.length === 0) return;
         const file = input.files[0];
         if (!file.type.startsWith('image/')) {
@@ -3753,9 +3797,9 @@ window.appLogic = {
         }
 
         const reader = new FileReader();
-        reader.onload = function(e) {
+        reader.onload = function (e) {
             const img = new Image();
-            img.onload = function() {
+            img.onload = function () {
                 const canvas = document.createElement('canvas');
                 let width = img.width;
                 let height = img.height;
@@ -3805,7 +3849,7 @@ window.appLogic = {
                 else if (currentViewId === 'expenses') this.renderExpenses();
             }
         }
-        
+
         // Force generic services grid repaint
         this.renderItems(this.services);
 
@@ -3895,7 +3939,7 @@ window.appLogic = {
             '#settings-modal .selector-group:nth-of-type(3) label': { ar: 'رقم الجوال', en: 'Phone Number' },
             '#settings-modal .selector-group:nth-of-type(4) label': { ar: 'الرقم الضريبي (اختياري)', en: 'Tax Number (Optional)' },
             '#settings-modal .selector-group:nth-of-type(5) label': { ar: 'مظهر النظام (Theme)', en: 'System Theme' },
-            '#trial-banner': { ar: 'نسخة تجريبية: متبقي <span id="trial-days">5</span> أيام', en: 'Trial version: <span id="trial-days">5</span> days left' },
+            '#trial-banner': { ar: 'نسخة تجريبية: متبقي <span id="trial-days"></span> أيام', en: 'Trial version: <span id="trial-days">5</span> days left' },
             '#initial-loader h2': { ar: 'جاري التحميل...', en: 'Loading...' },
 
             // Expense Modal Option Selectors (Deep Form Translation)
@@ -3905,7 +3949,7 @@ window.appLogic = {
             '#exp-category option[value="صيانة"]': { ar: 'صيانة دورية', en: 'Routine Maintenance' },
             '#exp-category option[value="مشتريات"]': { ar: 'مشتريات تشغيلية', en: 'Operating Purchases' },
             '#exp-category option[value="أخرى"]': { ar: 'أخرى / مصاريف نثرية', en: 'Misc / Petty Cash' },
-            
+
             // Sub-Headers across views
             '.history-header h2': { ar: 'سجل الفاتورة', en: 'Invoice History' },
             '#history-search': { attr: 'placeholder', ar: 'بحث برقم الفاتورة، اسم أو جوال العميل...', en: 'Search by Invoice ID, Customer Name or Phone...' },
@@ -3929,7 +3973,7 @@ window.appLogic = {
             '#trial-expired-overlay p:first-of-type': { ar: 'نشكركم على تجربة نظام سحاب. لقد انتهت الفترة المخصصة للتجربة، يرجى التواصل مع الإدارة لتفعيل الاشتراك الدائم أو تمديد الفترة.', en: 'Thank you for trying Sahab POS. Your trial has expired. Please contact administration to activate your subscription.' },
             '#trial-expired-overlay div p:first-of-type': { ar: 'للتواصل والدعم الفني:', en: 'Contact Technical Support:' },
             '#trial-expired-overlay button': { ar: '<i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج', en: '<i class="fa-solid fa-right-from-bracket"></i> Logout' },
-            
+
             // Buttons
             '#view-history .btn-primary': { ar: '<i class="fa-solid fa-plus"></i> إضافة خيار توصيل', en: '<i class="fa-solid fa-plus"></i> Add Delivery Option' },
             '#view-inventory .btn-primary': { ar: '<i class="fa-solid fa-box"></i> إضافة صنف استهلاكي', en: '<i class="fa-solid fa-box"></i> Add Consumable Item' },
@@ -3937,7 +3981,7 @@ window.appLogic = {
             '#view-expenses .btn-primary': { ar: '<i class="fa-solid fa-plus"></i> تقييد مصروف جديد', en: '<i class="fa-solid fa-plus"></i> Register New Expense' },
             '#view-expenses .btn-danger': { ar: '<i class="fa-solid fa-trash-can"></i> تصفير', en: '<i class="fa-solid fa-trash-can"></i> Reset All' },
             '.empty-cart-msg': { ar: 'السلة فارغة، يرجى اختيار أصناف.', en: 'Cart is empty. Please select items.' },
-            
+
             // Modals Headers (Fallback for ones controlled by JS)
             '#inventory-content h2': { ar: 'جاري تحضير قائمة الخدمات...', en: 'Preparing services list...' },
             '#inventory-content p': { ar: 'إذا استغرق هذا وقتاً طويلاً، يرجى تحديث الصفحة.', en: 'If this takes too long, please refresh the page.' },
@@ -3998,7 +4042,7 @@ window.appLogic = {
 
         const cSearch = document.getElementById('customer-search');
         if (cSearch) cSearch.placeholder = lang === 'en' ? 'Search by Name or Phone...' : 'بحث باسم العميل أو الجوال...';
-        
+
         // Modal Action text inside Checkout pos-laundry
         const pLName = document.getElementById('pos-laundry-name');
         if (pLName) pLName.placeholder = lang === 'en' ? 'Laundry Name (Required)' : 'اسم المغسلة (مطلوب)';
@@ -4006,7 +4050,7 @@ window.appLogic = {
         if (pLHood) pLHood.placeholder = lang === 'en' ? 'Neighborhood (Required)' : 'الحي (مطلوب)';
         const pLCost = document.getElementById('pos-laundry-cost');
         if (pLCost) pLCost.placeholder = lang === 'en' ? 'Cost (Required)' : 'التكلفة (مطلوب)';
-        
+
         // Add Expense Modal Deep Labels
         const expCatLabel = document.querySelector('#exp-category')?.previousElementSibling;
         if (expCatLabel) expCatLabel.innerText = lang === 'en' ? 'Category' : 'التصنيف';
@@ -4023,6 +4067,20 @@ window.appLogic = {
 
         // Force native chromium inputs (DatePicker) into english locale explicitly
         document.documentElement.lang = lang === 'en' ? 'en' : 'ar';
+
+        // --- ⚡ CRITICAL FIX: RE-INJECT DYNAMIC TRIAL DAYS INTO BANNER POST-TRANSLATION ---
+        const currentSession = localStorage.getItem('sahab_session_uid');
+        if (currentSession) {
+            const trialExpiryStr = localStorage.getItem(`sahab_trial_expiry_${currentSession}`);
+            if (trialExpiryStr) {
+                const exactDaysLeft = (parseInt(trialExpiryStr) - Date.now()) / (1000 * 60 * 60 * 24);
+                const displayDays = Math.ceil(exactDaysLeft);
+                const dSpan = document.getElementById('trial-days');
+                if (dSpan && exactDaysLeft > 0) {
+                    dSpan.innerText = displayDays;
+                }
+            }
+        }
     },
 
     closeSettingsModal() {
@@ -4046,9 +4104,9 @@ window.appLogic = {
         const tax = vatValue;
 
         // Merge locally so we don't destroy pre-existing properties like pin or status
-        window.tenantSettings = { 
+        window.tenantSettings = {
             ...(window.tenantSettings || {}),
-            name, phone, taxNumber: tax 
+            name, phone, taxNumber: tax
         };
 
         // Attach logo if uploaded
@@ -4065,7 +4123,7 @@ window.appLogic = {
                 updates[`users/${window.currentUID}/settings/phone`] = phone;
                 updates[`users/${window.currentUID}/settings/taxNumber`] = tax;
                 if (window._tempLogoBase64) updates[`users/${window.currentUID}/settings/logo`] = window._tempLogoBase64;
-                
+
                 // CRITICAL SYNC: Mirror updates to accountDetails so the Master Dashboard knows instantly
                 updates[`users/${window.currentUID}/accountDetails/laundryName`] = name;
                 updates[`users/${window.currentUID}/accountDetails/name`] = name;
@@ -4344,20 +4402,20 @@ window.appLogic = {
         try {
             // Hide standard invoice container specifically just in case
             const invContainer = document.getElementById('invoice-print-container');
-            if (invContainer) invContainer.innerHTML = ''; 
+            if (invContainer) invContainer.innerHTML = '';
 
             const zContainer = document.getElementById('z-report-print-container');
             if (zContainer) {
                 zContainer.innerHTML = reportContent;
             }
-            
+
             // Native Browser Print Dialog (Handles A4 export perfectly)
             // استخدام تأخير بسيط لضمان قيام نظام iOS (Safari) بتحميل عناصر الطباعة قبل فتح نافذة الطباعة
             setTimeout(() => {
                 window.print();
                 // تم إزالة مسح العنصر وتحديث الصفحة بشكل إجباري لأنها تقطع عملية الطباعة وتنتج صفحة بيضاء في نظام الجوال
             }, 500);
-            
+
         } catch (printErr) {
             console.error('[Print Gen] Error:', printErr);
         }
