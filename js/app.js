@@ -3744,36 +3744,49 @@ window.appLogic = {
         location.reload();
     },
 
-    openSettingsModal() {
+    async openSettingsModal() {
         const s = window.tenantSettings;
         document.getElementById('setting-name').value = s.name || '';
         document.getElementById('setting-phone').value = s.phone || '';
         document.getElementById('setting-tax').value = s.taxNumber || '';
 
         // PWA Button Gatekeeper Logic
+        let isPwaAllowed = s.canInstallPWA === true;
+        if (window.currentUID && typeof firebase !== 'undefined') {
+            try {
+                const snap = await firebase.database().ref(`users/${window.currentUID}/settings/canInstallPWA`).once('value');
+                if (snap.exists()) {
+                    isPwaAllowed = snap.val() === true;
+                    s.canInstallPWA = isPwaAllowed; // Update local cache
+                }
+            } catch (ignore) {}
+        }
+
         const installBtn = document.getElementById('pwa-install-btn');
         if (installBtn) {
-            if (s.canInstallPWA && !isStandalone) {
-                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-                if (deferredPrompt || isIOS) {
-                    installBtn.classList.remove('hidden');
-
-                    // If Android/Chrome desktop, setup native install prompt
-                    if (!isIOS) {
-                        installBtn.onclick = async () => {
-                            installBtn.classList.add('hidden');
-                            if (deferredPrompt) {
-                                deferredPrompt.prompt();
-                                const { outcome } = await deferredPrompt.userChoice;
-                                deferredPrompt = null;
-                            }
-                        };
+            if (isPwaAllowed && !isStandalone) {
+                installBtn.classList.remove('hidden');
+                installBtn.style.display = 'block'; // Ensure visibility
+                
+                installBtn.onclick = async (e) => {
+                    e.preventDefault();
+                    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+                    
+                    if (isIOS) {
+                        alert('في متصفح سفاري: اضغط على أيقونة المشاركة 📤 ثم اختر "إضافة إلى الصفحة الرئيسية"');
+                    } else if (deferredPrompt) {
+                        installBtn.classList.add('hidden');
+                        installBtn.style.display = 'none';
+                        deferredPrompt.prompt();
+                        const { outcome } = await deferredPrompt.userChoice;
+                        deferredPrompt = null;
+                    } else {
+                        alert('لا يمكن التثبيت التلقائي حالياً. يرجى تثبيت التطبيق يدوياً من قائمة المتصفح (Install App / Add to Home Screen).');
                     }
-                } else {
-                    installBtn.classList.add('hidden');
-                }
+                };
             } else {
                 installBtn.classList.add('hidden');
+                installBtn.style.display = 'none';
             }
         }
 
