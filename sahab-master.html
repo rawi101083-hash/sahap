@@ -1,6 +1,14 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+    <script>
+      window.onerror = function(message, source, lineno, colno, error) {
+        alert("CRASH ERROR: " + message + " at line " + lineno);
+      };
+      window.addEventListener("unhandledrejection", function(event) {
+        alert("PROMISE ERROR: " + event.reason);
+      });
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sahab Systems - Master Control</title>

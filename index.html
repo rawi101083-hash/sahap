@@ -2,6 +2,14 @@
 <html lang="en" dir="rtl" class="notranslate" translate="no">
 
 <head>
+    <script>
+      window.onerror = function(message, source, lineno, colno, error) {
+        alert("CRASH ERROR: " + message + " at line " + lineno);
+      };
+      window.addEventListener("unhandledrejection", function(event) {
+        alert("PROMISE ERROR: " + event.reason);
+      });
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google" content="notranslate">
