@@ -1411,52 +1411,48 @@ window.appLogic = {
             var origHTML = originalBtn ? originalBtn.innerHTML : '';
             if(originalBtn) originalBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري إرسال الطباعة...';
 
-            var origContainerCSS = container.style.cssText;
-            var allElements = container.querySelectorAll('*');
-            var origStyles = [];
-            for (var i = 0; i < allElements.length; i++) {
-                origStyles.push(allElements[i].style.cssText);
+            var invoiceInnerHTML = container.innerHTML;
+
+            var iframe = document.createElement('iframe');
+            iframe.style.width = '384px';
+            iframe.style.position = 'absolute';
+            iframe.style.left = '-9999px';
+            document.body.appendChild(iframe);
+
+            var doc = iframe.contentWindow.document;
+            doc.open();
+            doc.write(`
+            <html>
+            <head>
+            <style>
+            @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@700;900&display=swap');
+            body {
+            margin: 0; padding: 10px; width: 364px;
+            font-family: 'Tajawal', sans-serif; direction: rtl;
+            background: white; color: black; font-size: 24px; font-weight: 900;
             }
+            h1, h2, h3 { font-size: 32px; margin: 5px 0; text-align: center; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 22px; }
+            th, td { border-bottom: 2px dashed #000; padding: 5px 0; text-align: center; }
+            .total { font-size: 28px; font-weight: 900; text-align: left; margin-top: 10px; }
+            img { max-width: 150px; display: block; margin: 0 auto; }
+            </style>
+            </head>
+            <body>${invoiceInnerHTML}</body>
+            </html>
+            `);
+            doc.close();
 
-            container.style.cssText = origContainerCSS + '; width: 384px !important; margin: 0 auto !important; padding: 10px !important; background: white !important; color: black !important;';
+            await new Promise(function(resolve) { setTimeout(resolve, 300); });
 
-            for(var i = 0; i < allElements.length; i++) {
-                allElements[i].style.setProperty('color', 'black', 'important');
-                allElements[i].style.setProperty('box-shadow', 'none', 'important');
-                allElements[i].style.setProperty('background', 'transparent', 'important');
-                allElements[i].style.setProperty('border-color', 'black', 'important');
-                if(allElements[i].tagName !== 'IMG' && allElements[i].tagName !== 'SVG') {
-                    allElements[i].style.setProperty('font-size', '24px', 'important');
-                    allElements[i].style.setProperty('font-weight', '900', 'important');
-                    allElements[i].style.setProperty('line-height', '1.2', 'important');
-                }
-            }
-
-            var headers = container.querySelectorAll('h1, h2, h3, h4, th, .total');
-            for(var i = 0; i < headers.length; i++) {
-                headers[i].style.setProperty('font-size', '30px', 'important');
-            }
-
-            var logos = container.querySelectorAll('img');
-            for(var i = 0; i < logos.length; i++) {
-                logos[i].style.setProperty('max-width', '140px', 'important');
-                logos[i].style.setProperty('height', 'auto', 'important');
-            }
-
-            await new Promise(function(resolve) { setTimeout(resolve, 150); });
-
-            var canvas = await html2canvas(container, {
-                scale: 1,
-                width: 384,
-                windowWidth: 384,
-                useCORS: true,
-                backgroundColor: '#ffffff'
+            var canvas = await html2canvas(doc.body, { 
+                width: 384, 
+                windowWidth: 384, 
+                scale: 1, 
+                useCORS: true 
             });
-            
-            container.style.cssText = origContainerCSS;
-            for (var i = 0; i < allElements.length; i++) {
-                allElements[i].style.cssText = origStyles[i];
-            }
+
+            document.body.removeChild(iframe);
 
             var base64ImageString = canvas.toDataURL('image/png');
             
