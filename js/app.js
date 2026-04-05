@@ -1411,18 +1411,45 @@ window.appLogic = {
             var origHTML = originalBtn ? originalBtn.innerHTML : '';
             if(originalBtn) originalBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري إرسال الطباعة...';
 
-            var originalCSS = container.style.cssText;
-            // Force pure thermal styles
-            container.style.cssText = originalCSS + '; width: 380px !important; margin: 0 auto !important; padding: 10px !important; background: white !important; color: black !important; font-weight: bold !important;';
+            var tempDiv = container.cloneNode(true);
+            tempDiv.id = "thermal-temp-clone";
+            tempDiv.style.cssText = 'position: absolute; top: -9999px; left: -9999px; width: 384px !important; padding: 5px !important; margin: 0 auto !important; direction: rtl !important; background: white !important;';
             
-            var canvas = await html2canvas(container, {
-                scale: 2,
+            document.body.appendChild(tempDiv);
+
+            var allElements = tempDiv.querySelectorAll('*');
+            for(var i = 0; i < allElements.length; i++) {
+                allElements[i].style.setProperty('color', 'black', 'important');
+                allElements[i].style.setProperty('box-shadow', 'none', 'important');
+                allElements[i].style.setProperty('background', 'white', 'important');
+                allElements[i].style.setProperty('border-color', 'black', 'important');
+                if(allElements[i].tagName !== 'IMG' && allElements[i].tagName !== 'SVG') {
+                    allElements[i].style.setProperty('font-size', '26px', 'important');
+                    allElements[i].style.setProperty('font-weight', '900', 'important');
+                    allElements[i].style.setProperty('line-height', '1.2', 'important');
+                }
+            }
+
+            var headers = tempDiv.querySelectorAll('h1, h2, h3, h4, th, .total');
+            for(var i = 0; i < headers.length; i++) {
+                headers[i].style.setProperty('font-size', '34px', 'important');
+            }
+
+            var logos = tempDiv.querySelectorAll('img');
+            for(var i = 0; i < logos.length; i++) {
+                logos[i].style.setProperty('max-width', '140px', 'important');
+                logos[i].style.setProperty('height', 'auto', 'important');
+            }
+            
+            var canvas = await html2canvas(tempDiv, {
+                scale: 1,
+                width: 384,
+                windowWidth: 384,
                 useCORS: true,
                 backgroundColor: '#ffffff'
             });
             
-            // Revert UI immediately
-            container.style.cssText = originalCSS;
+            document.body.removeChild(tempDiv);
 
             var base64ImageString = canvas.toDataURL('image/png');
             
