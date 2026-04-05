@@ -1872,9 +1872,15 @@ window.appLogic = {
                     const rowStyle = isCancelled
                         ? 'border-bottom:1px solid var(--border); opacity:0.55; background:rgba(255,70,70,0.06);'
                         : 'border-bottom:1px solid var(--border);';
+                    // Refunded invoice visuals
+                    let refundBadge = '';
+                    if (i.status === 'مسترجع بالكامل' || i.status === 'مسترجع جزئياً') {
+                        refundBadge = `<span style="display:inline-block; background:#ef4444; color:#fff; font-size:11px; font-weight:900; padding:2px 8px; border-radius:12px; margin-right:6px;">${i.status}</span>`;
+                    }
+                    
                     const totalDisplay = isCancelled
                         ? `<span style="text-decoration:line-through; color:#f44336">${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${rsLabel}</span> <span style="display:inline-block; background:#c62828; color:#fff; font-size:11px; font-weight:900; padding:2px 8px; border-radius:12px; margin-right:6px;">${cancelL}</span>`
-                        : `${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${rsLabel} ${partnerBadge}`;
+                        : `${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${rsLabel} ${refundBadge} ${partnerBadge}`;
                     const cancelBtn = isCancelled
                         ? '' // Already cancelled — hide button
                         : `<button class="btn-action-icon btn-action-delete" type="button" data-action="cancel_inv" data-id="${i.id}" title="${actCancelTitle}"><i class="fa-solid fa-ban" style="pointer-events:none;"></i></button>`;
@@ -1887,7 +1893,7 @@ window.appLogic = {
                         <td style="padding:15px; text-align:center;">
                             ${isCancelled ? '' : `<button class="btn-action-icon btn-action-info" type="button" data-action="partner_info" data-id="${i.id}" title="${lang === 'en' ? 'Partner Laundry Details' : 'تفاصيل المغسلة الشريكة'}"><i class="fa-solid fa-truck-ramp-box" style="pointer-events:none;"></i></button>`}
                             <button class="btn-action-icon btn-action-print" type="button" data-action="print_inv" data-id="${i.id}" title="${lang === 'en' ? 'Preview & Reprint' : 'معاينة وإعادة طباعة'}"><i class="fa-solid fa-print" style="pointer-events:none;"></i></button>
-                            ${isCancelled ? '' : `<button class="btn-action-icon btn-action-edit" type="button" data-action="edit_inv" data-id="${i.id}" title="${lang === 'en' ? 'Edit' : 'تعديل'}"><i class="fa-solid fa-edit" style="pointer-events:none;"></i></button>`}
+                            ${isCancelled ? '' : `<button class="btn-action-icon btn-action-edit" type="button" data-action="refund_inv" data-id="${i.id}" title="${lang === 'en' ? 'Refund' : 'إرجاع'}"><i class="fa-solid fa-rotate-left" style="pointer-events:none; color:#ef4444;"></i></button>`}
                             ${cancelBtn}
                         </td>
                     </tr>
@@ -1943,8 +1949,8 @@ window.appLogic = {
             this.togglePartnerInfo(id);
         } else if (action === 'print_inv') {
             this.reprintInvoice(id);
-        } else if (action === 'edit_inv') {
-            this.editInvoice(id);
+        } else if (action === 'refund_inv') {
+            this.openRefundModal(id);
         }
     },
 
@@ -2069,43 +2075,128 @@ window.appLogic = {
         this.showToast(`تم إلغاء الفاتورة ${id} وتسجيلها كمرتجع ✓`);
     },
 
-    async editInvoice(id) {
-        if (!confirm(`تعديل الفاتورة سيقوم بإلغائها الحالية ونقل محتوياتها إلى نقطة البيع لإنشاء فاتورة جديدة. هل تود المتابعة؟`)) return;
-
+    async openRefundModal(id) {
         let invs = await localforage.getItem('invoices') || [];
-        const invoiceData = invs.find(i => i.id === id);
-
-        if (!invoiceData) {
-            alert('لا يمكن تعديل هذه الفاتورة لأنها في يومية مغلقة (مؤرشفة) أو غير موجودة.');
+        const invoice = invs.find(i => i.id == id);
+        
+        if (!invoice) {
+            alert('الفاتورة غير موجودة.');
             return;
         }
 
-        // Load to cart
-        this.cart = [...(invoiceData.items || [])];
-        this.customer = { phone: invoiceData.customer?.phone || '', name: invoiceData.customer?.name || '' };
-        this.deliveryFee = invoiceData.deliveryFee || 0;
-        this.editingInvoiceId = id; // Flag that we are updating this specific ID
+        if (invoice.isCancelled) {
+             alert('هذه الفاتورة ملغاة بالكامل مسبقاً.');
+             return;
+        }
 
-        // Safely map customer logic to the correct DOM nodes 
-        const cPhone = this.customer.phone === '0000000000' ? '' : this.customer.phone;
-        const cName = this.customer.name === 'عميل نقدي' ? '' : this.customer.name;
+        document.getElementById('refund-target-id').value = id;
+        document.getElementById('refund-invoice-id').innerText = id;
+        
+        const container = document.getElementById('refund-items-container');
+        container.innerHTML = '';
+        
+        // Render items to refund
+        (invoice.items || []).forEach((item, index) => {
+             let alreadyRefunded = item.refundedQty || 0;
+             let maxRef = item.qty - alreadyRefunded;
+             
+             if (maxRef <= 0) return; // skip fully refunded items
+             
+             let unitPrice = parseFloat(item.unitPrice || item.price || item.cost || 0); 
+             // Express fee inclusion safely
+             if (item.speed === 'express') {
+                  const svcs = JSON.parse(localStorage.getItem('sahab_services')) || [];
+                  const s = svcs.find(x => x.name === item.name);
+                  if (s && s.pricing && s.pricing.expressFee) unitPrice += s.pricing.expressFee;
+             }
+             
+             let row = document.createElement('div');
+             row.style.cssText = "display:flex; justify-content:space-between; align-items:center; padding:10px; border-bottom:1px solid var(--border);";
+             row.innerHTML = `
+                 <div style="flex:2">
+                     <strong style="color:var(--primary);">${item.name}</strong>
+                     <div style="color:var(--text-muted); font-size:12px;">سعر الوحدة: ${unitPrice.toFixed(2)} ر.س | متوفر للإرجاع: ${maxRef}</div>
+                 </div>
+                 <div style="flex:1; display:flex; justify-content:flex-end; align-items:center; gap:10px;">
+                     <input type="number" class="refund-qty-input" data-index="${index}" data-price="${unitPrice}" data-max="${maxRef}" min="0" max="${maxRef}" value="0" onchange="appLogic.calculateRefundTotal()" style="width:70px; padding:8px; text-align:center; background:#000; border:1px solid var(--border); color:#fff; border-radius:4px;">
+                 </div>
+             `;
+             container.appendChild(row);
+        });
 
-        if (document.getElementById('checkout-customer-phone')) document.getElementById('checkout-customer-phone').value = cPhone;
-        if (document.getElementById('checkout-customer-name')) document.getElementById('checkout-customer-name').value = cName;
+        if(container.innerHTML === '') {
+             container.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-muted);">تم إرجاع جميع أصناف هذه الفاتورة مسبقاً.</div>';
+             document.querySelector('#refund-invoice-modal .btn-danger').style.display = 'none';
+        } else {
+             document.querySelector('#refund-invoice-modal .btn-danger').style.display = 'block';
+        }
 
-        if (document.getElementById('pos-laundry-name')) document.getElementById('pos-laundry-name').value = invoiceData.partnerLaundryName || '';
-        if (document.getElementById('pos-laundry-hood')) document.getElementById('pos-laundry-hood').value = invoiceData.partnerLaundryNeighborhood || '';
-        if (document.getElementById('pos-laundry-cost')) document.getElementById('pos-laundry-cost').value = invoiceData.laundryCost || invoiceData.partnerLaundryCost || '';
-        if (document.getElementById('pos-laundry-paid')) document.getElementById('pos-laundry-paid').value = invoiceData.laundryPaid ? 'true' : 'false';
+        document.getElementById('refund-grand-total').innerText = '0.00 ر.س';
+        document.getElementById('refund-invoice-modal').classList.remove('hidden');
+    },
 
-        // UI updates
-        this.updateCartUI();
-        this.switchView('pos');
+    calculateRefundTotal() {
+        let total = 0;
+        document.querySelectorAll('.refund-qty-input').forEach(input => {
+             let qty = parseInt(input.value) || 0;
+             let price = parseFloat(input.getAttribute('data-price')) || 0;
+             let max = parseInt(input.getAttribute('data-max')) || 0;
+             if (qty > max) { qty = max; input.value = max; }
+             if (qty < 0) { qty = 0; input.value = 0; }
+             total += (qty * price);
+        });
+        document.getElementById('refund-grand-total').innerText = total.toFixed(2) + ' ر.س';
+        return total;
+    },
 
-        // ensure category is refreshed properly avoiding nested quotes issues
-        document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-        const posBtn = document.querySelector(`.nav-btn[onclick*="switchView('pos')"]`) || document.querySelector(`.nav-btn[onclick*='switchView("pos")']`);
-        if (posBtn) posBtn.classList.add('active');
+    async processRefund() {
+        const id = document.getElementById('refund-target-id').value;
+        const totalRefund = this.calculateRefundTotal();
+        
+        if (totalRefund <= 0) {
+            alert('الرجاء تحديد كميات لإرجاعها.');
+            return;
+        }
+
+        if(!confirm(`هل أنت متأكد من إرجاع مبلغ بقيمة ${totalRefund.toFixed(2)} ر.س من الفاتورة ${id}؟\n(سيتم خصم هذا المبلغ من يومية الكاشير)`)) return;
+
+        let invs = await localforage.getItem('invoices') || [];
+        const idx = invs.findIndex(i => i.id == id);
+        
+        if (idx === -1) return;
+        
+        let invoice = invs[idx];
+        
+        let fullyRefunded = true;
+        document.querySelectorAll('.refund-qty-input').forEach(input => {
+             let qty = parseInt(input.value) || 0;
+             let index = parseInt(input.getAttribute('data-index'));
+             if (qty > 0) {
+                 if (!invoice.items[index].refundedQty) invoice.items[index].refundedQty = 0;
+                 invoice.items[index].refundedQty += qty;
+             }
+             
+             let totalRefundedForItem = invoice.items[index].refundedQty || 0;
+             if (totalRefundedForItem < invoice.items[index].qty) {
+                 fullyRefunded = false;
+             }
+        });
+
+        invoice.refundAmount = (invoice.refundAmount || 0) + totalRefund;
+        invoice.status = fullyRefunded ? 'مسترجع بالكامل' : 'مسترجع جزئياً';
+
+        invs[idx] = invoice;
+        await localforage.setItem('invoices', invs);
+        await manualSyncToCloud('invoices', invs);
+
+        this.closeRefundModal();
+        this.renderHistory();
+        this.renderReports();
+        this.showToast(`تم إرجاع المبلغ (${totalRefund.toFixed(2)} ر.س) بنجاح وإغلاق الفاتورة.`);
+    },
+
+    closeRefundModal() {
+        document.getElementById('refund-invoice-modal').classList.add('hidden');
     },
 
     // Helper: Aggregates customer data from all non-cancelled invoices
@@ -2980,17 +3071,21 @@ window.appLogic = {
 
             // DYNAMIC ROLLING TOTALS
             const isInRange = (rTime >= startBound && (endBound === Infinity || rTime <= endBound));
+            
+            let refundAmt = parseFloat(i.refundAmount || 0);
+            if (i.isCancelled) refundAmt = amt; // if fully cancelled previously without refundAmount prop
+            const netAmt = amt - refundAmt;
 
             // Today's sales honors the Z-Report wipe (matchesShift) per user preference
             if (isInRange && matchesShift) {
-                salesToday += amt;
+                salesToday += netAmt;
             }
 
             // 7/30/365 metrics ignore Z-Report wipe and accumulate ALL historical data in range
             const isBeforeOrOnEnd = (endBound === Infinity || rTime <= endBound);
-            if (rTime >= weekAgo && isBeforeOrOnEnd) salesWeek += amt;
-            if (rTime >= monthAgo && isBeforeOrOnEnd) salesMonth += amt;
-            if (rTime >= yearAgo && isBeforeOrOnEnd) salesYear += amt;
+            if (rTime >= weekAgo && isBeforeOrOnEnd) salesWeek += netAmt;
+            if (rTime >= monthAgo && isBeforeOrOnEnd) salesMonth += netAmt;
+            if (rTime >= yearAgo && isBeforeOrOnEnd) salesYear += netAmt;
 
             // 🌟 EXCEPTION: MONTHLY SALES BREAKDOWN
             // DO NOT RESET: Must calculate sum of ALL invoices (historical + active) for calendar reporting
@@ -3001,21 +3096,23 @@ window.appLogic = {
             const monthName = (this.currentLang === 'en') ? monthsEn[mIdx] : monthsAr[mIdx];
             const label = `${monthName} ${year.toString()}`;
             if (!monthlyMap[key]) monthlyMap[key] = { label, total: 0, sortKey: key };
-            monthlyMap[key].total += amt;
+            monthlyMap[key].total += netAmt;
 
 
             // ACTIVE DASHBOARD FILTER (Selected Date)
             if (isInRange && matchesShift) {
                 totalAllInvoices += amt;
+                totalRefunds += refundAmt;
+                
                 if (i.isCancelled === true) {
-                    totalRefunds += amt;
+                    // Handled inside totalRefunds already
                 } else {
                     // Track Payment Methods for Z-Report Sync
                     const pMethod = i.paymentMethod || 'cash';
-                    if (pMethod === 'cash') cashTotal += amt;
-                    else if (pMethod === 'mada' || pMethod === 'network') madaTotal += amt;
-                    else if (pMethod === 'visa') visaTotal += amt;
-                    else if (pMethod === 'mastercard') mastercardTotal += amt;
+                    if (pMethod === 'cash') cashTotal += netAmt;
+                    else if (pMethod === 'mada' || pMethod === 'network') madaTotal += netAmt;
+                    else if (pMethod === 'visa') visaTotal += netAmt;
+                    else if (pMethod === 'mastercard') mastercardTotal += netAmt;
                 }
             }
         });
