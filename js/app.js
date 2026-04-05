@@ -1411,19 +1411,18 @@ window.appLogic = {
             var origHTML = originalBtn ? originalBtn.innerHTML : '';
             if(originalBtn) originalBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري إرسال الطباعة...';
 
-            var originalWidth = container.style.width;
-            var originalMargin = container.style.margin;
-            container.style.width = '384px'; 
-            container.style.margin = '0 auto';
+            var originalCSS = container.style.cssText;
+            // Force pure thermal styles
+            container.style.cssText = originalCSS + '; width: 380px !important; margin: 0 auto !important; padding: 10px !important; background: white !important; color: black !important; font-weight: bold !important;';
             
             var canvas = await html2canvas(container, {
-                scale: 1,
+                scale: 2,
                 useCORS: true,
                 backgroundColor: '#ffffff'
             });
             
-            container.style.width = originalWidth;
-            container.style.margin = originalMargin;
+            // Revert UI immediately
+            container.style.cssText = originalCSS;
 
             var base64ImageString = canvas.toDataURL('image/png');
             
