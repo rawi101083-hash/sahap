@@ -168,7 +168,7 @@ function generateZatcaBase64(sellerName, vatNumber, timestamp, totalAmount, vatA
         const buildTLV = (tag, value) => {
             const valBytes = toUTF8Bytes(value || "");
             // Tag (1 byte) | Length (1 byte) | Unicode UTF-8 Bytes
-            return new Uint8Array([tag, valBytes.length, ...valBytes]);
+            var arr = [tag, valBytes.length]; for (var i = 0; i < valBytes.length; i++) { arr.push(valBytes[i]); } return new Uint8Array(arr);
         };
 
         const parts = [
@@ -1224,7 +1224,7 @@ window.appLogic = {
 
         let invoiceData = {
             id: newInvId, timestamp: Date.now(), customer: { phone: cPhone, name: cName },
-            items: [...this.cart],
+            items: [].concat(this.cart),
             deliveryFee: parseFloat(this.deliveryFee) || 0,
             total: parseFloat(grT) || 0,
             grandTotal: parseFloat(grT) || 0,
@@ -1784,11 +1784,11 @@ window.appLogic = {
         } else {
             // Historical View: Retrieve from active (if unclosed) + archives
             const targetDateStr = this.currentViewDate;
-            invoices = [...activeInvs];
+            invoices = [].concat(activeInvs);
 
             const archives = await localforage.getItem('archived_z_reports') || [];
             archives.forEach(arc => {
-                if (arc.invoices) invoices.push(...arc.invoices);
+                if (arc.invoices) { Array.prototype.push.apply(invoices, arc.invoices); }
             });
         }
         // 📅 GLOBAL DATE FILTER: Strictly isolate Live Shift from Archived data
@@ -1841,7 +1841,7 @@ window.appLogic = {
                 html += `<tr><td colspan="5" style="padding:20px; text-align:center;">${noInv}</td></tr>`;
             } else {
                 // UNIFIED SORTING: Newest First based on timestamp. Max DOM array clamped to 500 to kill browser thread freezes.
-                const displayInvoices = [...filtered].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, 500);
+                const displayInvoices = [].concat(filtered).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, 500);
 
                 // Pre-compile DateFormat buffer centrally to completely destroy the artificial delay (10-second sync freeze)
                 const dFormatter = new Intl.DateTimeFormat('en-US', {
@@ -2305,7 +2305,7 @@ window.appLogic = {
                 html += `<tr><td colspan="5" style="padding:20px; text-align:center;">${emptyMsg}</td></tr>`;
             } else {
                 // Sort by latest activity (newest first)
-                const displayCustomers = [...customersArray].sort((a, b) => b.latestTimestamp - a.latestTimestamp);
+                const displayCustomers = [].concat(customersArray).sort((a, b) => b.latestTimestamp - a.latestTimestamp);
 
                 displayCustomers.forEach(c => {
                     if (!c) return;
@@ -3002,12 +3002,12 @@ window.appLogic = {
         const activeExps = await localforage.getItem('expenses') || [];
         const archives = await localforage.getItem('archived_z_reports') || [];
 
-        let Math_invoices = [...activeInvs];
-        let Math_exps = [...activeExps];
+        let Math_invoices = [].concat(activeInvs);
+        let Math_exps = [].concat(activeExps);
 
         archives.forEach(arc => {
-            if (arc.invoices) Math_invoices.push(...arc.invoices);
-            if (arc.expenses) Math_exps.push(...arc.expenses);
+            if (arc.invoices) { Array.prototype.push.apply(Math_invoices, arc.invoices); }
+            if (arc.expenses) { Array.prototype.push.apply(Math_exps, arc.expenses); }
         });
 
         const invoices = Math_invoices;
@@ -3481,7 +3481,7 @@ window.appLogic = {
             if (check.exists()) return this.createStore(); // retry
 
             const storeData = {
-                name, phone, taxNumber: tax,
+                name: name, phone: phone, taxNumber: tax,
                 timestamp: Date.now(),
                 status: 'active',
                 canInstallPWA: false
@@ -4214,7 +4214,7 @@ window.appLogic = {
 
         // Merge locally so we don't destroy pre-existing properties like pin or status
         window.tenantSettings = {
-            ...(window.tenantSettings || {}),
+            
             name, phone, taxNumber: tax
         };
 

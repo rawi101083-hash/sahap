@@ -1,0 +1,622 @@
+[
+  {
+    "line": 53,
+    "text": "window.addEventListener('beforeinstallprompt', (e) => {"
+  },
+  {
+    "line": 61,
+    "text": "window.addEventListener('appinstalled', () => {"
+  },
+  {
+    "line": 72,
+    "text": "window.addEventListener('DOMContentLoaded', () => {"
+  },
+  {
+    "line": 80,
+    "text": "window.addEventListener('DOMContentLoaded', () => {"
+  },
+  {
+    "line": 87,
+    "text": "installBtn.onclick = (e) => {"
+  },
+  {
+    "line": 166,
+    "text": "const toUTF8Bytes = (str) => new TextEncoder().encode(String(str));"
+  },
+  {
+    "line": 168,
+    "text": "const buildTLV = (tag, value) => {"
+  },
+  {
+    "line": 171,
+    "text": "return new Uint8Array([tag, valBytes.length, ...valBytes]);"
+  },
+  {
+    "line": 183,
+    "text": "const totalLen = parts.reduce((acc, curr) => acc + curr.length, 0);"
+  },
+  {
+    "line": 186,
+    "text": "parts.forEach(p => {"
+  },
+  {
+    "line": 295,
+    "text": "console.log(`[Manual-Sync] Sending ${path} to cloud...`);"
+  },
+  {
+    "line": 296,
+    "text": "const safePayload = JSON.parse(JSON.stringify(value, (k, v) => (v === undefined ? null : v)));"
+  },
+  {
+    "line": 324,
+    "text": "const fetchPromises = collectionsToSync.map(key => {"
+  },
+  {
+    "line": 325,
+    "text": "return new Promise((resolve) => {"
+  },
+  {
+    "line": 330,
+    "text": "console.log(`[Recovery] Applying 400-day optimization for ${key}...`);"
+  },
+  {
+    "line": 334,
+    "text": "console.log(`[Recovery] Requesting ${key} from cloud...`);"
+  },
+  {
+    "line": 336,
+    "text": "dbRef.once('value', async (snapshot) => {"
+  },
+  {
+    "line": 343,
+    "text": "cloudData = cloudData.filter(item => item !== null && typeof item === 'object');"
+  },
+  {
+    "line": 370,
+    "text": "}, (err) => {"
+  },
+  {
+    "line": 375,
+    "text": "dbRef.on('value', async (snapshot) => {"
+  },
+  {
+    "line": 384,
+    "text": "sanitized = sanitized.filter(item => item !== null && typeof item === 'object');"
+  },
+  {
+    "line": 413,
+    "text": "const hideInitialLoader = () => {"
+  },
+  {
+    "line": 417,
+    "text": "setTimeout(() => {"
+  },
+  {
+    "line": 424,
+    "text": "const getLocalYMD = (d) => {"
+  },
+  {
+    "line": 578,
+    "text": "console.log(\"[App] Waiting strictly for Firebase Heartbeat...\");"
+  },
+  {
+    "line": 618,
+    "text": "console.log(\"[Laundry] Seeding cumulative balances from existing history...\");"
+  },
+  {
+    "line": 622,
+    "text": "invoices.forEach(i => {"
+  },
+  {
+    "line": 647,
+    "text": "invs.forEach(i => {"
+  },
+  {
+    "line": 658,
+    "text": "datalist.innerHTML = Array.from(laundries).sort().map(name => `<option value=\"${name}\">`).join('');"
+  },
+  {
+    "line": 663,
+    "text": "hoodDatalist.innerHTML = Array.from(hoods).sort().map(hood => `<option value=\"${hood}\">`).join('');"
+  },
+  {
+    "line": 690,
+    "text": "document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));"
+  },
+  {
+    "line": 691,
+    "text": "document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));"
+  },
+  {
+    "line": 737,
+    "text": "document.querySelectorAll('.btn-cat').forEach(b => b.classList.remove('active'));"
+  },
+  {
+    "line": 748,
+    "text": "filtered = filtered.filter(i => i.cat === this.currentCategory);"
+  },
+  {
+    "line": 752,
+    "text": "filtered = filtered.filter(i => i.name.includes(term));"
+  },
+  {
+    "line": 763,
+    "text": "data.forEach(item => {"
+  },
+  {
+    "line": 767,
+    "text": "card.onclick = () => this.fastAddToCart(item);"
+  },
+  {
+    "line": 774,
+    "text": "document.querySelectorAll('#fb-type-wash_iron, #fb-type-iron, #fb-type-wash').forEach(b => b.classList.remove('active'));"
+  },
+  {
+    "line": 780,
+    "text": "document.querySelectorAll('#fb-speed-normal, #fb-speed-express').forEach(b => b.classList.remove('active'));"
+  },
+  {
+    "line": 811,
+    "text": "let existing = this.cart.find(i => i.id === item.id && i.type === type && i.speed === speed);"
+  },
+  {
+    "line": 841,
+    "text": "document.querySelectorAll('#item-modal .btn-toggle').forEach(b => b.classList.remove('active'));"
+  },
+  {
+    "line": 855,
+    "text": "document.querySelectorAll('#btn-type-iron, #btn-type-wash_iron, #btn-type-wash').forEach(b => b.classList.remove('active'));"
+  },
+  {
+    "line": 921,
+    "text": "let existing = this.cart.find(i => i.id === this.modalState.item.id && i.type === this.modalState.type && i.speed === this.modalState.speed);"
+  },
+  {
+    "line": 954,
+    "text": "document.querySelectorAll('.btn-delivery').forEach(b => b.classList.remove('active'));"
+  },
+  {
+    "line": 967,
+    "text": "this.cart.forEach((item, index) => {"
+  },
+  {
+    "line": 998,
+    "text": "const subt = this.cart.reduce((s, i) => s + (i.unitPrice * i.qty), 0);"
+  },
+  {
+    "line": 1114,
+    "text": "this.deliveryOptions.forEach(opt => {"
+  },
+  {
+    "line": 1126,
+    "text": "const subt = this.cart.reduce((s, i) => s + (i.unitPrice * i.qty), 0);"
+  },
+  {
+    "line": 1142,
+    "text": "this.deliveryOptions.forEach(opt => {"
+  },
+  {
+    "line": 1158,
+    "text": "const found = list.find(c => c.phone === this.customer.phone);"
+  },
+  {
+    "line": 1197,
+    "text": "invoices.forEach(i => {"
+  },
+  {
+    "line": 1207,
+    "text": "let subT = this.cart.reduce((s, i) => s + (i.unitPrice * i.qty), 0);"
+  },
+  {
+    "line": 1227,
+    "text": "items: [...this.cart],"
+  },
+  {
+    "line": 1262,
+    "text": "let cIdx = customers.findIndex(c => c.phone === this.customer.phone);"
+  },
+  {
+    "line": 1276,
+    "text": "let idx = invoices.findIndex(i => i.id === this.editingInvoiceId);"
+  },
+  {
+    "line": 1296,
+    "text": "setTimeout(() => {"
+  },
+  {
+    "line": 1423,
+    "text": "data.items.forEach(it => {"
+  },
+  {
+    "line": 1563,
+    "text": "originalBtn.innerHTML = '<i class=\"fa-solid fa-spinner fa-spin\"></i> جاري التجهيز...';"
+  },
+  {
+    "line": 1569,
+    "text": "await new Promise(r => setTimeout(r, 600));"
+  },
+  {
+    "line": 1626,
+    "text": "setTimeout(() => t.style.opacity = '0', 4000);"
+  },
+  {
+    "line": 1645,
+    "text": "data.items.forEach(item => {"
+  },
+  {
+    "line": 1787,
+    "text": "invoices = [...activeInvs];"
+  },
+  {
+    "line": 1790,
+    "text": "archives.forEach(arc => {"
+  },
+  {
+    "line": 1791,
+    "text": "if (arc.invoices) invoices.push(...arc.invoices);"
+  },
+  {
+    "line": 1795,
+    "text": "invoices = invoices.filter(inv => {"
+  },
+  {
+    "line": 1809,
+    "text": "invoices = invoices.filter(inv =>"
+  },
+  {
+    "line": 1816,
+    "text": "invoices.sort((a, b) => b.timestamp - a.timestamp);"
+  },
+  {
+    "line": 1821,
+    "text": "let validInvoices = filteredInvoices.filter(i => i && i.id && typeof i.grandTotal !== 'undefined');"
+  },
+  {
+    "line": 1844,
+    "text": "const displayInvoices = [...filtered].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, 500);"
+  },
+  {
+    "line": 1852,
+    "text": "displayInvoices.forEach(i => {"
+  },
+  {
+    "line": 1963,
+    "text": "const idx = invs.findIndex(i => i.id === id);"
+  },
+  {
+    "line": 1990,
+    "text": "const idx = invs.findIndex(i => i.id === id);"
+  },
+  {
+    "line": 2031,
+    "text": "const invoiceData = invs.find(i => i.id === id);"
+  },
+  {
+    "line": 2061,
+    "text": "const idx = invs.findIndex(i => i && i.id === id);"
+  },
+  {
+    "line": 2079,
+    "text": "const invoice = invs.find(i => i.id == id);"
+  },
+  {
+    "line": 2098,
+    "text": "(invoice.items || []).forEach((item, index) => {"
+  },
+  {
+    "line": 2108,
+    "text": "const s = svcs.find(x => x.name === item.name);"
+  },
+  {
+    "line": 2139,
+    "text": "document.querySelectorAll('.refund-qty-input').forEach(input => {"
+  },
+  {
+    "line": 2163,
+    "text": "const idx = invs.findIndex(i => i.id == id);"
+  },
+  {
+    "line": 2170,
+    "text": "document.querySelectorAll('.refund-qty-input').forEach(input => {"
+  },
+  {
+    "line": 2205,
+    "text": ".filter(i => i && i.id); // Relaxed filter: include all entries with an ID"
+  },
+  {
+    "line": 2209,
+    "text": "validInvoices.forEach(inv => {"
+  },
+  {
+    "line": 2252,
+    "text": "return Object.values(customersMap).sort((a, b) => b.latestTimestamp - a.latestTimestamp);"
+  },
+  {
+    "line": 2272,
+    "text": "aggregated = aggregated.filter(c => {"
+  },
+  {
+    "line": 2308,
+    "text": "const displayCustomers = [...customersArray].sort((a, b) => b.latestTimestamp - a.latestTimestamp);"
+  },
+  {
+    "line": 2310,
+    "text": "displayCustomers.forEach(c => {"
+  },
+  {
+    "line": 2379,
+    "text": "let item = inv.find(i => String(i.id) === String(id));"
+  },
+  {
+    "line": 2394,
+    "text": "inv = inv.filter(i => String(i.id) !== String(id));"
+  },
+  {
+    "line": 2414,
+    "text": "let idx = inv.findIndex(i => String(i.id) === String(id));"
+  },
+  {
+    "line": 2420,
+    "text": "let itemIdx = inv.findIndex(i => i.sku === sku);"
+  },
+  {
+    "line": 2443,
+    "text": "container.innerHTML = '<div style=\"text-align:center; padding:20px; color:var(--primary);\"><i class=\"fa-solid fa-spinner fa-spin\"></i> جاري تحميل البيانات...</div>';"
+  },
+  {
+    "line": 2446,
+    "text": "console.log('[UI] Starting renderInventory...');"
+  },
+  {
+    "line": 2480,
+    "text": "trackedInv.forEach(item => {"
+  },
+  {
+    "line": 2526,
+    "text": "services.forEach(item => {"
+  },
+  {
+    "line": 2580,
+    "text": "const service = this.services.find(s => s.id === id);"
+  },
+  {
+    "line": 2614,
+    "text": "AvailableIcons.forEach(icon => {"
+  },
+  {
+    "line": 2618,
+    "text": "btn.onclick = () => {"
+  },
+  {
+    "line": 2646,
+    "text": "const idx = this.services.findIndex(s => s.id === id);"
+  },
+  {
+    "line": 2663,
+    "text": "const idx = this.services.findIndex(s => s.id === id);"
+  },
+  {
+    "line": 2703,
+    "text": "deliveryArray.forEach(opt => {"
+  },
+  {
+    "line": 2737,
+    "text": "const opt = this.deliveryOptions.find(o => o.id === id);"
+  },
+  {
+    "line": 2766,
+    "text": "const idx = this.deliveryOptions.findIndex(o => o.id === id);"
+  },
+  {
+    "line": 2768,
+    "text": "this.deliveryOptions[idx] = { ...this.deliveryOptions[idx], name: name, amount: amt };"
+  },
+  {
+    "line": 2793,
+    "text": "this.deliveryOptions = this.deliveryOptions.filter(o => o.id !== id);"
+  },
+  {
+    "line": 2844,
+    "text": "${exps.sort((a, b) => new Date(b.date) - new Date(a.date)).map(e => `"
+  },
+  {
+    "line": 2861,
+    "text": "Object.keys(laundryBalances).forEach(key => {"
+  },
+  {
+    "line": 2866,
+    "text": "invoices.forEach(i => {"
+  },
+  {
+    "line": 2882,
+    "text": "keys.forEach(k => {"
+  },
+  {
+    "line": 2914,
+    "text": "${keys.map(key => {"
+  },
+  {
+    "line": 3005,
+    "text": "let Math_invoices = [...activeInvs];"
+  },
+  {
+    "line": 3006,
+    "text": "let Math_exps = [...activeExps];"
+  },
+  {
+    "line": 3008,
+    "text": "archives.forEach(arc => {"
+  },
+  {
+    "line": 3009,
+    "text": "if (arc.invoices) Math_invoices.push(...arc.invoices);"
+  },
+  {
+    "line": 3010,
+    "text": "if (arc.expenses) Math_exps.push(...arc.expenses);"
+  },
+  {
+    "line": 3062,
+    "text": "invoices.forEach(i => {"
+  },
+  {
+    "line": 3121,
+    "text": "exps.forEach(e => {"
+  },
+  {
+    "line": 3137,
+    "text": "Object.values(laundryBalances).forEach(b => {"
+  },
+  {
+    "line": 3246,
+    "text": "const sortedMonths = Object.values(monthlyMap).sort((a, b) => b.sortKey.localeCompare(a.sortKey));"
+  },
+  {
+    "line": 3251,
+    "text": "sortedMonths.forEach(m => {"
+  },
+  {
+    "line": 3319,
+    "text": "invs.forEach(i => {"
+  },
+  {
+    "line": 3391,
+    "text": "container.innerHTML = '<div style=\"text-align:center; padding:20px; color:var(--primary);\"><i class=\"fa-solid fa-spinner fa-spin\"></i> جاري تحميل بيانات المنصة...</div>';"
+  },
+  {
+    "line": 3415,
+    "text": "const sortedPins = Object.keys(stores).sort((a, b) => (stores[b].timestamp || 0) - (stores[a].timestamp || 0));"
+  },
+  {
+    "line": 3420,
+    "text": "sortedPins.forEach(pin => {"
+  },
+  {
+    "line": 3504,
+    "text": "console.log(`[Admin-Sync] Unifying status for PIN ${pin} to [${newStatus}]...`);"
+  },
+  {
+    "line": 3577,
+    "text": "btn.innerHTML = '<i class=\"fa-solid fa-spinner fa-spin\"></i> جاري التحقق...';"
+  },
+  {
+    "line": 3585,
+    "text": "console.log(`[Smart-Gate] AUTHORIZED: Persisting Master Auth and Redirecting...`);"
+  },
+  {
+    "line": 3660,
+    "text": "console.log(`[Smart-Gate] Auto-provisioning Auth account for PIN ${pin}...`);"
+  },
+  {
+    "line": 3713,
+    "text": "authRef.on('value', async (snap) => {"
+  },
+  {
+    "line": 3725,
+    "text": "firebase.auth().signOut().then(() => {"
+  },
+  {
+    "line": 3741,
+    "text": "const triggerNag = () => {"
+  },
+  {
+    "line": 3756,
+    "text": "}).then((result) => {"
+  },
+  {
+    "line": 3790,
+    "text": "const checkTrialExpiry = () => {"
+  },
+  {
+    "line": 3867,
+    "text": "installBtn.onclick = async (e) => {"
+  },
+  {
+    "line": 4052,
+    "text": "'#initial-loader h2': { ar: 'جاري التحميل...', en: 'Loading...' },"
+  },
+  {
+    "line": 4064,
+    "text": "'#history-search': { attr: 'placeholder', ar: 'بحث برقم الفاتورة، اسم أو جوال العميل...', en: 'Search by Invoice ID, Customer Name or Phone...' },"
+  },
+  {
+    "line": 4095,
+    "text": "'#inventory-content h2': { ar: 'جاري تحضير قائمة الخدمات...', en: 'Preparing services list...' },"
+  },
+  {
+    "line": 4128,
+    "text": "Object.entries(dict).forEach(([selector, textObj]) => {"
+  },
+  {
+    "line": 4130,
+    "text": "elements.forEach(el => {"
+  },
+  {
+    "line": 4141,
+    "text": "if (itemSearch) itemSearch.placeholder = lang === 'en' ? 'Search items...' : 'ابحث عن صنف...';"
+  },
+  {
+    "line": 4150,
+    "text": "if (invSearch) invSearch.placeholder = lang === 'en' ? 'Search by ID, Customer...' : 'بحث بالرقم، العميل أو الجوال...';"
+  },
+  {
+    "line": 4153,
+    "text": "if (cSearch) cSearch.placeholder = lang === 'en' ? 'Search by Name or Phone...' : 'بحث باسم العميل أو الجوال...';"
+  },
+  {
+    "line": 4217,
+    "text": "...(window.tenantSettings || {}),"
+  },
+  {
+    "line": 4443,
+    "text": "const filteredInvoices = invoices.filter(invoice => {"
+  },
+  {
+    "line": 4455,
+    "text": "const shiftExpenses = exps.filter(e => e && !e.isZReported && (e.date === targetFormattedDate || getLocalYMD(e.timestamp) === targetFormattedDate));"
+  },
+  {
+    "line": 4458,
+    "text": "filteredInvoices.forEach(i => { if (i) i.isZReported = true; });"
+  },
+  {
+    "line": 4459,
+    "text": "shiftExpenses.forEach(e => { if (e) e.isZReported = true; });"
+  },
+  {
+    "line": 4461,
+    "text": "// Wait... there may be invoices that didn't match the KSA date but ARE from today's shift visually?"
+  },
+  {
+    "line": 4463,
+    "text": "invoices.forEach(i => { if (i) i.isZReported = true; });"
+  },
+  {
+    "line": 4464,
+    "text": "exps.forEach(e => { if (e) e.isZReported = true; });"
+  },
+  {
+    "line": 4481,
+    "text": "const activeInvoices = invoices.filter(i => i && !i.isZReported);"
+  },
+  {
+    "line": 4482,
+    "text": "const activeExps = exps.filter(e => e && !e.isZReported);"
+  },
+  {
+    "line": 4523,
+    "text": "setTimeout(() => {"
+  },
+  {
+    "line": 4552,
+    "text": "const format = (num) => num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });"
+  },
+  {
+    "line": 4635,
+    "text": "document.addEventListener('DOMContentLoaded', () => {"
+  },
+  {
+    "line": 4653,
+    "text": "firebase.auth().onAuthStateChanged(async (user) => {"
+  }
+]
