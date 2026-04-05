@@ -1427,9 +1427,16 @@ window.appLogic = {
             <style>
             @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@700;900&display=swap');
             body {
-            margin: 0; padding: 20px; width: 728px;
-            font-family: 'Tajawal', sans-serif; direction: rtl;
-            background: white; color: black; font-size: 48px; font-weight: 900;
+            margin: 0; padding: 0; width: 768px;
+            background: white; color: black;
+            direction: ltr; /* FIX FOR HTML2CANVAS RTL BUG */
+            }
+            #rtl-wrapper {
+            direction: rtl;
+            padding: 20px;
+            width: 728px; /* 768 - 40 padding */
+            font-family: 'Tajawal', sans-serif;
+            font-size: 48px; font-weight: 900;
             }
             h1, h2, h3 { font-size: 64px; margin: 10px 0; text-align: center; }
             table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 44px; }
@@ -1438,7 +1445,11 @@ window.appLogic = {
             img { max-width: 300px; display: block; margin: 0 auto; }
             </style>
             </head>
-            <body>${invoiceInnerHTML}</body>
+            <body>
+            <div id="rtl-wrapper">
+            ${invoiceInnerHTML}
+            </div>
+            </body>
             </html>
             `);
             doc.close();
@@ -1449,7 +1460,11 @@ window.appLogic = {
                 width: 768, 
                 windowWidth: 768, 
                 scale: 1, 
-                useCORS: true 
+                useCORS: true,
+                x: 0,
+                y: 0,
+                scrollX: 0,
+                scrollY: 0
             });
 
             document.body.removeChild(iframe);
