@@ -238,7 +238,7 @@
                 
                 <label style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:13px; text-align: right;">توقيع العميل</label>
                 <div style="background: #fff; border-radius: 8px; overflow: hidden; border: 2px solid var(--primary);">
-                    <canvas id="signature-pad-canvas" width="550" height="150" style="touch-action: none; display: block;"></canvas>
+                    <canvas id="signature-pad-canvas" width="550" height="150" style="touch-action: none !important; display: block;"></canvas>
                 </div>
                 <div style="text-align: left; margin-top: 5px;">
                     <button onclick="contractGenerator.clearSignature()" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; font-size:12px; text-decoration:underline;">مسح التوقيع</button>
@@ -1015,12 +1015,6 @@
 
                     const getCoordinates = (e) => {
                         const rect = canvas.getBoundingClientRect();
-                        if (e.touches && e.touches.length > 0) {
-                            return {
-                                x: e.touches[0].clientX - rect.left,
-                                y: e.touches[0].clientY - rect.top
-                            };
-                        }
                         return {
                             x: e.clientX - rect.left,
                             y: e.clientY - rect.top
@@ -1029,6 +1023,7 @@
 
                     const startDraw = (e) => {
                         e.preventDefault();
+                        canvas.setPointerCapture(e.pointerId);
                         isDrawing = true;
                         padRef.hasInk = true;
                         const coords = getCoordinates(e);
@@ -1046,20 +1041,17 @@
 
                     const stopDraw = (e) => {
                         e.preventDefault();
+                        if (canvas.hasPointerCapture(e.pointerId)) {
+                            canvas.releasePointerCapture(e.pointerId);
+                        }
                         isDrawing = false;
                     };
 
-                    // Touch events (passive: false is mandatory to prevent scrolling & swallows)
-                    canvas.addEventListener("touchstart", startDraw, { passive: false });
-                    canvas.addEventListener("touchmove", draw, { passive: false });
-                    canvas.addEventListener("touchend", stopDraw, { passive: false });
-                    canvas.addEventListener("touchcancel", stopDraw, { passive: false });
-
-                    // Mouse events for Desktop
-                    canvas.addEventListener("mousedown", startDraw);
-                    canvas.addEventListener("mousemove", draw);
-                    canvas.addEventListener("mouseup", stopDraw);
-                    canvas.addEventListener("mouseout", stopDraw);
+                    // Pointer Events for Universal Input (Touch, Mouse, Stylus)
+                    canvas.addEventListener("pointerdown", startDraw, { passive: false });
+                    canvas.addEventListener("pointermove", draw, { passive: false });
+                    canvas.addEventListener("pointerup", stopDraw, { passive: false });
+                    canvas.addEventListener("pointercancel", stopDraw, { passive: false });
                 } else {
                     // Update dimensions dynamically if window resized
                     const canvas = document.getElementById('signature-pad-canvas');
