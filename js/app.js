@@ -1414,7 +1414,7 @@ window.appLogic = {
             var invoiceInnerHTML = container.innerHTML;
 
             var iframe = document.createElement('iframe');
-            iframe.style.width = '384px';
+            iframe.style.width = '768px';
             iframe.style.position = 'absolute';
             iframe.style.left = '-9999px';
             document.body.appendChild(iframe);
@@ -1427,15 +1427,15 @@ window.appLogic = {
             <style>
             @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@700;900&display=swap');
             body {
-            margin: 0; padding: 10px; width: 364px;
+            margin: 0; padding: 20px; width: 728px;
             font-family: 'Tajawal', sans-serif; direction: rtl;
-            background: white; color: black; font-size: 24px; font-weight: 900;
+            background: white; color: black; font-size: 48px; font-weight: 900;
             }
-            h1, h2, h3 { font-size: 32px; margin: 5px 0; text-align: center; }
-            table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 22px; }
-            th, td { border-bottom: 2px dashed #000; padding: 5px 0; text-align: center; }
-            .total { font-size: 28px; font-weight: 900; text-align: left; margin-top: 10px; }
-            img { max-width: 150px; display: block; margin: 0 auto; }
+            h1, h2, h3 { font-size: 64px; margin: 10px 0; text-align: center; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 44px; }
+            th, td { border-bottom: 4px dashed #000; padding: 10px 0; text-align: center; }
+            .total { font-size: 56px; font-weight: 900; text-align: left; margin-top: 20px; }
+            img { max-width: 300px; display: block; margin: 0 auto; }
             </style>
             </head>
             <body>${invoiceInnerHTML}</body>
@@ -1443,11 +1443,11 @@ window.appLogic = {
             `);
             doc.close();
 
-            await new Promise(function(resolve) { setTimeout(resolve, 300); });
+            await new Promise(function(resolve) { setTimeout(resolve, 400); });
 
             var canvas = await html2canvas(doc.body, { 
-                width: 384, 
-                windowWidth: 384, 
+                width: 768, 
+                windowWidth: 768, 
                 scale: 1, 
                 useCORS: true 
             });
