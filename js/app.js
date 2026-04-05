@@ -1357,9 +1357,138 @@ window.appLogic = {
         }
     },
 
-    printThermalReceipt() {
+    async connectBluetoothPrinter() {
+        try {
+            var device = await navigator.bluetooth.requestDevice({
+                filters: [
+                    { namePrefix: 'Inner' },
+                    { namePrefix: 'InnerPrinter' },
+                    { namePrefix: 'BlueTooth Printer' },
+                    { services: ['000018f0-0000-1000-8000-00805f9b34fb'] }
+                ],
+                optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb', '49535343-fe7d-4ae5-8fa9-9fafd205e455', 'e7810a71-73ae-499d-8c15-faa9aef0c3f2', '00001101-0000-1000-8000-00805f9b34fb']
+            }).catch(function() {
+                return navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true,
+                    optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb', '49535343-fe7d-4ae5-8fa9-9fafd205e455', 'e7810a71-73ae-499d-8c15-faa9aef0c3f2', '00001101-0000-1000-8000-00805f9b34fb']
+                });
+            });
+
+            var server = await device.gatt.connect();
+            var services = await server.getPrimaryServices();
+            var printerChar = null;
+            for (var i = 0; i < services.length; i++) {
+                var chars = await services[i].getCharacteristics();
+                for (var j = 0; j < chars.length; j++) {
+                    if (chars[j].properties.write || chars[j].properties.writeWithoutResponse) {
+                        printerChar = chars[j];
+                        break;
+                    }
+                }
+                if (printerChar) break;
+            }
+
+            if (!printerChar) throw new Error('لا توجد خدمة طباعة متاحة في هذا الجهاز');
+            
+            window.bluetoothCharacteristic = printerChar;
+            window.connectedBluetoothPrinter = device;
+            
+            var btnText = document.getElementById('bt-printer-status');
+            if (btnText) btnText.innerText = 'متصل: ' + device.name;
+            
+            alert('تم الاتصال بالطابعة بنجاح!');
+        } catch (err) {
+            alert('لم يتم التوصيل: ' + err.message);
+        }
+    },
+
+    async printThermalReceipt() {
         if (!this.currentInvoice) return;
-        this.printInvoice(this.currentInvoice);
+        
+        if (!window.bluetoothCharacteristic) {
+            this.printInvoice(this.currentInvoice.id);
+            return;
+        }
+
+        try {
+            var container = document.getElementById('invoice-preview-container');
+            var originalBtn = document.querySelector('button[onclick="appLogic.printThermalReceipt()"]');
+            var origHTML = originalBtn.innerHTML;
+            if(originalBtn) originalBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري إرسال الطباعة...';
+
+            var originalWidth = container.style.width;
+            var originalMargin = container.style.margin;
+            container.style.width = '384px'; // Safe default width for smaller 58mm. 80mm works with this centered too.
+            container.style.margin = '0 auto';
+            
+            var canvas = await html2canvas(container, {
+                scale: 1,
+                useCORS: true,
+                backgroundColor: '#ffffff'
+            });
+            
+            container.style.width = originalWidth;
+            container.style.margin = originalMargin;
+
+            var ctx = canvas.getContext('2d');
+            var width = canvas.width;
+            var height = canvas.height;
+            var imageData = ctx.getImageData(0, 0, width, height);
+            var rgb = imageData.data;
+
+            var w8 = Math.floor((width + 7) / 8) * 8;
+            var bytesPerRow = w8 / 8;
+            
+            var rasterData = new Uint8Array(bytesPerRow * height);
+            for (var y = 0; y < height; y++) {
+                for (var x = 0; x < width; x++) {
+                    var idx = (y * width + x) * 4;
+                    var r = rgb[idx];
+                    var g = rgb[idx + 1];
+                    var b = rgb[idx + 2];
+                    var a = rgb[idx + 3];
+
+                    var luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+                    if (luminance < 128 && a > 128) {
+                        var byteIdx = y * bytesPerRow + Math.floor(x / 8);
+                        var bitOffset = 7 - (x % 8);
+                        rasterData[byteIdx] |= (1 << bitOffset);
+                    }
+                }
+            }
+
+            var header = new Uint8Array([
+                0x1B, 0x40, // Init
+                0x1D, 0x76, 0x30, 0x00, // GS v 0 0
+                bytesPerRow % 256, Math.floor(bytesPerRow / 256),
+                height % 256, Math.floor(height / 256)
+            ]);
+            
+            var footer = new Uint8Array([
+                0x0A, 0x0A, 0x0A, 0x0A, 
+                0x1D, 0x56, 0x42, 0x00
+            ]);
+
+            var payloadSize = header.length + rasterData.length + footer.length;
+            var payload = new Uint8Array(payloadSize);
+            payload.set(header, 0);
+            payload.set(rasterData, header.length);
+            payload.set(footer, header.length + rasterData.length);
+
+            var char = window.bluetoothCharacteristic;
+            var CHUNK_SIZE = 200; 
+            for (var k = 0; k < payload.length; k += CHUNK_SIZE) {
+                var chunk = payload.slice(k, k + CHUNK_SIZE);
+                await char.writeValue(chunk);
+                await new Promise(function(resolve) { setTimeout(resolve, 5); });
+            }
+
+            if(originalBtn) originalBtn.innerHTML = origHTML;
+        } catch (err) {
+            alert('حدث خطأ أثناء الطباعة: ' + err.message);
+            var btn = document.querySelector('button[onclick="appLogic.printThermalReceipt()"]');
+            if(btn) btn.innerHTML = '<i class="fa-solid fa-print"></i> <span>طباعة إيصال حراري (80mm)</span>';
+        }
     },
 
 
