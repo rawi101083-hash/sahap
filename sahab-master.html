@@ -274,16 +274,18 @@
                     .no-break { page-break-inside: avoid; break-inside: avoid; }
                 }
                 #pdf-contract-template ul, #pdf-contract-template ol {
-                    direction: rtl;
-                    text-align: right;
-                    padding-right: 25px;
-                    margin-right: 0px;
-                    list-style-position: outside;
+                    direction: rtl !important;
+                    text-align: right !important;
+                    list-style-position: inside !important;
+                    padding-right: 15px !important;
+                    padding-left: 0 !important;
+                    margin-right: 0 !important;
+                    margin-left: 0 !important;
                 }
                 #pdf-contract-template li {
                     margin-bottom: 12px;
-                    direction: rtl;
-                    text-align: right;
+                    direction: rtl !important;
+                    text-align: right !important;
                 }
                 /* Enforce bidi override for brackets */
                 .bidi-fix { unicode-bidi: isolate; direction: rtl; display: inline-block; }
@@ -988,6 +990,11 @@
                         maxWidth: 3,
                         penColor: "rgb(0, 0, 0)"
                     });
+
+                    // Explicitly prevent scrolling on mobile devices when touching the canvas
+                    canvas.addEventListener("touchstart", function(e) { e.preventDefault(); }, { passive: false });
+                    canvas.addEventListener("touchmove", function(e) { e.preventDefault(); }, { passive: false });
+                    canvas.addEventListener("touchend", function(e) { e.preventDefault(); }, { passive: false });
                 } else {
                     this.signaturePad.clear();
                 }
