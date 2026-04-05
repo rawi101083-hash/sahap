@@ -1017,8 +1017,8 @@ window.appLogic = {
     syncCustomerData(source) {
         let name, phone;
         if (source === 'sidebar') {
-            name = document.getElementById('sidebar-customer-name')?.value || '';
-            phone = document.getElementById('sidebar-customer-phone')?.value || '';
+            name = (document.getElementById('sidebar-customer-name') || {}).value || '';
+            phone = (document.getElementById('sidebar-customer-phone') || {}).value || '';
 
             // Sync to modal
             const modalName = document.getElementById('checkout-customer-name');
@@ -1026,8 +1026,8 @@ window.appLogic = {
             if (modalName) modalName.value = name;
             if (modalPhone) modalPhone.value = phone;
         } else {
-            name = document.getElementById('checkout-customer-name')?.value || '';
-            phone = document.getElementById('checkout-customer-phone')?.value || '';
+            name = (document.getElementById('checkout-customer-name') || {}).value || '';
+            phone = (document.getElementById('checkout-customer-phone') || {}).value || '';
 
             // Sync back to sidebar
             const sideName = document.getElementById('sidebar-customer-name');
@@ -1043,8 +1043,8 @@ window.appLogic = {
         if (this.cart.length === 0) return alert('السلة فارغة!');
 
         // Fix 6: Disable annoying auto-fill of Cash Customer if nothing was typed
-        const sideName = document.getElementById('sidebar-customer-name')?.value || '';
-        const sidePhone = document.getElementById('sidebar-customer-phone')?.value || '';
+        const sideName = (document.getElementById('sidebar-customer-name') || {}).value || '';
+        const sidePhone = (document.getElementById('sidebar-customer-phone') || {}).value || '';
         document.getElementById('checkout-customer-name').value = sideName || '';
         document.getElementById('checkout-customer-phone').value = sidePhone || '';
 
@@ -1075,8 +1075,8 @@ window.appLogic = {
         document.getElementById('invoice-preview-container').innerHTML = this.generateThermalHTML(this.pendingInvoice, 'preview-qr-render');
 
         // Re-render QR for preview
-        const bizNamePreview = window.tenantSettings?.name || 'سحاب';
-        const zatcaQRBase64 = generateZatcaBase64(bizNamePreview, window.tenantSettings?.taxNumber || "000000000000000", this.pendingInvoice.timestamp, this.pendingInvoice.grandTotal, this.pendingInvoice.vatAmount);
+        const bizNamePreview = (window.tenantSettings || {}).name || 'سحاب';
+        const zatcaQRBase64 = generateZatcaBase64(bizNamePreview, (window.tenantSettings || {}).taxNumber || "000000000000000", this.pendingInvoice.timestamp, this.pendingInvoice.grandTotal, this.pendingInvoice.vatAmount);
 
         const qrBox = document.getElementById('preview-qr-render');
         if (qrBox) {
@@ -1380,7 +1380,7 @@ window.appLogic = {
         }
 
         // Build pre-filled message
-        const storeName = window.tenantSettings?.name || 'المغسلة';
+        const storeName = (window.tenantSettings || {}).name || 'المغسلة';
         const invId = inv.id || '';
         const total = (inv.grandTotal || inv.total || 0).toFixed(2);
         const msg = encodeURIComponent(
@@ -1409,11 +1409,11 @@ window.appLogic = {
         const _subtotal = _grand - _vatAmt;
         const _invId = (data.id || '').toString().replace(/^INV-/, '');
         const _custName = (!data.customer.name || data.customer.name === 'عميل نقدي' || data.customer.name === 'عميل دون اسم') ? '' : data.customer.name;
-        const _storeTax = window.tenantSettings?.taxNumber
+        const _storeTax = (window.tenantSettings || {}).taxNumber
             ? `<p style="margin:2px 0; font-size:14px; color:#444;">الرقم الضريبي: &nbsp;&nbsp; <strong style="direction:ltr; display:inline-block;">${window.tenantSettings.taxNumber}</strong></p>` : '';
-        const _storeWA = window.tenantSettings?.phone
+        const _storeWA = (window.tenantSettings || {}).phone
             ? `<p style="margin:2px 0; font-size:14px; color:#444;">رقم جوال النشاط: &nbsp;&nbsp; <strong style="direction:ltr; display:inline-block;">${window.tenantSettings.phone}</strong></p>` : '';
-        const _storeAddress = window.tenantSettings?.address
+        const _storeAddress = (window.tenantSettings || {}).address
             ? `<p style="margin:2px 0; font-size:14px; color:#444;">العنوان: &nbsp;&nbsp; <strong style="direction:rtl; display:inline-block;">${window.tenantSettings.address}</strong></p>`
             : `<p style="margin:2px 0; font-size:14px; color:#444;">العنوان: &nbsp;&nbsp; <strong style="direction:rtl; display:inline-block;">المملكة العربية السعودية</strong></p>`;
         const _hasValTax = !!(window.tenantSettings && window.tenantSettings.taxNumber && window.tenantSettings.taxNumber.trim() !== '');
@@ -1454,8 +1454,8 @@ window.appLogic = {
 
             <!-- Header: Store Name → VAT Number → Phone -->
             <div style="text-align:center; margin-bottom:30px; padding-bottom:20px; border-bottom:2px solid #000;">
-                ${window.tenantSettings?.logo ? `<img src="${window.tenantSettings.logo}" style="width: 100%; max-width: 80px; height: auto; display: block; margin: 0 auto 15px auto; border-radius: 6px;">` : ''}
-                <div style="font-size:32px; font-weight:900; color:#000; margin-top:6px; margin-bottom:14px;">${window.tenantSettings?.name || ''}</div>
+                ${(window.tenantSettings || {}).logo ? `<img src="${window.tenantSettings.logo}" style="width: 100%; max-width: 80px; height: auto; display: block; margin: 0 auto 15px auto; border-radius: 6px;">` : ''}
+                <div style="font-size:32px; font-weight:900; color:#000; margin-top:6px; margin-bottom:14px;">${(window.tenantSettings || {}).name || ''}</div>
                 ${_storeAddress}
                 ${_storeTax}
                 ${_storeWA}
@@ -1530,8 +1530,8 @@ window.appLogic = {
         document.body.appendChild(container);
 
         // Standard ZATCA QR (Updated with Real Tax)
-        const bizName = window.tenantSettings?.name || 'سحاب';
-        const zatcaQRBase64 = generateZatcaBase64(bizName, window.tenantSettings?.taxNumber || "000000000000000", data.timestamp, data.grandTotal, data.vatAmount);
+        const bizName = (window.tenantSettings || {}).name || 'سحاب';
+        const zatcaQRBase64 = generateZatcaBase64(bizName, (window.tenantSettings || {}).taxNumber || "000000000000000", data.timestamp, data.grandTotal, data.vatAmount);
         new QRCode(container.querySelector('#pdf-qr-container'), {
             text: zatcaQRBase64,
             width: 140, height: 140,
@@ -1632,7 +1632,6 @@ window.appLogic = {
         const dObj = new Date(data.timestamp);
         const dStr = dObj.toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
         const _invId = (data.id || '').toString().replace(/^INV-/, '');
-        const _custName = (!data.customer.name || data.customer.name === 'عميل نقدي' || data.customer.name === 'عميل دون اسم') ? '' : data.customer.name;
         const vatAmount = parseFloat(data.vatAmount || 0);
         const deliveryFee = parseFloat(data.deliveryFee || 0);
         const grandTotal = parseFloat(data.grandTotal || data.total || 0);
@@ -1641,7 +1640,7 @@ window.appLogic = {
         const displayLocale = 'en-US';
         const displayOpts = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
 
-        // Build item rows
+
         let itemsHtml = '';
         data.items.forEach(item => {
             if (!item) return;
@@ -1663,11 +1662,11 @@ window.appLogic = {
             </tr>`;
         }
 
-        const storePhone = window.tenantSettings?.phone
+        const storePhone = (window.tenantSettings || {}).phone
             ? `<p style="margin:0;"><span class="label">رقم جوال النشاط:</span> <span class="number">${window.tenantSettings.phone}</span></p>` : '';
-        const storeTax = window.tenantSettings?.taxNumber
+        const storeTax = (window.tenantSettings || {}).taxNumber
             ? `<p style="margin:0;"><span class="label">الرقم الضريبي:</span> <span class="number">${window.tenantSettings.taxNumber}</span></p>` : '';
-        const storeAddress = window.tenantSettings?.address
+        const storeAddress = (window.tenantSettings || {}).address
             ? `<p style="margin:0;"><span class="label">العنوان:</span> <span class="number">${window.tenantSettings.address}</span></p>`
             : `<p style="margin:0;"><span class="label">العنوان:</span> <span class="number">المملكة العربية السعودية</span></p>`;
 
@@ -1682,8 +1681,8 @@ window.appLogic = {
 
             <!-- Header: Store Name → VAT Number → Phone -->
             <div class="receipt-header">
-                ${window.tenantSettings?.logo ? `<img src="${window.tenantSettings.logo}" style="width: 100%; max-width: 60px; height: auto; display: block; margin: 0 auto 10px auto;">` : ''}
-                <div style="font-size:18px; font-weight:900; margin-bottom:4px;">${window.tenantSettings?.name || ''}</div>
+                ${(window.tenantSettings || {}).logo ? `<img src="${window.tenantSettings.logo}" style="width: 100%; max-width: 60px; height: auto; display: block; margin: 0 auto 10px auto;">` : ''}
+                <div style="font-size:18px; font-weight:900; margin-bottom:4px;">${(window.tenantSettings || {}).name || ''}</div>
                 <div style="font-size:13px; font-weight:bold; margin-bottom:4px;">${_hasValTax ? 'فاتورة ضريبية مبسطة' : 'فاتورة مبيعات'}</div>
                 ${storeAddress}
                 ${storeTax}
@@ -1753,8 +1752,8 @@ window.appLogic = {
     printInvoice(data) {
         document.getElementById('invoice-print-container').innerHTML = this.generateThermalHTML(data, 'print-qr-render');
 
-        const bizName = window.tenantSettings?.name || 'سحاب POS';
-        const zatcaQRBase64 = generateZatcaBase64(bizName, window.tenantSettings?.taxNumber || "000000000000000", data.timestamp, data.grandTotal, data.vatAmount);
+        const bizName = (window.tenantSettings || {}).name || 'سحاب POS';
+        const zatcaQRBase64 = generateZatcaBase64(bizName, (window.tenantSettings || {}).taxNumber || "000000000000000", data.timestamp, data.grandTotal, data.vatAmount);
         new QRCode(document.getElementById('print-qr-render'), {
             text: zatcaQRBase64,
             width: 120, height: 120,
@@ -2035,7 +2034,7 @@ window.appLogic = {
         this.currentInvoice = invoiceData;
         document.getElementById('invoice-preview-container').innerHTML = this.generateThermalHTML(invoiceData, 'preview-qr-render');
 
-        const zatcaQRBase64 = generateZatcaBase64(window.tenantSettings?.name || "Sahab POS", window.tenantSettings?.taxNumber || "000000000000000", invoiceData.timestamp, invoiceData.grandTotal, invoiceData.vatAmount || 0);
+        const zatcaQRBase64 = generateZatcaBase64((window.tenantSettings || {}).name || "Sahab POS", (window.tenantSettings || {}).taxNumber || "000000000000000", invoiceData.timestamp, invoiceData.grandTotal, invoiceData.vatAmount || 0);
         new QRCode(document.getElementById('preview-qr-render'), {
             text: zatcaQRBase64,
             width: 100, height: 100,
@@ -3951,7 +3950,7 @@ window.appLogic = {
         // Dynamically repaint the active table without refreshing the page
         const activeNav = document.querySelector('.main-nav .active');
         if (activeNav) {
-            const viewMatch = activeNav.getAttribute('onclick')?.match(/'([^']+)'/);
+            const viewMatch = (activeNav.getAttribute('onclick') || '').match(/'([^']+)'/);
             if (viewMatch) {
                 const currentViewId = viewMatch[1];
                 if (currentViewId === 'history') this.renderHistory();
@@ -4162,13 +4161,13 @@ window.appLogic = {
         if (pLCost) pLCost.placeholder = lang === 'en' ? 'Cost (Required)' : 'التكلفة (مطلوب)';
 
         // Add Expense Modal Deep Labels
-        const expCatLabel = document.querySelector('#exp-category')?.previousElementSibling;
+        const expCatLabel = (document.querySelector('#exp-category') || {}).previousElementSibling;
         if (expCatLabel) expCatLabel.innerText = lang === 'en' ? 'Category' : 'التصنيف';
-        const expAmtLabel = document.querySelector('#exp-amount')?.previousElementSibling;
+        const expAmtLabel = (document.querySelector('#exp-amount') || {}).previousElementSibling;
         if (expAmtLabel) expAmtLabel.innerText = lang === 'en' ? 'Amount (SAR)' : 'المبلغ (ر.س)';
-        const expDescLabel = document.querySelector('#exp-desc')?.previousElementSibling;
+        const expDescLabel = (document.querySelector('#exp-desc') || {}).previousElementSibling;
         if (expDescLabel) expDescLabel.innerText = lang === 'en' ? 'Description' : 'البيان / الوصف';
-        const expDateLabel = document.querySelector('#expense-date')?.previousElementSibling;
+        const expDateLabel = (document.querySelector('#expense-date') || {}).previousElementSibling;
         if (expDateLabel) expDateLabel.innerText = lang === 'en' ? 'Expense Date' : 'تاريخ المصروف';
         const expModalTitle = document.querySelector('#add-expense-modal h3');
         if (expModalTitle) expModalTitle.innerHTML = lang === 'en' ? '<i class="fa-solid fa-hand-holding-dollar"></i> Add New Expense' : '<i class="fa-solid fa-hand-holding-dollar"></i> تقييد مصروف جديد';
@@ -4279,7 +4278,7 @@ window.appLogic = {
     },
 
     applyBranding() {
-        const name = window.tenantSettings?.name || '';
+        const name = (window.tenantSettings || {}).name || '';
         const hStore = document.getElementById('header-store-name');
         if (hStore) hStore.textContent = name;
 
@@ -4311,7 +4310,7 @@ window.appLogic = {
         const todayKSA = getLocalYMD();          // e.g. "2026-04-01"
         const now = new Date();
         const reportDate = `${now.getMonth() + 1}/${now.getDate()}/${now.getFullYear()}`;
-        const bizName = window.tenantSettings?.name || 'سحاب';
+        const bizName = (window.tenantSettings || {}).name || 'سحاب';
 
         const reportContent = `
             <style>
@@ -4337,7 +4336,7 @@ window.appLogic = {
 
                 <!-- ══ HEADER ══ -->
                 <div style="background: #1a1a2e; color: #fff; text-align: center; padding: 16px 20px; border-radius: 8px; margin-bottom: 16px;">
-                    ${window.tenantSettings?.logo ? `<img src="${window.tenantSettings.logo}" style="width: 100%; max-width: 50px; height: auto; display: block; margin: 0 auto 10px auto; border-radius: 4px; background: #fff; padding: 2px;">` : `<div style="font-size: 9px; letter-spacing: 2px; color: #fdb813; text-transform: uppercase; margin-bottom: 4px;">${this.currentLang === 'en' ? 'Sahab POS System' : 'نظام سحاب POS'}</div>`}
+                    ${(window.tenantSettings || {}).logo ? `<img src="${window.tenantSettings.logo}" style="width: 100%; max-width: 50px; height: auto; display: block; margin: 0 auto 10px auto; border-radius: 4px; background: #fff; padding: 2px;">` : `<div style="font-size: 9px; letter-spacing: 2px; color: #fdb813; text-transform: uppercase; margin-bottom: 4px;">${this.currentLang === 'en' ? 'Sahab POS System' : 'نظام سحاب POS'}</div>`}
                     <h1 style="margin: 0; font-size: 20px; font-weight: 900; color: #fff; line-height: 1.3;">${this.currentLang === 'en' ? 'Daily Closure Report' : 'تقرير إغلاق اليومية'}</h1>
                     <div style="margin-top: 6px; font-size: 14px; font-weight: bold; color: #fdb813;">${bizName}</div>
                     <div style="margin-top: 4px; font-size: 11px; color: rgba(255,255,255,0.7);">
