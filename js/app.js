@@ -1405,20 +1405,15 @@ window.appLogic = {
     async printThermalReceipt() {
         if (!this.currentInvoice) return;
         
-        if (!window.bluetoothCharacteristic) {
-            this.printInvoice(this.currentInvoice.id);
-            return;
-        }
-
         try {
             var container = document.getElementById('invoice-preview-container');
             var originalBtn = document.querySelector('button[onclick="appLogic.printThermalReceipt()"]');
-            var origHTML = originalBtn.innerHTML;
+            var origHTML = originalBtn ? originalBtn.innerHTML : '';
             if(originalBtn) originalBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري إرسال الطباعة...';
 
             var originalWidth = container.style.width;
             var originalMargin = container.style.margin;
-            container.style.width = '384px'; // Safe default width for smaller 58mm. 80mm works with this centered too.
+            container.style.width = '384px'; 
             container.style.margin = '0 auto';
             
             var canvas = await html2canvas(container, {
@@ -1430,58 +1425,9 @@ window.appLogic = {
             container.style.width = originalWidth;
             container.style.margin = originalMargin;
 
-            var ctx = canvas.getContext('2d');
-            var width = canvas.width;
-            var height = canvas.height;
-            var imageData = ctx.getImageData(0, 0, width, height);
-            var rgb = imageData.data;
-
-            var w8 = Math.floor((width + 7) / 8) * 8;
-            var bytesPerRow = w8 / 8;
+            var base64ImageString = canvas.toDataURL('image/png');
             
-            var rasterData = new Uint8Array(bytesPerRow * height);
-            for (var y = 0; y < height; y++) {
-                for (var x = 0; x < width; x++) {
-                    var idx = (y * width + x) * 4;
-                    var r = rgb[idx];
-                    var g = rgb[idx + 1];
-                    var b = rgb[idx + 2];
-                    var a = rgb[idx + 3];
-
-                    var luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-                    if (luminance < 128 && a > 128) {
-                        var byteIdx = y * bytesPerRow + Math.floor(x / 8);
-                        var bitOffset = 7 - (x % 8);
-                        rasterData[byteIdx] |= (1 << bitOffset);
-                    }
-                }
-            }
-
-            var header = new Uint8Array([
-                0x1B, 0x40, // Init
-                0x1D, 0x76, 0x30, 0x00, // GS v 0 0
-                bytesPerRow % 256, Math.floor(bytesPerRow / 256),
-                height % 256, Math.floor(height / 256)
-            ]);
-            
-            var footer = new Uint8Array([
-                0x0A, 0x0A, 0x0A, 0x0A, 
-                0x1D, 0x56, 0x42, 0x00
-            ]);
-
-            var payloadSize = header.length + rasterData.length + footer.length;
-            var payload = new Uint8Array(payloadSize);
-            payload.set(header, 0);
-            payload.set(rasterData, header.length);
-            payload.set(footer, header.length + rasterData.length);
-
-            var char = window.bluetoothCharacteristic;
-            var CHUNK_SIZE = 200; 
-            for (var k = 0; k < payload.length; k += CHUNK_SIZE) {
-                var chunk = payload.slice(k, k + CHUNK_SIZE);
-                await char.writeValue(chunk);
-                await new Promise(function(resolve) { setTimeout(resolve, 5); });
-            }
+            window.location.href = "intent:" + base64ImageString + "#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;";
 
             if(originalBtn) originalBtn.innerHTML = origHTML;
         } catch (err) {
