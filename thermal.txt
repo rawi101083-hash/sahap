@@ -1,0 +1,120 @@
+    generateThermalHTML(data, qrContainerId) {
+        const _hasValTax = !!(window.tenantSettings && window.tenantSettings.taxNumber && window.tenantSettings.taxNumber.trim() !== '');
+        const dObj = new Date(data.timestamp);
+        const dStr = dObj.toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
+        const _invId = (data.id || '').toString().replace(/^INV-/, '');
+        const vatAmount = parseFloat(data.vatAmount || 0);
+        const deliveryFee = parseFloat(data.deliveryFee || 0);
+        const grandTotal = parseFloat(data.grandTotal || data.total || 0);
+        const combinedSum = grandTotal - vatAmount; // subtotal before VAT
+
+        const displayLocale = 'en-US';
+        const displayOpts = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
+
+
+        let itemsHtml = '';
+        data.items.forEach(item => {
+            if (!item) return;
+            let tLbl = item.type === 'iron' ? 'كوي' : (item.type === 'wash_iron' ? 'غسيل وكوي' : 'غسيل');
+            let sLbl = item.speed === 'normal' ? 'عادي' : 'سريع';
+            itemsHtml += `
+            <tr>
+                <td style="padding:4px 0; border-bottom:1px dashed #bbb; text-align:right;">${item.name} <span style="font-size:10px;"> &nbsp;-&nbsp; ${tLbl} &nbsp;-&nbsp; ${sLbl}</span></td>
+                <td style="padding:4px 0; border-bottom:1px dashed #bbb; text-align:center;">${item.qty}</td>
+                <td style="padding:4px 0; border-bottom:1px dashed #bbb; text-align:left; direction:ltr;">${(item.unitPrice * item.qty).toLocaleString(displayLocale, displayOpts)}</td>
+            </tr>`;
+        });
+        if (deliveryFee > 0) {
+            itemsHtml += `
+            <tr>
+                <td style="padding:4px 0; border-bottom:1px dashed #bbb; text-align:right;">رسوم التوصيل</td>
+                <td style="padding:4px 0; border-bottom:1px dashed #bbb; text-align:center;">1</td>
+                <td style="padding:4px 0; border-bottom:1px dashed #bbb; text-align:left; direction:ltr;">${deliveryFee.toLocaleString(displayLocale, displayOpts)}</td>
+            </tr>`;
+        }
+
+        const storePhone = (window.tenantSettings || {}).phone
+            ? `<p style="margin:0;"><span class="label">رقم جوال النشاط:</span> <span class="number">${window.tenantSettings.phone}</span></p>` : '';
+        const storeTax = (window.tenantSettings || {}).taxNumber
+            ? `<p style="margin:0;"><span class="label">الرقم الضريبي:</span> <span class="number">${window.tenantSettings.taxNumber}</span></p>` : '';
+        const storeAddress = (window.tenantSettings || {}).address
+            ? `<p style="margin:0;"><span class="label">العنوان:</span> <span class="number">${window.tenantSettings.address}</span></p>`
+            : `<p style="margin:0;"><span class="label">العنوان:</span> <span class="number">المملكة العربية السعودية</span></p>`;
+
+        return `
+        <style>
+            .receipt-header { text-align:center; border-bottom:1px solid #000; padding-bottom:8px; margin-bottom:10px; }
+            .receipt-header p { margin: 1px 0; font-size:11px; color:#000; }
+            .receipt-header .label { display: inline-block; }
+            .receipt-header .number { direction: ltr; display: inline-block; font-weight: bold; }
+        </style>
+        <div style="width:80mm; margin:0 auto; font-family:'Tajawal',Arial,sans-serif; direction:rtl; background:#fff; color:#000; padding:8px; box-sizing:border-box;">
+
+            <!-- Header: Store Name → VAT Number → Phone -->
+            <div class="receipt-header">
+                ${(window.tenantSettings || {}).logo ? `<img src="${window.tenantSettings.logo}" style="width: 100%; max-width: 60px; height: auto; display: block; margin: 0 auto 10px auto;">` : ''}
+                <div style="font-size:18px; font-weight:900; margin-bottom:4px;">${(window.tenantSettings || {}).name || ''}</div>
+                <div style="font-size:13px; font-weight:bold; margin-bottom:4px;">${_hasValTax ? 'فاتورة ضريبية مبسطة' : 'فاتورة مبيعات'}</div>
+                ${storeAddress}
+                ${storeTax}
+                ${storePhone}
+            </div>
+
+            <!-- Meta info — colon pinned to left of each label via unicode-bidi -->
+            <table style="width:100%; font-size:12px; margin-bottom:8px; border-collapse:collapse; direction:rtl;">
+                <tr style="border-bottom:1px solid #eee;">
+                    <td style="color:#555; text-align:right;">رقم الفاتورة:</td>
+                    <td style="font-weight:bold; text-align:left; direction:ltr;">${_invId}</td>
+                </tr>
+                <tr style="border-bottom:1px solid #eee;">
+                    <td style="color:#555; text-align:right;">التاريخ:</td>
+                    <td style="text-align:left; direction:ltr;">${dStr}</td>
+                </tr>
+                ${_custName ? `<tr style="border-bottom:1px solid #eee;"><td style="color:#555; text-align:right;">العميل:</td><td style="font-weight:bold; text-align:right;">${_custName}</td></tr>` : ''}
+                ${data.customer.phone && data.customer.phone !== '0000000000' ? `<tr style="border-bottom:1px solid #eee;"><td style="color:#555; text-align:right;">رقم الجوال:</td><td style="direction:ltr; text-align:left; font-weight:bold;">${data.customer.phone}</td></tr>` : ''}
+                <tr>
+                    <td style="color:#555; text-align:right; font-size: 11px;">وقت الطباعة:</td>
+                    <td style="text-align:left; direction:ltr; font-size: 11px; color:#333;">${new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</td>
+                </tr>
+            </table>
+
+            <!-- Items Table -->
+            <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                <thead>
+                    <tr style="border-top:1px solid #000; border-bottom:1px solid #000;">
+                        <th style="padding:3px 0; text-align:right;">الصنف</th>
+                        <th style="padding:3px 0; text-align:center; width:25px;">م</th>
+                        <th style="padding:3px 0; text-align:left;">إجمالي</th>
+                    </tr>
+                </thead>
+                <tbody>${itemsHtml}</tbody>
+            </table>
+
+            <table style="width:100%; font-size:12px; margin-top:8px; border-collapse:collapse;">
+                ${_hasValTax ? `
+                <tr>
+                    <td style="padding:3px 0; color:#555;">المجموع بدون ضريبة</td>
+                    <td style="text-align:left; font-weight:bold; direction:ltr;">${combinedSum.toLocaleString(displayLocale, displayOpts)} ر.س</td>
+                </tr>
+                <tr>
+                    <td style="padding:3px 0; color:#555;">ضريبة القيمة المضافة 15٪</td>
+                    <td style="text-align:left; font-weight:bold; direction:ltr;">${vatAmount.toLocaleString(displayLocale, displayOpts)} ر.س</td>
+                </tr>` : ''}
+                <tr>
+                    <td style="padding:3px 0; color:#555;">طريقة الدفع</td>
+                    <td style="text-align:left; font-weight:bold;">${{ 'cash': 'نقدي', 'mada': 'مدى', 'visa': 'فيزا', 'mastercard': 'ماستركارد', 'network': 'شبكة' }[data.paymentMethod] || data.paymentMethod}</td>
+                </tr>
+                <tr style="border-top:1px solid #000;">
+                    <td style="padding:5px 0; font-size:14px; font-weight:900;">الإجمالي النهائي</td>
+                    <td style="text-align:left; font-size:14px; font-weight:900; direction:ltr;">${grandTotal.toLocaleString(displayLocale, displayOpts)} ر.س</td>
+                </tr>
+            </table>
+
+            <!-- ZATCA QR + Footer -->
+            <div style="text-align:center; margin-top:12px; border-top:1px solid #ccc; padding-top:10px;">
+                <div id="${qrContainerId}" style="display:inline-block; margin-bottom:6px;"></div>
+                <div style="font-size:11px; color:#555;">Thank you for choosing Sahab POS</div>
+            </div>
+
+        </div>`;
+    },

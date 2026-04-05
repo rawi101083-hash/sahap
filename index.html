@@ -494,10 +494,6 @@
                         <h4
                             style="margin-top: 15px; margin-bottom: 10px; color: var(--text-muted); font-size: 14px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
                             إجراءات الفاتورة:</h4>
-                        
-                        <button class="btn w-100" onclick="appLogic.connectBluetoothPrinter()"
-                            style="background-color: transparent; color: #3b82f6; border: 1px solid #3b82f6; font-size: 15px; margin-bottom: 10px;"><i
-                                class="fa-brands fa-bluetooth"></i> <span id="bt-printer-status">ربط الطابعة (Bluetooth)</span></button>
 
                         <button class="btn btn-primary w-100" onclick="appLogic.printThermalReceipt()"
                             style="font-size: 16px; padding: 15px; margin-bottom: 10px;"><i
@@ -906,6 +902,11 @@
                         <option value="en">English</option>
                     </select>
                 </div>
+
+                <button class="btn w-100" onclick="appLogic.connectBluetoothPrinter()"
+                    style="margin-bottom:15px; font-size:16px; background-color: transparent; color: #3b82f6; border: 1px solid #3b82f6; padding:12px 18px; font-weight: 800;">
+                    <i class="fa-brands fa-bluetooth"></i> <span id="bt-printer-status">ربط الطابعة بلوتوث</span>
+                </button>
 
                 <button id="pwa-install-btn" class="btn w-100 hidden"
                     style="margin-bottom:15px; font-size:16px; background: rgba(76, 175, 80, 0.1); color: #4CAF50; border: 1px dashed #4CAF50; padding:12px 18px; font-weight: 800;">

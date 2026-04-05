@@ -1,0 +1,68 @@
+                installBtn.innerHTML = '<i class="fa-brands fa-apple"></i> للتثبيت: اضغط مشاركة 📤 ثم أضف للشاشة';
+function generateZatcaBase64(sellerName, vatNumber, timestamp, totalAmount, vatAmount) {
+            btn.innerHTML = 'إخفاء بيانات المغسلة ⬆️';
+            btn.innerHTML = 'إضافة مغسلة شريكة (اختياري) ⬇️';
+            iconEl.innerHTML = theme === 'light' ? '<i class="fa-solid fa-sun"></i>' : '<i class="fa-solid fa-moon"></i>';
+                datalist.innerHTML = Array.from(laundries).sort().map(name => `<option value="${name}">`).join('');
+                hoodDatalist.innerHTML = Array.from(hoods).sort().map(hood => `<option value="${hood}">`).join('');
+        grid.innerHTML = '';
+            card.innerHTML = `<div class="item-icon"><i class="fa-solid ${item.icon}"></i></div><div class="item-name">${this.translate(item.name)}</div>`;
+        container.innerHTML = '';
+            container.innerHTML = `<div class="empty-cart-msg">${this.currentLang === 'en' ? 'Cart is empty, please select items.' : 'السلة فارغة، يرجى اختيار أصناف.'}</div>`;
+                container.innerHTML += `
+        // Re-generate thermal HTML with the selected payment method
+        document.getElementById('invoice-preview-container').innerHTML = this.generateThermalHTML(this.pendingInvoice, 'preview-qr-render');
+        const zatcaQRBase64 = generateZatcaBase64(bizNamePreview, (window.tenantSettings || {}).taxNumber || "000000000000000", this.pendingInvoice.timestamp, this.pendingInvoice.grandTotal, this.pendingInvoice.vatAmount);
+            qrBox.innerHTML = '';
+        container.innerHTML = '';
+            container.innerHTML += `
+        container.innerHTML = '';
+            container.innerHTML += `
+            var origHTML = originalBtn.innerHTML;
+            if(originalBtn) originalBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري إرسال الطباعة...';
+            if(originalBtn) originalBtn.innerHTML = origHTML;
+            if(btn) btn.innerHTML = '<i class="fa-solid fa-print"></i> <span>طباعة إيصال حراري (80mm)</span>';
+        container.innerHTML = `
+        const zatcaQRBase64 = generateZatcaBase64(bizName, (window.tenantSettings || {}).taxNumber || "000000000000000", data.timestamp, data.grandTotal, data.vatAmount);
+            originalText = originalBtn.innerHTML;
+            originalBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري التجهيز...';
+                originalBtn.innerHTML = originalText;
+                originalBtn.innerHTML = originalText;
+    // HTML Generator for Thermal Receipt (Zero Ink — white background, RTL Arabic)
+    generateThermalHTML(data, qrContainerId) {
+        document.getElementById('invoice-print-container').innerHTML = this.generateThermalHTML(data, 'print-qr-render');
+        const zatcaQRBase64 = generateZatcaBase64(bizName, (window.tenantSettings || {}).taxNumber || "000000000000000", data.timestamp, data.grandTotal, data.vatAmount);
+            if (container) container.innerHTML = html;
+            if (container) container.innerHTML = `<p style="color:red; text-align:center; padding:20px;">${lang === 'en' ? 'Error loading invoice history: ' : 'خطأ في تحميل سجل الفواتير: '}${err.message}</p>`;
+        document.getElementById('invoice-preview-container').innerHTML = this.generateThermalHTML(invoiceData, 'preview-qr-render');
+        const zatcaQRBase64 = generateZatcaBase64((window.tenantSettings || {}).name || "Sahab POS", (window.tenantSettings || {}).taxNumber || "000000000000000", invoiceData.timestamp, invoiceData.grandTotal, invoiceData.vatAmount || 0);
+        container.innerHTML = '';
+             row.innerHTML = `
+        if(container.innerHTML === '') {
+             container.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-muted);">تم إرجاع جميع أصناف هذه الفاتورة مسبقاً.</div>';
+            if (container) container.innerHTML = html;
+        document.querySelector('#add-inventory-modal h3').innerHTML = '<i class="fa-solid fa-box-open"></i> إضافة صنف استهلاكي';
+        document.querySelector('#add-inventory-modal h3').innerHTML = '<i class="fa-solid fa-edit"></i> تعديل صنف استهلاكي';
+        container.innerHTML = '<div style="text-align:center; padding:20px; color:var(--primary);"><i class="fa-solid fa-spinner fa-spin"></i> جاري تحميل البيانات...</div>';
+            container.innerHTML = html;
+            container.innerHTML = `<div style="color:red; padding:20px;">خطأ في تحميل الجدول: ${err.message}</div>`;
+        document.getElementById('service-modal-title').innerHTML = '<i class="fa-solid fa-plus"></i> إضافة خدمة جديدة';
+        document.getElementById('service-modal-title').innerHTML = '<i class="fa-solid fa-edit"></i> تعديل الخدمة';
+        grid.innerHTML = '';
+            btn.innerHTML = `<i class="fa-solid ${icon}"></i>`;
+            container.innerHTML = html;
+            container.innerHTML = html;
+        document.getElementById('reports-content').innerHTML = html;
+        container.innerHTML = '<div style="text-align:center; padding:20px; color:var(--primary);"><i class="fa-solid fa-spinner fa-spin"></i> جاري تحميل بيانات المنصة...</div>';
+            container.innerHTML = html;
+            container.innerHTML = '<div style="color:red; padding:20px; text-align:center;">خطأ في تحميل لوحة الإدارة. تأكد من أنك Super Admin.</div>';
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري التحقق...';
+            btn.innerHTML = lang === 'en' ? '<i class="fa-solid fa-right-to-bracket"></i> Login' : '<i class="fa-solid fa-right-to-bracket"></i> دخول';
+            '#daily-review-modal .modal-body > p': { ar: 'يرجى مطابقة الأرقام أدناه مع النقد الفعلي والأرصدة بالدرج. في حال تأكيد العملية وتصفير الدرج، سيتم تصدير تقرير Z-Report وإشعار الإدارة.', en: 'Please match physical cash and terminals with the figures below. Once confirmed, a Z-Report will be generated and the dashboard resets.' },
+                else el.innerHTML = textObj[lang] || textObj['ar'];
+        if (expModalTitle) expModalTitle.innerHTML = lang === 'en' ? '<i class="fa-solid fa-hand-holding-dollar"></i> Add New Expense' : '<i class="fa-solid fa-hand-holding-dollar"></i> تقييد مصروف جديد';
+        if (expSubmitBtn) expSubmitBtn.innerHTML = lang === 'en' ? '<i class="fa-solid fa-check"></i> Save Expense Record' : '<i class="fa-solid fa-check"></i> حفظ القيد المحاسبي';
+                    <span>${this.currentLang === 'en' ? 'Report generated by <strong>Sahab POS System</strong>' : 'تم توليد هذا التقرير بواسطة <strong>نظام سحاب POS</strong>'}</span>
+            if (invContainer) invContainer.innerHTML = '';
+                zContainer.innerHTML = reportContent;
+        document.getElementById('z-report-preview-content').innerHTML = content;

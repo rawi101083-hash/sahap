@@ -1,0 +1,44 @@
+yId('invoice-preview-container').innerHTML = this.generateThermalHTML(invoiceData, 'preview-qr-render');
+
+        const zatcaQRBase64 = generateZatcaBase64((window.tenantSettings || {}).name || "Sahab POS", (window.tenantSettings || {}).taxNumber || "000000000000000", invoiceData.timestamp, invoiceData.grandTotal, invoiceData.vatAmount || 0);
+        new QRCode(document.getElementById('preview-qr-render'), {
+            text: zatcaQRBase64,
+            width: 100, height: 100,
+            colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L
+        });
+
+        document.getElementById('modal-actions-preview').classList.add('hidden');
+        document.getElementById('modal-actions-success').classList.remove('hidden');
+
+        document.getElementById('preview-invoice-id').innerText = invoiceData.id;
+        document.getElementById('success-invoice-ref').innerText = invoiceData.id + " (نسخة مطابقة)";
+
+        // Ensure WhatsApp button is visible even for old/reprinted invoices
+        const _waBtnEl = document.getElementById('btn-whatsapp-share');
+        if (_waBtnEl) _waBtnEl.style.display = 'block';
+
+        document.getElementById('invoice-preview-modal').classList.remove('hidden');
+    },
+
+    async cancelInvoice(id) {
+        if (!confirm(`هل أنت متأكد من إلغاء هذه الفاتورة كمرتجع؟\nالفاتورة: ${id}\nسيتم تسجيلها كملغاة ولن تُحذف من السجلات.`)) return;
+
+        let invs = await localforage.getItem('invoices') || [];
+        const idx = invs.findIndex(i => i && i.id === id);
+        if (idx === -1) return;
+
+        invs[idx].isCancelled = true;
+        invs[idx].cancelledAt = Date.now();
+        invs[idx].status = 'cancelled';
+
+        await localforage.setItem('invoices', invs);
+        await manualSyncToCloud('invoices', invs);
+
+        await this.renderHistory();
+        await this.renderReports();
+
+        this.showToast(`تم إلغاء الفاتورة ${id} وتسجيلها كمرتجع ✓`);
+    },
+
+    async openRefundModal(id) {
+        let invs = await localfora

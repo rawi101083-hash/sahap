@@ -1,0 +1,66 @@
+yId('invoice-preview-container').innerHTML = this.generateThermalHTML(this.pendingInvoice, 'preview-qr-render');
+
+        // Re-render QR for preview
+        const bizNamePreview = (window.tenantSettings || {}).name || 'سحاب';
+        const zatcaQRBase64 = generateZatcaBase64(bizNamePreview, (window.tenantSettings || {}).taxNumber || "000000000000000", this.pendingInvoice.timestamp, this.pendingInvoice.grandTotal, this.pendingInvoice.vatAmount);
+
+        const qrBox = document.getElementById('preview-qr-render');
+        if (qrBox) {
+            qrBox.innerHTML = '';
+            new QRCode(qrBox, {
+                text: zatcaQRBase64,
+                width: 100, height: 100,
+                colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L
+            });
+        }
+
+        this.closePaymentModal();
+
+        // 🛡️ CRITICAL FIX: Ensure modal is in "Preview" state, not stuck in "Success" from a previous invoice
+        const previewActions = document.getElementById('modal-actions-preview');
+        const successActions = document.getElementById('modal-actions-success');
+        if (previewActions) previewActions.classList.remove('hidden');
+        if (successActions) successActions.classList.add('hidden');
+
+        document.getElementById('invoice-preview-modal').classList.remove('hidden');
+    },
+
+    setPaymentMethod(method) {
+        this.paymentMethod = method;
+        const cashBtn = document.getElementById('pay-cash');
+        const netBtn = document.getElementById('pay-network');
+        if (cashBtn) cashBtn.classList.toggle('active', method === 'cash');
+        if (netBtn) netBtn.classList.toggle('active', method === 'network');
+    },
+
+    renderCheckoutDeliveryButtons() {
+        const container = document.getElementById('checkout-delivery-buttons');
+        if (!container) return;
+        container.innerHTML = '';
+        this.deliveryOptions.forEach(opt => {
+            const isActive = this.deliveryFee === opt.amount;
+            container.innerHTML += `
+                <button class="btn-delivery ${isActive ? 'active' : ''}" 
+                        onclick="appLogic.setDelivery(${opt.amount}, this); appLogic.updateCheckoutTotal(); appLogic.renderCheckoutDeliveryButtons();">
+                    ${opt.name}${opt.amount > 0 ? ': ' + opt.amount + ' ر.س' : ''}
+                </button>
+            `;
+        });
+    },
+
+    updateCheckoutTotal() {
+        const subt = this.cart.reduce((s, i) => s + (i.unitPrice * i.qty), 0);
+        let totalVal = subt + this.deliveryFee;
+        let totalStr = totalVal.toFixed(2);
+
+        const modalTotal = document.getElementById('checkout-grand-total');
+        if (modalTotal) modalTotal.innerText = totalStr;
+
+        // Keep sidebar total in sync if needed
+        const sidebarTotal = document.getElementById('grand-total');
+        if (sidebarTotal) sidebarTotal.innerText = totalStr;
+    },
+
+    renderDeliveryButtons() {
+        const container = document.querySelector('.delivery-buttons');
+        if (!container) ret

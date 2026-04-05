@@ -1766,6 +1766,8 @@ window.appLogic = {
         const grandTotal = parseFloat(data.grandTotal || data.total || 0);
         const combinedSum = grandTotal - vatAmount; // subtotal before VAT
 
+        const _custName = (data.customer && data.customer.name && data.customer.name !== 'عميل نقدي') ? data.customer.name : '';
+
         const displayLocale = 'en-US';
         const displayOpts = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
 
@@ -2894,7 +2896,7 @@ window.appLogic = {
         if (id) {
             const idx = this.deliveryOptions.findIndex(o => o.id === id);
             if (idx !== -1) {
-                this.deliveryOptions[idx] = { ...this.deliveryOptions[idx], name: name, amount: amt };
+                this.deliveryOptions[idx] = Object.assign({}, this.deliveryOptions[idx], { name: name, amount: amt });
             }
         } else {
             this.deliveryOptions.push({
