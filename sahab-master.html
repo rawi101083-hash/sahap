@@ -269,9 +269,10 @@
                 .no-break { 
                     page-break-inside: avoid; 
                     break-inside: avoid; 
+                    display: block !important;
                 }
                 @media print {
-                    .no-break { page-break-inside: avoid; break-inside: avoid; }
+                    .no-break { page-break-inside: avoid; break-inside: avoid; display: block !important; }
                 }
                 #pdf-contract-template ul, #pdf-contract-template ol {
                     direction: rtl !important;
@@ -322,28 +323,28 @@
 
             <div style="margin-bottom: 30px;" class="no-break">
                 <h4 style="font-size: 16px; font-weight: bold; border-right: 4px solid #666; padding-right: 10px; margin-bottom: 15px;">البند الثاني: باقة التأسيس والتجهيز (مرة واحدة)</h4>
-                <ol dir="rtl" style="font-size: 15px; text-align: justify;">
-                    <li>يقدم الطرف الأول باقة تأسيس تشمل: تفعيل النظام السحابي، وتوفير وتركيب معدات نقاط البيع اللازمة لتشغيل النظام.</li>
-                    <li>إجمالي قيمة "باقة التأسيس والتجهيز" هو <strong id="pdf-setup" style="text-decoration: underline; font-size: 16px;">---</strong> ريال، تُدفع مرة واحدة عند التركيب.</li>
-                    <li><strong>نقل الملكية والضمان:</strong> بمجرد إتمام التركيب، تصبح المعدات والأجهزة الملموسة ملكاً خالصاً للطرف الثاني. ويقتصر ضمان هذه الأجهزة وصيانتها على (الوكيل المعتمد للأجهزة)، ولا يتحمل الطرف الأول أية مسؤولية قانونية أو فنية عن صيانتها أو استرجاع قيمتها.</li>
+                <ol dir="rtl" style="font-size: 15px; text-align: justify; direction: rtl !important; text-align: right !important; list-style-position: inside !important; padding-right: 15px !important; margin-right: 0 !important;">
+                    <li style="direction: rtl !important; text-align: right !important; margin-bottom: 12px;">يقدم الطرف الأول باقة تأسيس تشمل: تفعيل النظام السحابي، وتوفير وتركيب معدات نقاط البيع اللازمة لتشغيل النظام.</li>
+                    <li style="direction: rtl !important; text-align: right !important; margin-bottom: 12px;">إجمالي قيمة "باقة التأسيس والتجهيز" هو <strong id="pdf-setup" style="text-decoration: underline; font-size: 16px;">---</strong> ريال، تُدفع مرة واحدة عند التركيب.</li>
+                    <li style="direction: rtl !important; text-align: right !important; margin-bottom: 12px;"><strong>نقل الملكية والضمان:</strong> بمجرد إتمام التركيب، تصبح المعدات والأجهزة الملموسة ملكاً خالصاً للطرف الثاني. ويقتصر ضمان هذه الأجهزة وصيانتها على (الوكيل المعتمد للأجهزة)، ولا يتحمل الطرف الأول أية مسؤولية قانونية أو فنية عن صيانتها أو استرجاع قيمتها.</li>
                 </ol>
             </div>
 
             <div style="margin-bottom: 30px;" class="no-break">
                 <h4 style="font-size: 16px; font-weight: bold; border-right: 4px solid #666; padding-right: 10px; margin-bottom: 15px;">البند الثالث: اشتراك النظام السحابي (البرمجيات)</h4>
-                <ol dir="rtl" style="font-size: 15px; text-align: justify;">
-                    <li>يشترك الطرف الثاني في نظام (<span dir="ltr" style="display: inline-block;">Sahab POS</span>) بدفع رسوم الاشتراك مقدماً، ونوع الاشتراك هو: اشتراك (<strong id="pdf-duration" style="text-decoration: underline; font-size: 16px;">---</strong>) بقيمة: <strong id="pdf-sub-fee" style="text-decoration: underline; font-size: 16px;">---</strong> ريال.</li>
-                    <li><strong>شرط الإيقاف:</strong> يحق للطرف الأول إيقاف النظام آلياً عن منشأة الطرف الثاني في حال التأخر عن سداد رسوم الاشتراك لمدة تتجاوز (3 أيام) من تاريخ الاستحقاق.</li>
-                    <li>لا يحق للطرف الثاني المطالبة بأي تعويضات عن توقف العمل خلال فترة الإيقاف، أو المطالبة باستخراج بياناته إلا بعد سداد الرسوم المتأخرة.</li>
+                <ol dir="rtl" style="font-size: 15px; text-align: justify; direction: rtl !important; text-align: right !important; list-style-position: inside !important; padding-right: 15px !important; margin-right: 0 !important;">
+                    <li style="direction: rtl !important; text-align: right !important; margin-bottom: 12px;">يشترك الطرف الثاني في نظام (<span dir="ltr" style="display: inline-block;">Sahab POS</span>) بدفع رسوم الاشتراك مقدماً، ونوع الاشتراك هو: اشتراك (<strong id="pdf-duration" style="text-decoration: underline; font-size: 16px;">---</strong>) بقيمة: <strong id="pdf-sub-fee" style="text-decoration: underline; font-size: 16px;">---</strong> ريال.</li>
+                    <li style="direction: rtl !important; text-align: right !important; margin-bottom: 12px;"><strong>شرط الإيقاف:</strong> يحق للطرف الأول إيقاف النظام آلياً عن منشأة الطرف الثاني في حال التأخر عن سداد رسوم الاشتراك لمدة تتجاوز (3 أيام) من تاريخ الاستحقاق.</li>
+                    <li style="direction: rtl !important; text-align: right !important; margin-bottom: 12px;">لا يحق للطرف الثاني المطالبة بأي تعويضات عن توقف العمل خلال فترة الإيقاف، أو المطالبة باستخراج بياناته إلا بعد سداد الرسوم المتأخرة.</li>
                 </ol>
             </div>
 
             <div style="margin-bottom: 40px;" class="no-break">
                 <h4 style="font-size: 16px; font-weight: bold; border-right: 4px solid #666; padding-right: 10px; margin-bottom: 15px;">البند الرابع: الأحكام العامة</h4>
-                <ol dir="rtl" style="font-size: 15px; text-align: justify;">
-                    <li>يلتزم الطرف الأول بتقديم الدعم الفني الخاص "بالنظام السحابي فقط" عن بُعد.</li>
-                    <li>لا يتحمل الطرف الأول أي مسؤولية مالية أو ضريبية ناتجة عن إدخال الطرف الثاني لبيانات خاطئة في النظام.</li>
-                    <li>نُسخ هذا العقد من نسختين أصليتين، بيد كل طرف نسخة للعمل بموجبها.</li>
+                <ol dir="rtl" style="font-size: 15px; text-align: justify; direction: rtl !important; text-align: right !important; list-style-position: inside !important; padding-right: 15px !important; margin-right: 0 !important;">
+                    <li style="direction: rtl !important; text-align: right !important; margin-bottom: 12px;">يلتزم الطرف الأول بتقديم الدعم الفني الخاص "بالنظام السحابي فقط" عن بُعد.</li>
+                    <li style="direction: rtl !important; text-align: right !important; margin-bottom: 12px;">لا يتحمل الطرف الأول أي مسؤولية مالية أو ضريبية ناتجة عن إدخال الطرف الثاني لبيانات خاطئة في النظام.</li>
+                    <li style="direction: rtl !important; text-align: right !important; margin-bottom: 12px;">نُسخ هذا العقد من نسختين أصليتين، بيد كل طرف نسخة للعمل بموجبها.</li>
                 </ol>
             </div>
 
@@ -976,26 +977,101 @@
             openModal() {
                 document.getElementById('contract-modal').classList.remove('hidden');
                 
-                // Initialize Signature Pad if not already
+                // Initialize Signature Pad Logic
                 if (!this.signaturePad) {
                     const canvas = document.getElementById('signature-pad-canvas');
-                    // Adjust canvas for high DPI screens
-                    const ratio =  Math.max(window.devicePixelRatio || 1, 1);
-                    canvas.width = canvas.offsetWidth * ratio;
-                    canvas.height = canvas.offsetHeight * ratio;
-                    canvas.getContext("2d").scale(ratio, ratio);
+                    // FIX: Ensure canvas internal resolution matches CSS exactly
+                    canvas.width = canvas.offsetWidth;
+                    canvas.height = canvas.offsetHeight;
                     
-                    this.signaturePad = new SignaturePad(canvas, {
-                        minWidth: 1.5,
-                        maxWidth: 3,
-                        penColor: "rgb(0, 0, 0)"
-                    });
+                    const ctx = canvas.getContext("2d");
+                    ctx.lineWidth = 2.5;
+                    ctx.lineCap = "round";
+                    ctx.lineJoin = "round";
+                    ctx.strokeStyle = "rgb(0, 0, 0)";
+                    
+                    const padRef = {
+                        hasInk: false,
+                        clear: function() {
+                            ctx.clearRect(0, 0, canvas.width, canvas.height);
+                            this.hasInk = false;
+                        },
+                        isEmpty: function() { return !this.hasInk; },
+                        toDataURL: function(mime) { return canvas.toDataURL(mime); },
+                        fromDataURL: function(url) {
+                            const img = new Image();
+                            img.onload = () => {
+                                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                                padRef.hasInk = true;
+                            };
+                            img.src = url;
+                        }
+                    };
+                    
+                    this.signaturePad = padRef;
 
-                    // Explicitly prevent scrolling on mobile devices when touching the canvas
-                    canvas.addEventListener("touchstart", function(e) { e.preventDefault(); }, { passive: false });
-                    canvas.addEventListener("touchmove", function(e) { e.preventDefault(); }, { passive: false });
-                    canvas.addEventListener("touchend", function(e) { e.preventDefault(); }, { passive: false });
+                    let isDrawing = false;
+
+                    const getCoordinates = (e) => {
+                        const rect = canvas.getBoundingClientRect();
+                        if (e.touches && e.touches.length > 0) {
+                            return {
+                                x: e.touches[0].clientX - rect.left,
+                                y: e.touches[0].clientY - rect.top
+                            };
+                        }
+                        return {
+                            x: e.clientX - rect.left,
+                            y: e.clientY - rect.top
+                        };
+                    };
+
+                    const startDraw = (e) => {
+                        e.preventDefault();
+                        isDrawing = true;
+                        padRef.hasInk = true;
+                        const coords = getCoordinates(e);
+                        ctx.beginPath();
+                        ctx.moveTo(coords.x, coords.y);
+                    };
+
+                    const draw = (e) => {
+                        e.preventDefault();
+                        if (!isDrawing) return;
+                        const coords = getCoordinates(e);
+                        ctx.lineTo(coords.x, coords.y);
+                        ctx.stroke();
+                    };
+
+                    const stopDraw = (e) => {
+                        e.preventDefault();
+                        isDrawing = false;
+                    };
+
+                    // Touch events (passive: false is mandatory to prevent scrolling & swallows)
+                    canvas.addEventListener("touchstart", startDraw, { passive: false });
+                    canvas.addEventListener("touchmove", draw, { passive: false });
+                    canvas.addEventListener("touchend", stopDraw, { passive: false });
+                    canvas.addEventListener("touchcancel", stopDraw, { passive: false });
+
+                    // Mouse events for Desktop
+                    canvas.addEventListener("mousedown", startDraw);
+                    canvas.addEventListener("mousemove", draw);
+                    canvas.addEventListener("mouseup", stopDraw);
+                    canvas.addEventListener("mouseout", stopDraw);
                 } else {
+                    // Update dimensions dynamically if window resized
+                    const canvas = document.getElementById('signature-pad-canvas');
+                    if(canvas.width !== canvas.offsetWidth || canvas.height !== canvas.offsetHeight) {
+                        canvas.width = canvas.offsetWidth;
+                        canvas.height = canvas.offsetHeight;
+                        const ctx = canvas.getContext("2d");
+                        ctx.lineWidth = 2.5;
+                        ctx.lineCap = "round";
+                        ctx.lineJoin = "round";
+                        ctx.strokeStyle = "rgb(0, 0, 0)";
+                    }
                     this.signaturePad.clear();
                 }
 
@@ -1126,7 +1202,8 @@
                         filename: `عقد_${company.replace(/\s+/g, '_')}_${now.getTime()}.pdf`,
                         image: { type: 'jpeg', quality: 0.98 },
                         html2canvas: { scale: 2, useCORS: true, logging: false },
-                        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                        pagebreak: { mode: ['css', 'legacy'] }
                     };
 
                     // Firebase Save Logic
@@ -1274,7 +1351,8 @@
                         filename: `عقد_${c.company.replace(/\s+/g, '_')}_${dateObj.getTime()}.pdf`,
                         image: { type: 'jpeg', quality: 0.98 },
                         html2canvas: { scale: 2, useCORS: true, logging: false },
-                        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                        pagebreak: { mode: ['css', 'legacy'] }
                     };
 
                     await html2pdf().set(opt).from(templateEl).save();
