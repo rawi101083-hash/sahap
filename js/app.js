@@ -237,19 +237,19 @@ const accountingEngine = {
         };
         journals.unshift(jEntry);
         await localforage.setItem('journal_entries', journals);
-        await manualSyncToCloud('journal_entries', journals);
+        await manualSyncToCloud('journal_entries', jEntry, jEntry.id);
 
-        let taxRecords = await localforage.getItem('tax_records') || [];
-        taxRecords.unshift({
+        let taxRecord = {
             id: `TAX-${Date.now()}`,
             date: invoice.timestamp,
             ref_invoice: invoice.id,
             grossTotal: total,
             netTotal: subtotal,
             vatCollected: vat
-        });
+        };
+        taxRecords.unshift(taxRecord);
         await localforage.setItem('tax_records', taxRecords);
-        await manualSyncToCloud('tax_records', taxRecords);
+        await manualSyncToCloud('tax_records', taxRecord, taxRecord.id);
 
         // Let inventory remain intact natively without blasting entire unchanged massive arrays to cloud.
         // let inventory = await localforage.getItem('inventory') || [];
@@ -1127,7 +1127,7 @@ window.appLogic = {
             invs[idx].date = getLocalYMD();
 
             await localforage.setItem('invoices', invs);
-            await manualSyncToCloud('invoices', invs);
+            await manualSyncToCloud('invoices', invs[idx], invs[idx].id);
 
             const settlementId = this.settlingInvoiceId;
             this.closePaymentModal();
@@ -1347,7 +1347,7 @@ window.appLogic = {
             let cData = { phone: this.customer.phone, name: this.customer.name || '', timestamp: Date.now() };
             if (cIdx >= 0) customers[cIdx] = cData; else customers.push(cData);
             await localforage.setItem('customers', customers);
-            await manualSyncToCloud('customers', customers);
+            await manualSyncToCloud('customers', cData, cData.phone);
         }
 
         // Pass to Wafeq Accounting Engine
@@ -1366,7 +1366,9 @@ window.appLogic = {
         }
 
         await localforage.setItem('invoices', invoices);
-        await manualSyncToCloud('invoices', invoices);
+        
+        // MULTI-DEVICE FIX: Only push the specific pending invoice to its own ID node!
+        await manualSyncToCloud('invoices', this.pendingInvoice, this.pendingInvoice.id);
 
         this.currentInvoice = this.pendingInvoice;
         this.pendingInvoice = null;
@@ -2240,7 +2242,7 @@ window.appLogic = {
 
         invs[idx].laundryPaid = !invs[idx].laundryPaid;
         await localforage.setItem('invoices', invs);
-        await manualSyncToCloud('invoices', invs);
+        await manualSyncToCloud('invoices', invs[idx], invs[idx].id);
 
         this.renderHistory();
         this.renderReports();
@@ -2274,7 +2276,7 @@ window.appLogic = {
         invs[idx].partnerLaundryCost = cost; // Mirror for safety/back-compat
 
         await localforage.setItem('invoices', invs);
-        await manualSyncToCloud('invoices', invs);
+        await manualSyncToCloud('invoices', invs[idx], invs[idx].id);
 
         // Update Cumulative Balance Store
         let balances = await localforage.getItem('laundry_balances') || {};
@@ -2341,7 +2343,7 @@ window.appLogic = {
         invs[idx].status = 'cancelled';
 
         await localforage.setItem('invoices', invs);
-        await manualSyncToCloud('invoices', invs);
+        await manualSyncToCloud('invoices', invs[idx], invs[idx].id);
 
         await this.renderHistory();
         await this.renderReports();
@@ -2461,7 +2463,7 @@ window.appLogic = {
 
         invs[idx] = invoice;
         await localforage.setItem('invoices', invs);
-        await manualSyncToCloud('invoices', invs);
+        await manualSyncToCloud('invoices', invs[idx], invs[idx].id);
 
         this.closeRefundModal();
         this.renderHistory();
@@ -3254,7 +3256,7 @@ window.appLogic = {
 
         await localforage.setItem('expenses', exps);
         localStorage.setItem('expenses', JSON.stringify(exps));
-        await manualSyncToCloud('expenses', exps);
+        await manualSyncToCloud('expenses', newExpense, newExpense.id);
 
         this.closeExpenseModal();
         this.renderExpenses();
