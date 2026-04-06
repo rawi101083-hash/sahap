@@ -2046,7 +2046,7 @@ window.appLogic = {
                             : `<button class="btn-action-icon btn-action-delete" type="button" data-action="cancel_inv" data-id="${i.id}" title="${actCancelTitle}"><i class="fa-solid fa-ban" style="pointer-events:none;"></i></button>`;
 
                         const markPaidBtn = (isUnpaidSection && !isCancelled)
-                            ? `<button class="btn-action-icon" type="button" data-action="mark_paid" data-id="${i.id}" title="${lang === 'en' ? 'Mark as Paid' : 'تسديد الفاتورة'}" style="color: #4CAF50; background: rgba(76, 175, 80, 0.1); border: 1px solid #4CAF50;"><i class="fa-solid fa-check" style="pointer-events:none;"></i></button>`
+                            ? `<button class="btn-action-icon" type="button" data-action="mark_paid" data-id="${i.id}" title="${lang === 'en' ? 'Mark as Paid' : 'تسديد الفاتورة'}" style="color: #4CAF50; background: rgba(76, 175, 80, 0.1); border: 1px solid #4CAF50; padding: 8px 24px; min-width: 60px; border-radius: 6px;"><i class="fa-solid fa-check" style="pointer-events:none;"></i></button>`
                             : '';
 
                         sectionHtml += `<tr style="${rowStyle}">
@@ -2302,7 +2302,7 @@ window.appLogic = {
                      <div style="color:var(--text-muted); font-size:12px;">سعر الوحدة: ${unitPrice.toFixed(2)} ر.س | متوفر للإرجاع: ${maxRef}</div>
                  </div>
                  <div style="flex:1; display:flex; justify-content:flex-end; align-items:center; gap:10px;">
-                     <input type="number" class="refund-qty-input" data-index="${index}" data-price="${unitPrice}" data-max="${maxRef}" min="0" max="${maxRef}" value="0" onchange="appLogic.calculateRefundTotal()" style="width:70px; padding:8px; text-align:center; background:#000; border:1px solid var(--border); color:#fff; border-radius:4px;">
+                     <input type="number" class="refund-qty-input" data-index="${index}" data-price="${unitPrice}" data-max="${maxRef}" min="0" max="${maxRef}" value="" placeholder="0" onchange="appLogic.calculateRefundTotal()" style="width:70px; padding:8px; text-align:center; background:#000; border:1px solid var(--border); color:#fff; border-radius:4px;">
                  </div>
              `;
              container.appendChild(row);
