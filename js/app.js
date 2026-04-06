@@ -3978,9 +3978,20 @@ window.appLogic = {
                 console.warn("[SECURITY] Kill switch triggered! Account deactivated from Admin.");
                 const lang = localStorage.getItem('sahab-lang') || 'ar';
                 alert(lang === 'en' ? "System disabled. Please contact administration." : "النظام معطل، يرجى التواصل مع الإدارة");
+                // Preserve Address Data
+                const _city = localStorage.getItem('invoiceCity');
+                const _hood = localStorage.getItem('invoiceNeighborhood');
+                const _street = localStorage.getItem('invoiceStreet');
+
                 localStorage.clear();
                 sessionStorage.clear();
                 await localforage.clear();
+
+                // Restore Address Data
+                if(_city) localStorage.setItem('invoiceCity', _city);
+                if(_hood) localStorage.setItem('invoiceNeighborhood', _hood);
+                if(_street) localStorage.setItem('invoiceStreet', _street);
+
                 firebase.auth().signOut().then(() => {
                     window.location.reload();
                 });
@@ -4097,9 +4108,20 @@ window.appLogic = {
     async logoutUser() {
         this.closeSettingsModal();
         await firebase.auth().signOut();
+        // Preserve Address Data
+        const _city = localStorage.getItem('invoiceCity');
+        const _hood = localStorage.getItem('invoiceNeighborhood');
+        const _street = localStorage.getItem('invoiceStreet');
+
         await localforage.clear();
         localStorage.clear();
         sessionStorage.clear();
+
+        // Restore Address Data
+        if(_city) localStorage.setItem('invoiceCity', _city);
+        if(_hood) localStorage.setItem('invoiceNeighborhood', _hood);
+        if(_street) localStorage.setItem('invoiceStreet', _street);
+
         localStorage.removeItem('sahab_session_uid'); // Purge session marker
         window.currentUID = null;
         window.isDataInitialized = false;
