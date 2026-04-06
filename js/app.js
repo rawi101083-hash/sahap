@@ -237,8 +237,9 @@ const accountingEngine = {
         };
         journals.unshift(jEntry);
         await localforage.setItem('journal_entries', journals);
-        await manualSyncToCloud('journal_entries', jEntry, jEntry.id);
+        manualSyncToCloud('journal_entries', jEntry, jEntry.id).catch(console.error);
 
+        let taxRecords = await localforage.getItem('tax_records') || [];
         let taxRecord = {
             id: `TAX-${Date.now()}`,
             date: invoice.timestamp,
@@ -249,7 +250,7 @@ const accountingEngine = {
         };
         taxRecords.unshift(taxRecord);
         await localforage.setItem('tax_records', taxRecords);
-        await manualSyncToCloud('tax_records', taxRecord, taxRecord.id);
+        manualSyncToCloud('tax_records', taxRecord, taxRecord.id).catch(console.error);
 
         // Let inventory remain intact natively without blasting entire unchanged massive arrays to cloud.
         // let inventory = await localforage.getItem('inventory') || [];
@@ -1368,13 +1369,14 @@ window.appLogic = {
         await localforage.setItem('invoices', invoices);
         
         // MULTI-DEVICE FIX: Only push the specific pending invoice to its own ID node!
-        await manualSyncToCloud('invoices', this.pendingInvoice, this.pendingInvoice.id);
+        // DO NOT AWAIT to prevent network latency from blocking the print command
+        manualSyncToCloud('invoices', this.pendingInvoice, this.pendingInvoice.id).catch(console.error);
 
         this.currentInvoice = this.pendingInvoice;
         this.pendingInvoice = null;
 
         if (isAutoCheckout) {
-            // Trigger instant thermal print intent off the hidden rendered container
+            // Trigger instant thermal print intent off the hidden rendered container (for Sunmi/Android)
             await this.printThermalReceipt();
 
             // Clear internal state quietly
