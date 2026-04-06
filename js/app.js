@@ -1134,13 +1134,13 @@ window.appLogic = {
 
         this.closePaymentModal();
 
-        // 🛡️ CRITICAL FIX: Ensure modal is in "Preview" state, not stuck in "Success" from a previous invoice
-        const previewActions = document.getElementById('modal-actions-preview');
-        const successActions = document.getElementById('modal-actions-success');
-        if (previewActions) previewActions.classList.remove('hidden');
-        if (successActions) successActions.classList.add('hidden');
+        this.closePaymentModal();
 
-        document.getElementById('invoice-preview-modal').classList.remove('hidden');
+        // FAST AUTO-CHECKOUT & PRINT (Bypass Preview Modal entirely)
+        // Wait 100ms for QRCode library to finish rendering the canvas
+        setTimeout(async () => {
+             await this.confirmCheckout(true);
+        }, 100);
     },
 
     setPaymentMethod(method) {
@@ -1302,7 +1302,7 @@ window.appLogic = {
         document.getElementById('payment-method-modal').classList.remove('hidden');
     },
 
-    async confirmCheckout() {
+    async confirmCheckout(isAutoCheckout = false) {
         console.log('Button Clicked: confirmCheckout - Start confirming invoice');
         if (!this.pendingInvoice) return;
 
@@ -1337,22 +1337,32 @@ window.appLogic = {
         this.currentInvoice = this.pendingInvoice;
         this.pendingInvoice = null;
 
-        // Switch Modal State
-        document.getElementById('success-invoice-ref').innerText = (this.currentInvoice.id || '').toString().replace(/^INV-/, '');
-        document.getElementById('modal-actions-preview').classList.add('hidden');
-        document.getElementById('modal-actions-success').classList.remove('hidden');
+        if (isAutoCheckout) {
+            // Trigger instant thermal print intent off the hidden rendered container
+            await this.printThermalReceipt();
 
-        // Fix 8: Automatic Invoice PDF Download
-        setTimeout(() => {
-            if (this.currentInvoice) {
-                this.downloadDigitalPDF(null);
-                console.log('Invoice PDF auto-downloaded successfully.');
-            }
-        }, 1200);
+            // Clear internal state quietly
+            this.currentInvoice = null;
+            this.paymentMethod = 'cash';
+            this.showToast('تم الطباعة بنجاح ✓');
+        } else {
+            // Switch Modal State for historical viewing / non-auto flows
+            document.getElementById('success-invoice-ref').innerText = (this.currentInvoice.id || '').toString().replace(/^INV-/, '');
+            document.getElementById('modal-actions-preview').classList.add('hidden');
+            document.getElementById('modal-actions-success').classList.remove('hidden');
 
-        // WhatsApp sharing
-        const _waBtnEl = document.getElementById('btn-whatsapp-share');
-        if (_waBtnEl) _waBtnEl.style.display = 'block';
+            // Automatic Invoice PDF Download
+            setTimeout(() => {
+                if (this.currentInvoice) {
+                    this.downloadDigitalPDF(null);
+                    console.log('Invoice PDF auto-downloaded successfully.');
+                }
+            }, 1200);
+
+            // WhatsApp sharing
+            const _waBtnEl = document.getElementById('btn-whatsapp-share');
+            if (_waBtnEl) _waBtnEl.style.display = 'block';
+        }
 
         this.updateCartUI();
         await this.updateLaundryDatalist();
