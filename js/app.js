@@ -4382,7 +4382,7 @@ window.appLogic = {
             '#settings-modal .selector-group:nth-of-type(3) label': { ar: 'رقم الجوال', en: 'Phone Number' },
             '#settings-modal .selector-group:nth-of-type(4) label': { ar: 'الرقم الضريبي (اختياري)', en: 'Tax Number (Optional)' },
             '#settings-modal .selector-group:nth-of-type(5) label': { ar: 'مظهر النظام (Theme)', en: 'System Theme' },
-            '#trial-banner': { ar: 'نسخة تجريبية: متبقي <span id="trial-days" style="font-weight:bold; margin:0 4px;"></span>&nbsp; أيام', en: 'Trial version: &nbsp;<span id="trial-days" style="font-weight:bold; margin:0 4px;"></span>&nbsp; days left' },
+            '#trial-banner': { ar: 'نسخة تجريبية: متبقي <span id="trial-days" style="font-weight:bold; margin:0 2px;"></span> أيام', en: 'Trial version: <span id="trial-days" style="font-weight:bold; margin:0 2px;"></span> days left' },
             '#initial-loader h2': { ar: 'جاري التحميل...', en: 'Loading...' },
 
             // Expense Modal Option Selectors (Deep Form Translation)
