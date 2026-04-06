@@ -976,6 +976,9 @@ window.appLogic = {
     updateCartUI() {
         const container = document.getElementById('cart-items');
         container.innerHTML = '';
+        
+        const isVatActive = !!(window.tenantSettings && window.tenantSettings.taxNumber && window.tenantSettings.taxNumber.trim() !== "");
+        const mult = isVatActive ? 1.15 : 1;
 
         if (this.cart.length === 0) {
             container.innerHTML = `<div class="empty-cart-msg">${this.currentLang === 'en' ? 'Cart is empty, please select items.' : 'السلة فارغة، يرجى اختيار أصناف.'}</div>`;
@@ -988,6 +991,8 @@ window.appLogic = {
                     ? (item.speed === 'normal' ? 'Normal' : 'Express')
                     : (item.speed === 'normal' ? 'عادي' : 'مستعجل');
 
+                let displayPrice = (item.unitPrice * item.qty) * mult;
+
                 container.innerHTML += `
                     <div class="cart-item">
                         <div class="cart-item-header">
@@ -996,7 +1001,7 @@ window.appLogic = {
                                 <span class="cart-item-qty num-en">x${item.qty}</span>
                             </div>
                             <div class="cart-item-price-block">
-                                <div class="cart-item-price num-en">${(item.unitPrice * item.qty).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                <div class="cart-item-price num-en">${displayPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                                 <button class="btn-remove" onclick="appLogic.removeFromCart(${index})">
                                     <i class="fa-solid fa-times"></i>
                                 </button>
@@ -1008,12 +1013,10 @@ window.appLogic = {
             });
         }
 
-        // Auto-Scroll to Bottom for immediate visibility of new items
         container.scrollTop = container.scrollHeight;
 
         const subt = this.cart.reduce((s, i) => s + (i.unitPrice * i.qty), 0);
 
-        // Fix 1: Strict Total Logic
         if (this.cart.length === 0) {
             this.deliveryFee = 0;
             const zeroValue = (0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -1021,7 +1024,7 @@ window.appLogic = {
             if (document.getElementById('mobile-grand-total')) document.getElementById('mobile-grand-total').innerText = zeroValue;
             if (document.getElementById('golden-trigger-total')) document.getElementById('golden-trigger-total').innerText = zeroValue;
         } else {
-            const finalValue = (subt + this.deliveryFee).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const finalValue = ((subt + this.deliveryFee) * mult).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             document.getElementById('grand-total').innerText = finalValue;
             if (document.getElementById('mobile-grand-total')) document.getElementById('mobile-grand-total').innerText = finalValue;
             if (document.getElementById('golden-trigger-total')) document.getElementById('golden-trigger-total').innerText = finalValue;
@@ -1174,8 +1177,12 @@ window.appLogic = {
     },
 
     updateCheckoutTotal() {
+        const isVatActive = !!(window.tenantSettings && window.tenantSettings.taxNumber && window.tenantSettings.taxNumber.trim() !== "");
+        const mult = isVatActive ? 1.15 : 1;
+        
         const subt = this.cart.reduce((s, i) => s + (i.unitPrice * i.qty), 0);
-        let totalVal = subt + this.deliveryFee;
+        let baseVal = subt + this.deliveryFee;
+        let totalVal = baseVal * mult;
         let totalStr = totalVal.toFixed(2);
 
         const modalTotal = document.getElementById('checkout-grand-total');
@@ -1257,7 +1264,7 @@ window.appLogic = {
 
         // Prepare Invoice Details (Not Saved Yet)
         let subT = this.cart.reduce((s, i) => s + (i.unitPrice * i.qty), 0);
-        let grT = subT + this.deliveryFee;
+        let baseGrT = subT + this.deliveryFee; // Pure Base Price
 
         let pName = document.getElementById('pos-laundry-name') ? document.getElementById('pos-laundry-name').value.trim() : '';
         let pHood = document.getElementById('pos-laundry-hood') ? document.getElementById('pos-laundry-hood').value.trim() : '';
@@ -1274,12 +1281,20 @@ window.appLogic = {
             }
         }
 
+        const isVatActive = !!(window.tenantSettings && window.tenantSettings.taxNumber && window.tenantSettings.taxNumber.trim() !== "");
+        const mult = isVatActive ? 1.15 : 1;
+        const finalGrT = baseGrT * mult;
+        const vatAmountCalculated = finalGrT - baseGrT;
+
         let invoiceData = {
             id: newInvId, timestamp: Date.now(), customer: { phone: cPhone, name: cName },
             items: [].concat(this.cart),
             deliveryFee: parseFloat(this.deliveryFee) || 0,
-            total: parseFloat(grT) || 0,
-            grandTotal: parseFloat(grT) || 0,
+            total: parseFloat(baseGrT) || 0,        // Base total (0% VAT)
+            grandTotal: parseFloat(finalGrT) || 0,  // Final inclusive total
+            subtotalNet: parseFloat(baseGrT) || 0,  // Same as base
+            vatAmount: parseFloat(vatAmountCalculated) || 0,
+            hasVatApplied: isVatActive,             // Core engine boolean for historical locking
             laundryCost: pCost,
             partnerLaundryCost: pCost,
             partnerLaundryName: pName,
@@ -1289,14 +1304,6 @@ window.appLogic = {
             paymentMethod: this.paymentMethod || 'cash',
             taxNumber: (window.tenantSettings || {}).taxNumber || ''
         };
-
-        // Calculate 15% Inclusive VAT: Subtotal = Total / 1.15, VAT = Total - Subtotal
-        const _total = parseFloat(grT) || 0;
-        const _subtotalNet = _total / 1.15;
-        const _vatAmount = _total - _subtotalNet;
-
-        invoiceData.subtotalNet = _subtotalNet;
-        invoiceData.vatAmount = _vatAmount;
 
         this.pendingInvoice = invoiceData;
 
@@ -1824,7 +1831,10 @@ window.appLogic = {
 
     // HTML Generator for Thermal Receipt (Zero Ink — white background, RTL Arabic)
     generateThermalHTML(data, qrContainerId) {
-        const _hasValTax = !!(window.tenantSettings && window.tenantSettings.taxNumber && window.tenantSettings.taxNumber.trim() !== '');
+        let _hasValTax = false;
+        if (typeof data.hasVatApplied !== 'undefined') _hasValTax = data.hasVatApplied;
+        else _hasValTax = !!(data.taxNumber && data.taxNumber.trim() !== '');
+
         const dObj = new Date(data.timestamp);
         const dStr = dObj.toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
         const _invId = (data.id || '').toString().replace(/^INV-/, '');
@@ -1837,26 +1847,28 @@ window.appLogic = {
 
         const displayLocale = 'en-US';
         const displayOpts = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
-
+        const mult = _hasValTax ? 1.15 : 1;
 
         let itemsHtml = '';
         data.items.forEach(item => {
             if (!item) return;
             let tLbl = item.type === 'iron' ? 'كوي' : (item.type === 'wash_iron' ? 'غسيل وكوي' : 'غسيل');
             let sLbl = item.speed === 'normal' ? 'عادي' : 'سريع';
+            let lineTotal = (item.unitPrice * item.qty) * mult;
             itemsHtml += `
             <tr>
                 <td style="padding:4px 0; border-bottom:1px dashed #bbb; text-align:right;">${item.name} <span style="font-size:10px;"> &nbsp;-&nbsp; ${tLbl} &nbsp;-&nbsp; ${sLbl}</span></td>
                 <td style="padding:4px 0; border-bottom:1px dashed #bbb; text-align:center;">${item.qty}</td>
-                <td style="padding:4px 0; border-bottom:1px dashed #bbb; text-align:left; direction:ltr;">${(item.unitPrice * item.qty).toLocaleString(displayLocale, displayOpts)}</td>
+                <td style="padding:4px 0; border-bottom:1px dashed #bbb; text-align:left; direction:ltr;">${lineTotal.toLocaleString(displayLocale, displayOpts)}</td>
             </tr>`;
         });
         if (deliveryFee > 0) {
+            let deliveryDisplay = deliveryFee * mult;
             itemsHtml += `
             <tr>
                 <td style="padding:4px 0; border-bottom:1px dashed #bbb; text-align:right;">رسوم التوصيل</td>
                 <td style="padding:4px 0; border-bottom:1px dashed #bbb; text-align:center;">1</td>
-                <td style="padding:4px 0; border-bottom:1px dashed #bbb; text-align:left; direction:ltr;">${deliveryFee.toLocaleString(displayLocale, displayOpts)}</td>
+                <td style="padding:4px 0; border-bottom:1px dashed #bbb; text-align:left; direction:ltr;">${deliveryDisplay.toLocaleString(displayLocale, displayOpts)}</td>
             </tr>`;
         }
 
@@ -2760,17 +2772,20 @@ window.appLogic = {
                 `;
 
             if (Array.isArray(services)) {
+                const isVatActive = !!(window.tenantSettings && window.tenantSettings.taxNumber && window.tenantSettings.taxNumber.trim() !== "");
+                const mult = isVatActive ? 1.15 : 1;
+
                 services.forEach(item => {
                     if (!item) return;
                     const p = item.prices || {};
-                    const iron = parseFloat(p.iron) || 0;
-                    const washIron = parseFloat(p.wash_iron) || 0;
-                    const wash = parseFloat(p.wash) || 0;
+                    const iron = (parseFloat(p.iron) || 0) * mult;
+                    const washIron = (parseFloat(p.wash_iron) || 0) * mult;
+                    const wash = (parseFloat(p.wash) || 0) * mult;
 
                     let expLbl = '0.00';
                     if (item.expressFee) {
                         if (typeof item.expressFee === 'object') expLbl = 'متغير';
-                        else expLbl = `+${parseFloat(item.expressFee).toFixed(2)}`;
+                        else expLbl = `+${((parseFloat(item.expressFee)||0) * mult).toFixed(2)}`;
                     }
 
                     html += `
@@ -4593,73 +4608,6 @@ window.appLogic = {
         window.tenantSettings = settings || { name: '', phone: '', taxNumber: '' };
         this.applyBranding();
 
-        // ONE-TIME INVENTORY MIGRATION SCRIPT FOR "مغاسل جدة الحديثة" ONLY
-        if (window.tenantSettings && (window.tenantSettings.storeName === "مغاسل جدة الحديثة" || window.tenantSettings.name === "مغاسل جدة الحديثة")) {
-            if (!localStorage.getItem('jeddah_inventory_migrated_v1')) {
-                const rawItems = [
-                    { name: "ثوب", wN: 4, wU: 6, iN: 2, iU: 3 },
-                    { name: "فنيلة", wN: 2, wU: 3, iN: 1, iU: 1 },
-                    { name: "سروال قصير", wN: 2, wU: 3, iN: 1, iU: 1 },
-                    { name: "سروال طويل", wN: 2, wU: 3, iN: 1, iU: 1 },
-                    { name: "شماغ", wN: 4, wU: 6, iN: 3, iU: 3 },
-                    { name: "غترة", wN: 4, wU: 6, iN: 3, iU: 3 },
-                    { name: "منشفة", wN: 4, wU: 6, iN: 1, iU: 2 },
-                    { name: "احرام", wN: 6, wU: 12, iN: 0, iU: 0 },
-                    { name: "فوطة", wN: 3, wU: 6, iN: 0, iU: 0 },
-                    { name: "مقطب", wN: 3, wU: 6, iN: 0, iU: 0 },
-                    { name: "بنطلون", wN: 3, wU: 6, iN: 2, iU: 2 },
-                    { name: "قميص", wN: 3, wU: 6, iN: 2, iU: 2 },
-                    { name: "بدلة", wN: 6, wU: 12, iN: 4, iU: 4 },
-                    { name: "ترنج رياضي", wN: 6, wU: 12, iN: 4, iU: 4 },
-                    { name: "بدلة رياضي", wN: 6, wU: 12, iN: 4, iU: 4 },
-                    { name: "بدلة عسكري", wN: 6, wU: 12, iN: 4, iU: 4 },
-                    { name: "بدلة باكستاني", wN: 6, wU: 12, iN: 4, iU: 4 },
-                    { name: "قبوع", wN: 1, wU: 2, iN: 0, iU: 0 },
-                    { name: "فنيلة عسكري", wN: 2, wU: 3, iN: 1, iU: 1 },
-                    { name: "كوت", wN: 10, wU: 15, iN: 5, iU: 5 },
-                    { name: "جاكيت", wN: 6, wU: 10, iN: 3, iU: 3 },
-                    { name: "شرشف خفيف", wN: 6, wU: 10, iN: 3, iU: 3 },
-                    { name: "بيت مخدة", wN: 2, wU: 3, iN: 1, iU: 1 },
-                    { name: "لحاف كبير", wN: 25, wU: 0, iN: 0, iU: 0 },
-                    { name: "لحاف قصير", wN: 20, wU: 0, iN: 0, iU: 0 },
-                    { name: "بطانية كبير", wN: 25, wU: 0, iN: 0, iU: 0 },
-                    { name: "بطانية قصير", wN: 20, wU: 0, iN: 0, iU: 0 },
-                    { name: "مشلح", wN: 10, wU: 15, iN: 5, iU: 5 },
-                    { name: "بالطو", wN: 4, wU: 6, iN: 2, iU: 3 },
-                    { name: "عباية", wN: 10, wU: 15, iN: 5, iU: 5 },
-                    { name: "طرحة", wN: 3, wU: 5, iN: 2, iU: 2 },
-                    { name: "فرهول", wN: 6, wU: 10, iN: 4, iU: 4 },
-                    { name: "مريول", wN: 6, wU: 10, iN: 4, iU: 4 },
-                    { name: "فستان", wN: 20, wU: 25, iN: 10, iU: 10 }
-                ];
-                
-                let newInventory = [];
-                let idCounter = 1;
-                rawItems.forEach(item => {
-                    // Normal (عادي)
-                    if (item.wN > 0 && item.iN > 0) {
-                        newInventory.push({ id: idCounter++, name: `${item.name} - غسيل وكوي - عادي`, price: item.wN + item.iN, category: 'غسيل وكوي' });
-                        newInventory.push({ id: idCounter++, name: `${item.name} - غسيل - عادي`, price: item.wN, category: 'غسيل' });
-                        newInventory.push({ id: idCounter++, name: `${item.name} - كوي - عادي`, price: item.iN, category: 'كوي' });
-                    } else if (item.wN > 0) {
-                        newInventory.push({ id: idCounter++, name: `${item.name} - غسيل - عادي`, price: item.wN, category: 'غسيل' });
-                    }
-                    
-                    // Urgent (مستعجل)
-                    if (item.wU > 0 && item.iU > 0) {
-                        newInventory.push({ id: idCounter++, name: `${item.name} - غسيل وكوي - مستعجل`, price: item.wU + item.iU, category: 'مستعجل' });
-                        newInventory.push({ id: idCounter++, name: `${item.name} - غسيل - مستعجل`, price: item.wU, category: 'مستعجل' });
-                        newInventory.push({ id: idCounter++, name: `${item.name} - كوي - مستعجل`, price: item.iU, category: 'مستعجل' });
-                    } else if (item.wU > 0) {
-                        newInventory.push({ id: idCounter++, name: `${item.name} - غسيل - مستعجل`, price: item.wU, category: 'مستعجل' });
-                    }
-                });
-
-                localStorage.setItem('inventory', JSON.stringify(newInventory));
-                localStorage.setItem('jeddah_inventory_migrated_v1', 'true');
-                window.location.reload(); // Refresh the page to load the new data seamlessly
-            }
-        }
     },
 
     applyBranding() {
