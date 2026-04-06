@@ -18,13 +18,19 @@
         const trialDays = document.getElementById('trial-days');
 
         if (isSubscribedLocal === 'true') {
-            if (banner) banner.classList.add('hidden');
+            if (banner) {
+                banner.classList.add('hidden');
+                banner.style.display = 'none';
+            }
         } else if (trialExpiryLocal) {
             const exactDaysLeft = (parseInt(trialExpiryLocal) - Date.now()) / (1000 * 60 * 60 * 24);
             const daysLeft = Math.ceil(exactDaysLeft);
             if (exactDaysLeft > 0) {
                 if (trialDays) trialDays.innerText = daysLeft;
-                if (banner) banner.classList.remove('hidden');
+                if (banner) {
+                    banner.classList.remove('hidden');
+                    banner.style.display = 'flex';
+                }
             } else {
                 // Hard visual lock on start if localstorage knows it's expired
                 console.warn("[Fast-Guard] Trial Expired.");
@@ -33,7 +39,10 @@
                     expiredOverlay.classList.remove('hidden');
                     expiredOverlay.style.display = 'flex';
                 }
-                if (banner) banner.classList.add('hidden');
+                if (banner) {
+                    banner.classList.add('hidden');
+                    banner.style.display = 'none';
+                }
             }
         }
     } else {
@@ -1270,7 +1279,8 @@ window.appLogic = {
             partnerLaundryNeighborhood: pHood,
             laundryPaid: pPaid,
             status: 'completed',
-            paymentMethod: this.paymentMethod || 'cash'
+            paymentMethod: this.paymentMethod || 'cash',
+            taxNumber: (window.tenantSettings || {}).taxNumber || ''
         };
 
         // Calculate 15% Inclusive VAT: Subtotal = Total / 1.15, VAT = Total - Subtotal
@@ -1568,13 +1578,23 @@ window.appLogic = {
         const _subtotal = _grand - _vatAmt;
         const _invId = (data.id || '').toString().replace(/^INV-/, '');
         const _custName = (!data.customer.name || data.customer.name === 'عميل نقدي' || data.customer.name === 'عميل دون اسم') ? '' : data.customer.name;
-        const _storeTax = (window.tenantSettings || {}).taxNumber
-            ? `<p style="margin:2px 0; font-size:14px; color:#444;">الرقم الضريبي: &nbsp;&nbsp; <strong style="direction:ltr; display:inline-block;">${window.tenantSettings.taxNumber}</strong></p>` : '';
+        const _invoiceTax = data.taxNumber;
+        const _storeTax = _invoiceTax
+            ? `<p style="margin:2px 0; font-size:14px; color:#444;">الرقم الضريبي: &nbsp;&nbsp; <strong style="direction:ltr; display:inline-block;">${_invoiceTax}</strong></p>` : '';
         const _storeWA = (window.tenantSettings || {}).phone
             ? `<p style="margin:2px 0; font-size:14px; color:#444;">رقم جوال النشاط: &nbsp;&nbsp; <strong style="direction:ltr; display:inline-block;">${window.tenantSettings.phone}</strong></p>` : '';
-        const _storeAddress = (window.tenantSettings || {}).address
-            ? `<p style="margin:2px 0; font-size:14px; color:#444;">العنوان: &nbsp;&nbsp; <strong style="direction:rtl; display:inline-block;">${window.tenantSettings.address}</strong></p>`
-            : `<p style="margin:2px 0; font-size:14px; color:#444;">العنوان: &nbsp;&nbsp; <strong style="direction:rtl; display:inline-block;">المملكة العربية السعودية</strong></p>`;
+        const _iCity = localStorage.getItem('invoiceCity') || '';
+        const _iHood = localStorage.getItem('invoiceNeighborhood') || '';
+        const _iStreet = localStorage.getItem('invoiceStreet') || '';
+        const _addrParts = [];
+        if (_iCity) _addrParts.push(_iCity);
+        if (_iHood) _addrParts.push(_iHood);
+        if (_iStreet) _addrParts.push(_iStreet);
+        const _addressText = _addrParts.length > 0 ? _addrParts.join(' - ') : '';
+
+        const _storeAddress = _addressText
+            ? `<p style="margin:2px 0; font-size:14px; color:#444;">العنوان: &nbsp;&nbsp; <strong style="direction:rtl; display:inline-block;">${_addressText}</strong></p>`
+            : ``;
         const _hasValTax = !!(window.tenantSettings && window.tenantSettings.taxNumber && window.tenantSettings.taxNumber.trim() !== '');
         const _invType = _hasValTax ? 'فاتورة ضريبية مبسطة' : 'فاتورة مبيعات';
 
@@ -1825,11 +1845,21 @@ window.appLogic = {
 
         const storePhone = (window.tenantSettings || {}).phone
             ? `<p style="margin:0;"><span class="label">رقم جوال النشاط:</span> <span class="number">${window.tenantSettings.phone}</span></p>` : '';
-        const storeTax = (window.tenantSettings || {}).taxNumber
-            ? `<p style="margin:0;"><span class="label">الرقم الضريبي:</span> <span class="number">${window.tenantSettings.taxNumber}</span></p>` : '';
-        const storeAddress = (window.tenantSettings || {}).address
-            ? `<p style="margin:0;"><span class="label">العنوان:</span> <span class="number">${window.tenantSettings.address}</span></p>`
-            : `<p style="margin:0;"><span class="label">العنوان:</span> <span class="number">المملكة العربية السعودية</span></p>`;
+        const _invoiceTax = data.taxNumber;
+        const storeTax = _invoiceTax
+            ? `<p style="margin:0;"><span class="label">الرقم الضريبي:</span> <span class="number">${_invoiceTax}</span></p>` : '';
+        const _iCity = localStorage.getItem('invoiceCity') || '';
+        const _iHood = localStorage.getItem('invoiceNeighborhood') || '';
+        const _iStreet = localStorage.getItem('invoiceStreet') || '';
+        const _addrParts = [];
+        if (_iCity) _addrParts.push(_iCity);
+        if (_iHood) _addrParts.push(_iHood);
+        if (_iStreet) _addrParts.push(_iStreet);
+        const _addressText = _addrParts.length > 0 ? _addrParts.join(' - ') : '';
+
+        const storeAddress = _addressText
+            ? `<p style="margin:0;"><span class="label">العنوان:</span> <span class="number">${_addressText}</span></p>`
+            : ``;
 
         return `
         <style>
@@ -3838,9 +3868,14 @@ window.appLogic = {
                     throw new Error('account-deactivated');
                 }
 
-                if (accountData.isTrial === true && accountData.trialEndDate) {
-                    if (Date.now() > accountData.trialEndDate) {
-                        throw new Error('trial-expired');
+                if (accountData.isSubscribed === true) {
+                    localStorage.setItem(`sahab_is_subscribed_${targetUID}`, 'true');
+                } else {
+                    localStorage.setItem(`sahab_is_subscribed_${targetUID}`, 'false');
+                    if (accountData.isTrial === true && accountData.trialEndDate) {
+                        if (Date.now() > accountData.trialEndDate) {
+                            throw new Error('trial-expired');
+                        }
                     }
                 }
             }
@@ -3999,7 +4034,10 @@ window.appLogic = {
                     expiredOverlay.classList.add('hidden');
                     expiredOverlay.style.display = 'none';
                 }
-                if (banner) banner.classList.add('hidden');
+                if (banner) {
+                    banner.classList.add('hidden');
+                    banner.style.display = 'none';
+                }
             } else if (data.isTrial === true && effectiveTrialEndDate) {
                 const checkTrialExpiry = () => {
                     const exactDaysLeft = (effectiveTrialEndDate - Date.now()) / (1000 * 60 * 60 * 24);
@@ -4012,7 +4050,10 @@ window.appLogic = {
                             expiredOverlay.classList.remove('hidden');
                             expiredOverlay.style.display = 'flex'; // Ensure flex display for centering
                         }
-                        if (banner) banner.classList.add('hidden');
+                        if (banner) {
+                            banner.classList.add('hidden');
+                            banner.style.display = 'none';
+                        }
                     } else {
                         // Trial Active - Show Banner & Unlock
                         if (expiredOverlay) {
@@ -4022,6 +4063,7 @@ window.appLogic = {
                         if (banner && trialDays) {
                             trialDays.innerText = displayDays;
                             banner.classList.remove('hidden');
+                            banner.style.display = 'flex';
                         }
                     }
                 };
@@ -4059,6 +4101,10 @@ window.appLogic = {
         document.getElementById('setting-name').value = s.name || '';
         document.getElementById('setting-phone').value = s.phone || '';
         document.getElementById('setting-tax').value = s.taxNumber || '';
+        
+        if(document.getElementById('setting-city')) document.getElementById('setting-city').value = localStorage.getItem('invoiceCity') || '';
+        if(document.getElementById('setting-hood')) document.getElementById('setting-hood').value = localStorage.getItem('invoiceNeighborhood') || '';
+        if(document.getElementById('setting-street')) document.getElementById('setting-street').value = localStorage.getItem('invoiceStreet') || '';
 
         // PWA Button Gatekeeper Logic
         let isPwaAllowed = s.canInstallPWA === true;
@@ -4431,6 +4477,13 @@ window.appLogic = {
             
             name, phone, taxNumber: tax
         };
+
+        const city = document.getElementById('setting-city') ? document.getElementById('setting-city').value.trim() : '';
+        const hood = document.getElementById('setting-hood') ? document.getElementById('setting-hood').value.trim() : '';
+        const street = document.getElementById('setting-street') ? document.getElementById('setting-street').value.trim() : '';
+        localStorage.setItem('invoiceCity', city);
+        localStorage.setItem('invoiceNeighborhood', hood);
+        localStorage.setItem('invoiceStreet', street);
 
         // Attach logo if uploaded
         if (window._tempLogoBase64) {
