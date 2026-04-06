@@ -251,10 +251,10 @@ const accountingEngine = {
         await localforage.setItem('tax_records', taxRecords);
         await manualSyncToCloud('tax_records', taxRecords);
 
-        let inventory = await localforage.getItem('inventory') || [];
-        // Future-proof: Logic to deduct raw materials if required
-        await localforage.setItem('inventory', inventory);
-        await manualSyncToCloud('inventory', inventory);
+        // Let inventory remain intact natively without blasting entire unchanged massive arrays to cloud.
+        // let inventory = await localforage.getItem('inventory') || [];
+        // await localforage.setItem('inventory', inventory);
+        // await manualSyncToCloud('inventory', inventory);
 
         return invoice;
     }
@@ -306,6 +306,7 @@ localforage.removeItem = async function (key) {
     return await originalRemoveItem.call(localforage, getTenantKey(key));
 };
 
+window._activeSyncs = 0;
 // 2. EXPLICIT SYNC: Targeted helper to send specific records or collections to Firebase (UID-scoped)
 async function manualSyncToCloud(key, value, recordId = null) {
     if (!window.isDataInitialized) {
@@ -315,13 +316,23 @@ async function manualSyncToCloud(key, value, recordId = null) {
 
     if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "YOUR_API_KEY" && !!firebaseConfig.apiKey) {
         const path = recordId ? `${key}/${recordId}` : key;
+        window._activeSyncs++;
         try {
             console.log(`[Manual-Sync] Sending ${path} to cloud...`);
             const safePayload = JSON.parse(JSON.stringify(value, (k, v) => (v === undefined ? null : v)));
+
+            // EXTREME FIREBASE DEBUGGER
+            if (key === 'invoices') {
+                console.warn(`CRITICAL DEBUG: manualSyncToCloud called for invoices. Path: ${getDbPath(path)}. Payload Length: ${safePayload ? safePayload.length : 0}`);
+            }
+
             await firebase.database().ref(getDbPath(path)).set(safePayload);
             console.log(`[Manual-Sync] ${path} saved successfully.`);
         } catch (err) {
             console.error(`[Manual-Sync] Error saving ${path}:`, err);
+            alert(`حدث خطأ أثناء مزامنة ${path}: ` + err.message);
+        } finally {
+            window._activeSyncs--;
         }
     }
 }
@@ -348,12 +359,6 @@ async function initFirebaseSync() {
     const fetchPromises = collectionsToSync.map(key => {
         return new Promise((resolve) => {
             let dbRef = firebase.database().ref(getDbPath(key));
-
-            // OPTIMIZATION: Only fetch last 400 days for heavy transactional collections
-            if (key === 'invoices' || key === 'expenses') {
-                console.log(`[Recovery] Applying 400-day optimization for ${key}...`);
-                dbRef = dbRef.orderByChild('timestamp').startAt(fourHundredDaysAgo);
-            }
 
             console.log(`[Recovery] Requesting ${key} from cloud...`);
 
@@ -2027,6 +2032,7 @@ window.appLogic = {
             });
         }
         // 📅 GLOBAL DATE FILTER: Strictly isolate Live Shift from Archived data
+        let invoicesBeforeFilter = invoices.length;
         invoices = invoices.filter(inv => {
             if (!inv) return false;
 
@@ -2035,8 +2041,18 @@ window.appLogic = {
 
             // Normalize dates to KSA Local YYYY-MM-DD for comparison ensuring 100% strict match
             const invDate = getLocalYMD(inv.timestamp || inv.date);
+
+            // EXTREME FILTER DEBUGGER
+            if (invoicesBeforeFilter > 0) {
+                console.warn(`[Filter-Debug] Checking Invoice ID: ${inv.id}, Date: ${invDate}, TargetView: ${this.currentViewDate || todayYMD}, isLive: ${isLiveShift}, isZ: ${inv.isZReported}`);
+            }
+
             return invDate === (this.currentViewDate || todayYMD);
         });
+
+        if (invoicesBeforeFilter > 0 && invoices.length === 0) {
+            alert(`CRITICAL FILTER DEBUG: We had ${invoicesBeforeFilter} invoices before date filtering, but now we have 0! They DID fetch from DB! Check console logs for details.`);
+        }
 
         // Search Filter (Secondary)
         if (searchTerm) {
@@ -4025,9 +4041,6 @@ window.appLogic = {
                 const _hood = localStorage.getItem('invoiceNeighborhood');
                 const _street = localStorage.getItem('invoiceStreet');
 
-                localStorage.clear();
-                sessionStorage.clear();
-                await localforage.clear();
 
                 // Restore Address Data
                 if (_city) localStorage.setItem('invoiceCity', _city);
@@ -4148,6 +4161,13 @@ window.appLogic = {
     },
 
     async logoutUser() {
+        if (window._activeSyncs && window._activeSyncs > 0) {
+            const btn = document.querySelector('.logout-btn') || document.getElementById('setting-logout');
+            if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري مزامنة البيانات...';
+            setTimeout(() => this.logoutUser(), 1000);
+            return;
+        }
+
         this.closeSettingsModal();
         await firebase.auth().signOut();
         // Preserve Address Data
@@ -4155,9 +4175,6 @@ window.appLogic = {
         const _hood = localStorage.getItem('invoiceNeighborhood');
         const _street = localStorage.getItem('invoiceStreet');
 
-        await localforage.clear();
-        localStorage.clear();
-        sessionStorage.clear();
 
         // Restore Address Data
         if (_city) localStorage.setItem('invoiceCity', _city);
