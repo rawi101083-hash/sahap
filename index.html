@@ -672,6 +672,13 @@
                             ماستركارد (Mastercard)</span>
                         <i class="fa-solid fa-chevron-left" style="font-size:12px; opacity:0.5;"></i>
                     </button>
+                    <!-- Pay Later Method -->
+                    <button class="btn w-100" id="method-paylater"
+                        onclick="appLogic.finalizeWithPayment('pay_later')"
+                        style="background: #2a1b00; color: #f59e0b; padding: 20px; border: 1px dashed #f59e0b; font-size: 18px; display: flex; justify-content: space-between; align-items: center;">
+                        <span><i class="fa-solid fa-clock" style="margin-left:10px;"></i> دفع لاحقاً (Pay Later)</span>
+                        <i class="fa-solid fa-chevron-left" style="font-size:12px; opacity:0.5;"></i>
+                    </button>
                 </div>
             </div>
         </div>
@@ -970,7 +977,7 @@
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./service-worker.js').then((registration) => {
+                navigator.serviceWorker.register('./sw.js').then((registration) => {
                     console.log('PWA ServiceWorker registered with scope:', registration.scope);
                 }).catch((error) => {
                     console.error('PWA ServiceWorker registration failed:', error);

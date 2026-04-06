@@ -1064,12 +1064,47 @@ window.appLogic = {
 
     closePaymentModal() {
         document.getElementById('payment-method-modal').classList.add('hidden');
+        this.settlingInvoiceId = null;
+        const payLaterBtn = document.getElementById('method-paylater');
+        if (payLaterBtn) {
+            payLaterBtn.style.display = 'flex'; // Reset to default visibility
+        }
     },
 
     async finalizeWithPayment(method) {
+        if (this.settlingInvoiceId) {
+            let invs = await localforage.getItem('invoices') || [];
+            const idx = invs.findIndex(i => i && i.id === this.settlingInvoiceId);
+            if (idx === -1) {
+                this.closePaymentModal();
+                return;
+            }
+
+            invs[idx].paymentStatus = 'paid';
+            invs[idx].paymentMethod = method;
+            
+            // 🔄 CRITICAL LOGIC: Overwrite the timestamp & date
+            invs[idx].timestamp = Date.now();
+            invs[idx].date = getLocalYMD();
+
+            await localforage.setItem('invoices', invs);
+            await manualSyncToCloud('invoices', invs);
+
+            const settlementId = this.settlingInvoiceId;
+            this.closePaymentModal();
+
+            await this.renderHistory();
+            await this.renderReports();
+
+            const translatedMethod = this.translate ? this.translate(method === 'network' ? 'شبكة' : (method === 'cash' ? 'نقدي' : method)) : method;
+            this.showToast(`تم سداد الفاتورة ${settlementId} بواسطة [${translatedMethod}] وإدراجها ضمن مبيعات اليوم ✓`);
+            return;
+        }
+
         if (!this.pendingInvoice) return;
         this.paymentMethod = method;
         this.pendingInvoice.paymentMethod = method;
+        this.pendingInvoice.paymentStatus = (method === 'pay_later') ? 'unpaid' : 'paid';
 
         // Re-generate thermal HTML with the selected payment method
         document.getElementById('invoice-preview-container').innerHTML = this.generateThermalHTML(this.pendingInvoice, 'preview-qr-render');
@@ -1201,6 +1236,7 @@ window.appLogic = {
                 }
             });
             newInvId = String(max + 1).padStart(6, '0');
+            localStorage.setItem('sahab_invoiceCounter', max + 1);
         }
 
         // Prepare Invoice Details (Not Saved Yet)
@@ -1249,6 +1285,10 @@ window.appLogic = {
 
         // Fix 5: Open Payment Method Modal (New Step 2)
         this.closeCheckoutModal();
+        const payLaterBtn = document.getElementById('method-paylater');
+        if (payLaterBtn) {
+            payLaterBtn.style.display = 'flex';
+        }
         document.getElementById('payment-method-modal').classList.remove('hidden');
     },
 
@@ -1946,102 +1986,115 @@ window.appLogic = {
                 await localforage.setItem('invoices', validInvoices);
             }
 
-            let filtered = validInvoices;
-
-            let html = '<table onclick="appLogic.handleHistoryAction(event)" style="width:100%; border-collapse:collapse; background:var(--bg-surface); border-radius:12px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.5)">';
+            let html = '';
             const lang = this.currentLang || 'ar';
             const thId = lang === 'en' ? 'Invoice ID' : 'رقم الفاتورة';
             const thCust = lang === 'en' ? 'Customer' : 'العميل';
             const thAmt = lang === 'en' ? 'Amount' : 'المبلغ';
             const thDate = lang === 'en' ? 'Date' : 'التاريخ';
             const thAct = lang === 'en' ? 'Actions' : 'إجراءات';
-            html += `<thead><tr style="background:#111; color:var(--primary)"><th style="padding:15px; text-align:right;">${thId}</th><th style="padding:15px; text-align:right;">${thCust}</th><th style="padding:15px; text-align:right;">${thAmt}</th><th style="padding:15px; text-align:right;">${thDate}</th><th style="padding:15px; text-align:center;">${thAct}</th></tr></thead><tbody>`;
 
-            if (filtered.length === 0) {
-                const noInv = lang === 'en' ? 'No invoices match your search.' : 'لا توجد فواتير مطابقة للبحث.';
-                html += `<tr><td colspan="5" style="padding:20px; text-align:center;">${noInv}</td></tr>`;
-            } else {
-                // UNIFIED SORTING: Newest First based on timestamp. Max DOM array clamped to 500 to kill browser thread freezes.
-                const displayInvoices = [].concat(filtered).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, 500);
+            const generateTableHTML = (sectionInvoices, title, isUnpaidSection) => {
+                let sectionHtml = `<h3 style="color:var(--primary); font-size:18px; margin-top:30px; margin-bottom:15px;"><i class="fa-solid ${isUnpaidSection ? 'fa-clock' : 'fa-check'}"></i> ${title}</h3>`;
+                sectionHtml += '<table onclick="appLogic.handleHistoryAction(event)" style="width:100%; border-collapse:collapse; background:var(--bg-surface); border-radius:12px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.5); margin-bottom:20px;">';
+                sectionHtml += `<thead><tr style="background:#111; color:var(--primary)"><th style="padding:15px; text-align:right;">${thId}</th><th style="padding:15px; text-align:right;">${thCust}</th><th style="padding:15px; text-align:right;">${thAmt}</th><th style="padding:15px; text-align:right;">${thDate}</th><th style="padding:15px; text-align:center;">${thAct}</th></tr></thead><tbody>`;
 
-                // Pre-compile DateFormat buffer centrally to completely destroy the artificial delay (10-second sync freeze)
-                const dFormatter = new Intl.DateTimeFormat('en-US', {
-                    year: 'numeric', month: 'numeric', day: 'numeric',
-                    hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true
-                });
+                if (sectionInvoices.length === 0) {
+                    const noInv = lang === 'en' ? 'No invoices match your search.' : 'لا توجد فواتير مطابقة للبحث.';
+                    sectionHtml += `<tr><td colspan="5" style="padding:20px; text-align:center;">${noInv}</td></tr>`;
+                } else {
+                    const dFormatter = new Intl.DateTimeFormat('en-US', {
+                        year: 'numeric', month: 'numeric', day: 'numeric',
+                        hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true
+                    });
 
-                displayInvoices.forEach(i => {
-                    if (!i) return;
-                    const isCancelled = i.isCancelled === true;
-                    let customerName = (i.customer && i.customer.name) ? i.customer.name : '';
-                    let customerPhone = (i.customer && i.customer.phone) ? i.customer.phone : '0000000000';
-                    let cellPhone = (customerPhone !== '0000000000') ? `<br><small style="color:var(--text-muted); direction:ltr; display:inline-block">${customerPhone}</small>` : '';
-                    let total = i.grandTotal || 0;
-                    let dateStr = i.timestamp ? dFormatter.format(new Date(i.timestamp)) : '-';
+                    const displayInvoices = [].concat(sectionInvoices).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, 500);
 
-                    const rsLabel = lang === 'en' ? 'SAR' : 'ر.س';
-                    const paidL = lang === 'en' ? 'Paid' : 'مدفوع';
-                    const unpaidL = lang === 'en' ? 'Unpaid' : 'غير مدفوع';
-                    const lName = lang === 'en' ? 'Laundry:' : 'مغسلة:';
-                    const cancelL = lang === 'en' ? 'Cancelled' : 'ملغاة';
-                    const actCancelTitle = lang === 'en' ? 'Cancel Invoice' : 'إلغاء الفاتورة';
+                    displayInvoices.forEach(i => {
+                        if (!i) return;
+                        const isCancelled = i.isCancelled === true;
+                        let customerName = (i.customer && i.customer.name) ? i.customer.name : '';
+                        let customerPhone = (i.customer && i.customer.phone) ? i.customer.phone : '0000000000';
+                        let cellPhone = (customerPhone !== '0000000000') ? `<br><small style="color:var(--text-muted); direction:ltr; display:inline-block">${customerPhone}</small>` : '';
+                        let total = i.grandTotal || 0;
+                        let dateStr = i.timestamp ? dFormatter.format(new Date(i.timestamp)) : '-';
 
-                    let partnerBadge = i.partnerLaundryName ? `<br><span onclick="appLogic.toggleLaundryPaid('${i.id}')" style="cursor:pointer; display:inline-block; margin-top:5px; font-size:11px; padding:3px 8px; border-radius:12px; background:${i.laundryPaid ? '#4CAF50' : '#f44336'}; color:#fff;"><i class="fa-solid ${i.laundryPaid ? 'fa-check' : 'fa-times'}"></i> ${lName} ${i.partnerLaundryName} (${i.laundryPaid ? paidL : unpaidL})</span>` : '';
+                        const rsLabel = lang === 'en' ? 'SAR' : 'ر.س';
+                        const paidL = lang === 'en' ? 'Paid' : 'مدفوع';
+                        const unpaidL = lang === 'en' ? 'Unpaid' : 'غير مدفوع';
+                        const lName = lang === 'en' ? 'Laundry:' : 'مغسلة:';
+                        const cancelL = lang === 'en' ? 'Cancelled' : 'ملغاة';
+                        const actCancelTitle = lang === 'en' ? 'Cancel Invoice' : 'إلغاء الفاتورة';
 
-                    // Cancelled invoice visuals
-                    const rowStyle = isCancelled
-                        ? 'border-bottom:1px solid var(--border); opacity:0.55; background:rgba(255,70,70,0.06);'
-                        : 'border-bottom:1px solid var(--border);';
-                    // Refunded invoice visuals
-                    let refundBadge = '';
-                    if (i.status === 'مسترجع بالكامل' || i.status === 'مسترجع جزئياً') {
-                        refundBadge = `<span style="display:inline-block; background:#ef4444; color:#fff; font-size:11px; font-weight:900; padding:2px 8px; border-radius:12px; margin-right:6px;">${i.status}</span>`;
-                    }
-                    
-                    const totalDisplay = isCancelled
-                        ? `<span style="text-decoration:line-through; color:#f44336">${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${rsLabel}</span> <span style="display:inline-block; background:#c62828; color:#fff; font-size:11px; font-weight:900; padding:2px 8px; border-radius:12px; margin-right:6px;">${cancelL}</span>`
-                        : `${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${rsLabel} ${refundBadge} ${partnerBadge}`;
-                    const cancelBtn = isCancelled
-                        ? '' // Already cancelled — hide button
-                        : `<button class="btn-action-icon btn-action-delete" type="button" data-action="cancel_inv" data-id="${i.id}" title="${actCancelTitle}"><i class="fa-solid fa-ban" style="pointer-events:none;"></i></button>`;
+                        let partnerBadge = i.partnerLaundryName ? `<br><span onclick="appLogic.toggleLaundryPaid('${i.id}')" style="cursor:pointer; display:inline-block; margin-top:5px; font-size:11px; padding:3px 8px; border-radius:12px; background:${i.laundryPaid ? '#4CAF50' : '#f44336'}; color:#fff;"><i class="fa-solid ${i.laundryPaid ? 'fa-check' : 'fa-times'}"></i> ${lName} ${i.partnerLaundryName} (${i.laundryPaid ? paidL : unpaidL})</span>` : '';
 
-                    html += `<tr style="${rowStyle}">
-                        <td style="padding:15px; font-weight:bold;">${i.id || 'N/A'}</td>
-                        <td style="padding:15px;">${customerName}${cellPhone}</td>
-                        <td style="padding:15px; font-weight:bold; color:${isCancelled ? '#f44336' : 'var(--primary)'}">${totalDisplay}</td>
-                        <td style="padding:15px;">${dateStr}</td>
-                        <td style="padding:15px; text-align:center;">
-                            ${isCancelled ? '' : `<button class="btn-action-icon btn-action-info" type="button" data-action="partner_info" data-id="${i.id}" title="${lang === 'en' ? 'Partner Laundry Details' : 'تفاصيل المغسلة الشريكة'}"><i class="fa-solid fa-truck-ramp-box" style="pointer-events:none;"></i></button>`}
-                            <button class="btn-action-icon btn-action-print" type="button" data-action="print_inv" data-id="${i.id}" title="${lang === 'en' ? 'Preview & Reprint' : 'معاينة وإعادة طباعة'}"><i class="fa-solid fa-print" style="pointer-events:none;"></i></button>
-                            ${isCancelled ? '' : `<button class="btn-action-icon btn-action-edit" type="button" data-action="refund_inv" data-id="${i.id}" title="${lang === 'en' ? 'Refund' : 'إرجاع'}"><i class="fa-solid fa-rotate-left" style="pointer-events:none; color:#ef4444;"></i></button>`}
-                            ${cancelBtn}
-                        </td>
-                    </tr>
-                    ${isCancelled ? '' : `<tr id="partner-info-${i.id}" class="hidden" style="background:rgba(253,184,19,0.03); border-bottom:2px solid var(--primary);">
-                        <td colspan="5" style="padding:20px;">
-                            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:15px; align-items:end;">
-                                <div>
-                                    <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px;">${lang === 'en' ? 'Laundry Name' : 'اسم المغسلة'}</label>
-                                    <input type="text" id="partner-name-${i.id}" value="${i.partnerLaundryName || ''}" list="saved-laundries" style="width:100%; background:#000; color:#fff; border:1px solid var(--border); padding:8px; border-radius:4px;">
+                        const rowStyle = isCancelled
+                            ? 'border-bottom:1px solid var(--border); opacity:0.55; background:rgba(255,70,70,0.06);'
+                            : 'border-bottom:1px solid var(--border);';
+                            
+                        let refundBadge = '';
+                        if (i.status === 'مسترجع بالكامل' || i.status === 'مسترجع جزئياً') {
+                            refundBadge = `<span style="display:inline-block; background:#ef4444; color:#fff; font-size:11px; font-weight:900; padding:2px 8px; border-radius:12px; margin-right:6px;">${i.status}</span>`;
+                        }
+                        
+                        const totalDisplay = isCancelled
+                            ? `<span style="text-decoration:line-through; color:#f44336">${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${rsLabel}</span> <span style="display:inline-block; background:#c62828; color:#fff; font-size:11px; font-weight:900; padding:2px 8px; border-radius:12px; margin-right:6px;">${cancelL}</span>`
+                            : `${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${rsLabel} ${refundBadge} ${partnerBadge}`;
+
+                        const cancelBtn = isCancelled
+                            ? ''
+                            : `<button class="btn-action-icon btn-action-delete" type="button" data-action="cancel_inv" data-id="${i.id}" title="${actCancelTitle}"><i class="fa-solid fa-ban" style="pointer-events:none;"></i></button>`;
+
+                        const markPaidBtn = (isUnpaidSection && !isCancelled)
+                            ? `<button class="btn-action-icon" type="button" data-action="mark_paid" data-id="${i.id}" title="${lang === 'en' ? 'Mark as Paid' : 'تسديد الفاتورة'}" style="color: #4CAF50; background: rgba(76, 175, 80, 0.1); border: 1px solid #4CAF50;"><i class="fa-solid fa-check" style="pointer-events:none;"></i></button>`
+                            : '';
+
+                        sectionHtml += `<tr style="${rowStyle}">
+                            <td style="padding:15px; font-weight:bold;">${i.id || 'N/A'} ${isUnpaidSection ? `<br><span style="background:#f59e0b; color:#000; font-size:10px; padding:2px 6px; border-radius:8px; font-weight:bold;">${lang === 'en' ? 'Unpaid' : 'دفع لاحقاً'}</span>` : ''}</td>
+                            <td style="padding:15px;">${customerName}${cellPhone}</td>
+                            <td style="padding:15px; font-weight:bold; color:${isCancelled ? '#f44336' : (isUnpaidSection ? '#f59e0b' : 'var(--primary)')}">${totalDisplay}</td>
+                            <td style="padding:15px;">${dateStr}</td>
+                            <td style="padding:15px; text-align:center;">
+                                ${markPaidBtn}
+                                ${isCancelled ? '' : `<button class="btn-action-icon btn-action-info" type="button" data-action="partner_info" data-id="${i.id}" title="${lang === 'en' ? 'Partner Laundry Details' : 'تفاصيل المغسلة الشريكة'}"><i class="fa-solid fa-truck-ramp-box" style="pointer-events:none;"></i></button>`}
+                                <button class="btn-action-icon btn-action-print" type="button" data-action="print_inv" data-id="${i.id}" title="${lang === 'en' ? 'Preview & Reprint' : 'معاينة وإعادة طباعة'}"><i class="fa-solid fa-print" style="pointer-events:none;"></i></button>
+                                ${isCancelled ? '' : `<button class="btn-action-icon btn-action-edit" type="button" data-action="refund_inv" data-id="${i.id}" title="${lang === 'en' ? 'Refund' : 'إرجاع'}"><i class="fa-solid fa-rotate-left" style="pointer-events:none; color:#ef4444;"></i></button>`}
+                                ${cancelBtn}
+                            </td>
+                        </tr>
+                        ${isCancelled ? '' : `<tr id="partner-info-${i.id}" class="hidden" style="background:rgba(253,184,19,0.03); border-bottom:2px solid var(--primary);">
+                            <td colspan="5" style="padding:20px;">
+                                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:15px; align-items:end;">
+                                    <div>
+                                        <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px;">${lang === 'en' ? 'Laundry Name' : 'اسم المغسلة'}</label>
+                                        <input type="text" id="partner-name-${i.id}" value="${i.partnerLaundryName || ''}" list="saved-laundries" style="width:100%; background:#000; color:#fff; border:1px solid var(--border); padding:8px; border-radius:4px;">
+                                    </div>
+                                    <div>
+                                        <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px;">${lang === 'en' ? 'Cost (SAR)' : 'حساب المغاسل (ر.س)'}</label>
+                                        <input type="number" id="partner-cost-${i.id}" value="${i.laundryCost || i.partnerLaundryCost || 0}" style="width:100%; background:#000; color:#fff; border:1px solid var(--border); padding:8px; border-radius:4px;">
+                                    </div>
+                                    <div>
+                                        <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px;">${lang === 'en' ? 'Neighborhood' : 'الحي'}</label>
+                                        <input type="text" id="partner-hood-${i.id}" value="${i.partnerLaundryNeighborhood || ''}" list="saved-neighborhoods" style="width:100%; background:#000; color:#fff; border:1px solid var(--border); padding:8px; border-radius:4px;">
+                                    </div>
+                                    <div>
+                                        <button class="btn btn-primary" style="width:100%; padding:9px;" onclick="appLogic.savePartnerInfo('${i.id}')">${lang === 'en' ? 'Save Details' : 'حفظ التفاصيل'}</button>
+                                    </div>
                                 </div>
-                                <div>
-                                    <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px;">${lang === 'en' ? 'Cost (SAR)' : 'حساب المغاسل (ر.س)'}</label>
-                                    <input type="number" id="partner-cost-${i.id}" value="${i.laundryCost || i.partnerLaundryCost || 0}" style="width:100%; background:#000; color:#fff; border:1px solid var(--border); padding:8px; border-radius:4px;">
-                                </div>
-                                <div>
-                                    <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px;">${lang === 'en' ? 'Neighborhood' : 'الحي'}</label>
-                                    <input type="text" id="partner-hood-${i.id}" value="${i.partnerLaundryNeighborhood || ''}" list="saved-neighborhoods" style="width:100%; background:#000; color:#fff; border:1px solid var(--border); padding:8px; border-radius:4px;">
-                                </div>
-                                <div>
-                                    <button class="btn btn-primary" style="width:100%; padding:9px;" onclick="appLogic.savePartnerInfo('${i.id}')">${lang === 'en' ? 'Save Details' : 'حفظ التفاصيل'}</button>
-                                </div>
-                            </div>
-                        </td>
-                    </tr>`}`;
-                });
+                            </td>
+                        </tr>`}`;
+                    });
+                }
+                sectionHtml += '</tbody></table>';
+                return sectionHtml;
+            };
 
-            }
-            html += '</tbody></table>';
+            let paidInvoices = validInvoices.filter(i => i.paymentStatus !== 'unpaid');
+            let unpaidInvoices = validInvoices.filter(i => i.paymentStatus === 'unpaid');
+
+            html += generateTableHTML(unpaidInvoices, lang === 'en' ? 'Unpaid Invoices (Pay Later)' : 'الفواتير غير المسددة (دفع لاحقاً)', true);
+            html += generateTableHTML(paidInvoices, lang === 'en' ? 'Paid Invoices' : 'الفواتير المسددة', false);
+
             const container = document.getElementById('history-content');
             if (container) container.innerHTML = html;
         } catch (err) {
@@ -2071,7 +2124,18 @@ window.appLogic = {
             this.reprintInvoice(id);
         } else if (action === 'refund_inv') {
             this.openRefundModal(id);
+        } else if (action === 'mark_paid') {
+            this.markInvoiceAsPaid(id);
         }
+    },
+
+    async markInvoiceAsPaid(id) {
+        this.settlingInvoiceId = id;
+        const payLaterBtn = document.getElementById('method-paylater');
+        if (payLaterBtn) {
+            payLaterBtn.style.display = 'none'; // Hide when settling unpaid invoice
+        }
+        document.getElementById('payment-method-modal').classList.remove('hidden');
     },
 
     togglePartnerInfo(id) {
@@ -3177,6 +3241,7 @@ window.appLogic = {
         let totalRefunds = 0;
         let totalOperatingExpenses = 0;
         let totalLaundryDebt = 0;
+        let totalUncollected = 0; // NEW TRACKER
 
         // 1. Process Invoices
         let cashTotal = 0, madaTotal = 0, visaTotal = 0, mastercardTotal = 0;
@@ -3195,44 +3260,55 @@ window.appLogic = {
             let refundAmt = parseFloat(i.refundAmount || 0);
             if (i.isCancelled) refundAmt = amt; // if fully cancelled previously without refundAmount prop
             const netAmt = amt - refundAmt;
+            const isUnpaid = i.paymentStatus === 'unpaid';
 
             // Today's sales honors the Z-Report wipe (matchesShift) per user preference
             if (isInRange && matchesShift) {
-                salesToday += netAmt;
+                if (isUnpaid) {
+                    totalUncollected += netAmt;
+                } else {
+                    salesToday += netAmt;
+                }
             }
 
             // 7/30/365 metrics ignore Z-Report wipe and accumulate ALL historical data in range
             const isBeforeOrOnEnd = (endBound === Infinity || rTime <= endBound);
-            if (rTime >= weekAgo && isBeforeOrOnEnd) salesWeek += netAmt;
-            if (rTime >= monthAgo && isBeforeOrOnEnd) salesMonth += netAmt;
-            if (rTime >= yearAgo && isBeforeOrOnEnd) salesYear += netAmt;
+            if (!isUnpaid) {
+                if (rTime >= weekAgo && isBeforeOrOnEnd) salesWeek += netAmt;
+                if (rTime >= monthAgo && isBeforeOrOnEnd) salesMonth += netAmt;
+                if (rTime >= yearAgo && isBeforeOrOnEnd) salesYear += netAmt;
+            }
 
             // 🌟 EXCEPTION: MONTHLY SALES BREAKDOWN
             // DO NOT RESET: Must calculate sum of ALL invoices (historical + active) for calendar reporting
-            const d = new Date(i.date || i.timestamp);
-            const mIdx = d.getMonth();
-            const year = d.getFullYear();
-            const key = `${year}-${String(mIdx + 1).padStart(2, '0')}`;
-            const monthName = (this.currentLang === 'en') ? monthsEn[mIdx] : monthsAr[mIdx];
-            const label = `${monthName} ${year.toString()}`;
-            if (!monthlyMap[key]) monthlyMap[key] = { label, total: 0, sortKey: key };
-            monthlyMap[key].total += netAmt;
+            if (!isUnpaid) {
+                const d = new Date(i.date || i.timestamp);
+                const mIdx = d.getMonth();
+                const year = d.getFullYear();
+                const key = `${year}-${String(mIdx + 1).padStart(2, '0')}`;
+                const monthName = (this.currentLang === 'en') ? monthsEn[mIdx] : monthsAr[mIdx];
+                const label = `${monthName} ${year.toString()}`;
+                if (!monthlyMap[key]) monthlyMap[key] = { label, total: 0, sortKey: key };
+                monthlyMap[key].total += netAmt;
+            }
 
 
             // ACTIVE DASHBOARD FILTER (Selected Date)
             if (isInRange && matchesShift) {
-                totalAllInvoices += amt;
-                totalRefunds += refundAmt;
-                
-                if (i.isCancelled === true) {
-                    // Handled inside totalRefunds already
-                } else {
-                    // Track Payment Methods for Z-Report Sync
-                    const pMethod = i.paymentMethod || 'cash';
-                    if (pMethod === 'cash') cashTotal += netAmt;
-                    else if (pMethod === 'mada' || pMethod === 'network') madaTotal += netAmt;
-                    else if (pMethod === 'visa') visaTotal += netAmt;
-                    else if (pMethod === 'mastercard') mastercardTotal += netAmt;
+                if (!isUnpaid) {
+                    totalAllInvoices += amt;
+                    totalRefunds += refundAmt;
+                    
+                    if (i.isCancelled === true) {
+                        // Handled inside totalRefunds already
+                    } else {
+                        // Track Payment Methods for Z-Report Sync
+                        const pMethod = i.paymentMethod || 'cash';
+                        if (pMethod === 'cash') cashTotal += netAmt;
+                        else if (pMethod === 'mada' || pMethod === 'network') madaTotal += netAmt;
+                        else if (pMethod === 'visa') visaTotal += netAmt;
+                        else if (pMethod === 'mastercard') mastercardTotal += netAmt;
+                    }
                 }
             }
         });
@@ -3312,6 +3388,12 @@ window.appLogic = {
                 <div id="db-op-expenses-display" style="font-size:24px; font-weight:800; direction:ltr; color:#ff453a;">- ${totalOperatingExpenses.toFixed(2)} ر.س</div>
             </div>
 
+            <!-- Uncollected Amounts (Pay Later) -->
+            <div style="background:var(--bg-surface); border:1px solid rgba(245, 158, 11, 0.2); border-radius:var(--radius-md); padding:20px; text-align:center; box-shadow:var(--shadow-sm);">
+                <h3 style="color:var(--text-muted); font-size:13px; margin-bottom:5px;">${lang === 'en' ? 'Uncollected Amounts (Rolling Balance)' : 'مبالغ غير محصلة (رصيد تراكمي)'}</h3>
+                <div id="db-uncollected-display" style="font-size:24px; font-weight:800; direction:ltr; color:#f59e0b;">${totalUncollected.toFixed(2)} ر.س</div>
+            </div>
+
             <!-- 6. FINAL NET PROFIT OVERLAY (Full Width) -->
             <div style="grid-column: 1 / -1; background:var(--bg-elevated); border:2px solid var(--primary); border-radius:var(--radius-md); padding:25px; text-align:center; box-shadow:var(--shadow-lg);">
                 <h3 style="color:var(--text-muted); font-size:15px; margin-bottom:10px;">${lang === 'en' ? 'Net Profit' : 'صافي الربح النهائي (Net Profit)'}</h3>
@@ -3331,7 +3413,8 @@ window.appLogic = {
                  data-cash="${cashTotal.toFixed(2)}"
                  data-mada="${madaTotal.toFixed(2)}"
                  data-visa="${visaTotal.toFixed(2)}"
-                 data-mastercard="${mastercardTotal.toFixed(2)}">
+                 data-mastercard="${mastercardTotal.toFixed(2)}"
+                 data-uncollected="${totalUncollected.toFixed(2)}">
             </div>
         </div>
 
@@ -3413,8 +3496,18 @@ window.appLogic = {
                     <div style="font-size:24px; font-weight:800; color:#9c27b0; direction:ltr;">${salesYear.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR</div>
                 </div>
             </div>
+            </div>
         </div>
         `;
+
+        // 💾 OFFLINE SYNC: BIND METRICS STRICTLY TO LOCALSTORAGE OUTSIDE INDEXEDDB
+        localStorage.setItem('sahab_totalSales', totalAllInvoices);
+        localStorage.setItem('sahab_uncollectedAmounts', totalUncollected);
+        localStorage.setItem('sahab_cashTotal', cashTotal);
+        localStorage.setItem('sahab_madaTotal', madaTotal);
+        localStorage.setItem('sahab_visaTotal', visaTotal);
+        localStorage.setItem('sahab_mastercardTotal', mastercardTotal);
+
         document.getElementById('reports-content').innerHTML = html;
     },
 
@@ -4426,6 +4519,7 @@ window.appLogic = {
         const madaTotal = parseFloat(syncEl.dataset.mada) || 0;
         const visaTotal = parseFloat(syncEl.dataset.visa) || 0;
         const mastercardTotal = parseFloat(syncEl.dataset.mastercard) || 0;
+        const uncollected = parseFloat(syncEl.dataset.uncollected) || 0;
 
         // === KSA STRICT LOCAL DATE (prevents UTC timezone drift) ===
         const todayKSA = getLocalYMD();          // e.g. "2026-04-01"
@@ -4531,6 +4625,10 @@ window.appLogic = {
                                             <td style="padding: 8px 10px; color: #c62828; font-weight: 700;">${this.currentLang === 'en' ? 'Total Expenses' : 'إجمالي المصاريف'}</td>
                                             <td style="padding: 8px 10px; text-align: left; font-weight: 900; direction: ltr; color: #c62828; font-size: 13px;">- ${opExps.toFixed(2)} ر.س</td>
                                         </tr>
+                                        <tr style="background: #fff; border-bottom: 2px solid #e0e0e0;">
+                                            <td style="padding: 8px 10px; color: #f59e0b; font-weight: 700;">${this.currentLang === 'en' ? 'Uncollected (Rolling)' : 'مبالغ غير محصلة (تراكمي)'}</td>
+                                            <td style="padding: 8px 10px; text-align: left; font-weight: 900; direction: ltr; color: #f59e0b; font-size: 13px;">${uncollected.toFixed(2)} ر.س</td>
+                                        </tr>
                                         <!-- FINAL NET PROFIT - BOLD STANDOUT ROW -->
                                         <tr style="background: #1b5e20; border-top: 3px double #a5d6a7;">
                                             <td style="padding: 10px 10px; font-size: 13px; font-weight: 900; color: #fff;">🏆 ${this.currentLang === 'en' ? 'Final Net Profit' : 'صافي الربح النهائي'}</td>
@@ -4576,19 +4674,24 @@ window.appLogic = {
         const shiftExpenses = exps.filter(e => e && !e.isZReported && (e.date === targetFormattedDate || getLocalYMD(e.timestamp) === targetFormattedDate));
 
         // ═══ CRITICAL FIX: MARK CLOSED STATE *BEFORE* SERIALIZING TO ARCHIVE DB ═══
-        filteredInvoices.forEach(i => { if (i) i.isZReported = true; });
+        filteredInvoices.forEach(i => { if (i && i.paymentStatus !== 'unpaid') i.isZReported = true; });
         shiftExpenses.forEach(e => { if (e) e.isZReported = true; });
 
         // Wait... there may be invoices that didn't match the KSA date but ARE from today's shift visually?
         // To be absolutely safe and prevent rogue ghost invoices from persisting: 
-        invoices.forEach(i => { if (i) i.isZReported = true; });
+        // EXCEPTION: Unpaid "Pay Later" invoices MUST persist across daily closures.
+        invoices.forEach(i => { 
+            if (i && i.paymentStatus !== 'unpaid') {
+                i.isZReported = true; 
+            }
+        });
         exps.forEach(e => { if (e) e.isZReported = true; });
 
         const archiveEntry = {
             id: 'Z-' + Date.now(),
             timestamp: Date.now(),
             date: reportDate,
-            totals: { gross, refunds, netRev, opExps, netProfit, paymentBreakdown: { cashTotal, madaTotal, visaTotal, mastercardTotal } },
+            totals: { gross, refunds, netRev, opExps, netProfit, paymentBreakdown: { cashTotal, madaTotal, visaTotal, mastercardTotal }, uncollected },
             invoices: filteredInvoices,
             expenses: shiftExpenses
         };
@@ -4669,6 +4772,7 @@ window.appLogic = {
         const madaTotal = parseFloat(syncEl.dataset.mada) || 0;
         const visaTotal = parseFloat(syncEl.dataset.visa) || 0;
         const mastercardTotal = parseFloat(syncEl.dataset.mastercard) || 0;
+        const uncollected = parseFloat(syncEl.dataset.uncollected) || 0;
 
         const format = (num) => num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -4727,6 +4831,13 @@ window.appLogic = {
                         <span class="label">${lang === 'en' ? 'Operating Expenses' : 'إجمالي المصاريف التشغيلية'}</span>
                     </div>
                     <span class="value" style="color:var(--danger)">- ${format(opExps)} ر.س</span>
+                </div>
+                <div class="z-report-item">
+                    <div class="info">
+                        <i class="fa-solid fa-clock" style="color:#f59e0b; margin-left:10px;"></i>
+                        <span class="label">${lang === 'en' ? 'Uncollected (Rolling)' : 'مبالغ غير محصلة (تراكمي)'}</span>
+                    </div>
+                    <span class="value" style="color:#f59e0b">${format(uncollected)} ر.س</span>
                 </div>
                 <div class="z-report-item profit">
                     <div class="info">
