@@ -283,12 +283,27 @@ if (typeof firebase !== 'undefined' && !firebase.apps.length) {
 
 const collectionsToSync = ['customers', 'invoices', 'journal_entries', 'tax_records', 'inventory', 'services', 'expenses', 'delivery_options'];
 const originalSetItem = localforage.setItem;
+const originalGetItem = localforage.getItem;
+const originalRemoveItem = localforage.removeItem;
+
 window.isDataInitialized = false; // THE MASTER LOCK: App starts in strict READ-ONLY mode
 window.__syncingFromFirebase = false;
 
-// 1. SIMPLE STORAGE: localforage now ONLY handles local database
+// 0. STRICT MULTI-TENANCY NAMESPACE ISOLATION
+function getTenantKey(key) {
+    if (window.currentUID) return `${window.currentUID}_${key}`;
+    return key;
+}
+
+// 1. SIMPLE STORAGE: localforage now strictly routes to isolated tenant namespaces
 localforage.setItem = async function (key, value) {
-    return await originalSetItem.call(localforage, key, value);
+    return await originalSetItem.call(localforage, getTenantKey(key), value);
+};
+localforage.getItem = async function (key) {
+    return await originalGetItem.call(localforage, getTenantKey(key));
+};
+localforage.removeItem = async function (key) {
+    return await originalRemoveItem.call(localforage, getTenantKey(key));
 };
 
 // 2. EXPLICIT SYNC: Targeted helper to send specific records or collections to Firebase (UID-scoped)
@@ -352,19 +367,19 @@ async function initFirebaseSync() {
                         cloudData = cloudData.filter(item => item !== null && typeof item === 'object');
                     }
                     window.__syncingFromFirebase = true;
-                    await originalSetItem.call(localforage, key, cloudData);
+                    await originalSetItem.call(localforage, getTenantKey(key), cloudData);
                     window.__syncingFromFirebase = false;
                 } else {
                     console.log(`[Multi-Tenant] Cloud is empty for ${key}. Checking local redundancy.`);
 
                     // REDUNDANCY CHECK: If local storage has data, don't zero it yet!
-                    const localBackup = localStorage.getItem(key);
+                    const localBackup = localStorage.getItem(getDbPath(key)) || localStorage.getItem(key);
                     if (localBackup && (key === 'expenses' || key === 'invoices')) {
                         try {
                             const parsed = JSON.parse(localBackup);
                             if (parsed && parsed.length > 0) {
                                 console.log(`[Recovery] Cloud empty but localStorage has ${key}. Using local data.`);
-                                await originalSetItem.call(localforage, key, parsed);
+                                await originalSetItem.call(localforage, getTenantKey(key), parsed);
                                 resolve();
                                 return;
                             }
@@ -372,7 +387,7 @@ async function initFirebaseSync() {
                     }
 
                     window.__syncingFromFirebase = true;
-                    await originalSetItem.call(localforage, key, []); // ZERO STATE PROMISE!
+                    await originalSetItem.call(localforage, getTenantKey(key), []); // ZERO STATE PROMISE!
                     window.__syncingFromFirebase = false;
                 }
                 resolve();
@@ -396,7 +411,7 @@ async function initFirebaseSync() {
                 console.log(`[Realtime-Sync] Update received for ${key}: ${sanitized.length} items.`);
 
                 window.__syncingFromFirebase = true;
-                await originalSetItem.call(localforage, key, sanitized);
+                await originalSetItem.call(localforage, getTenantKey(key), sanitized);
                 window.__syncingFromFirebase = false;
 
                 if (window.appLogic) {
@@ -769,7 +784,7 @@ window.appLogic = {
         if (!data) data = window.appLogic.services || [];
         const grid = document.getElementById('items-grid');
         if (grid) grid.innerHTML = '';
-        
+
         let validCounter = 0;
         data.forEach(item => {
             if (!item || typeof item !== 'object') return;
@@ -976,7 +991,7 @@ window.appLogic = {
     updateCartUI() {
         const container = document.getElementById('cart-items');
         container.innerHTML = '';
-        
+
         const isVatActive = !!(window.tenantSettings && window.tenantSettings.taxNumber && window.tenantSettings.taxNumber.trim() !== "");
         const mult = isVatActive ? 1.15 : 1;
 
@@ -1101,7 +1116,7 @@ window.appLogic = {
 
             invs[idx].paymentStatus = 'paid';
             invs[idx].paymentMethod = method;
-            
+
             // 🔄 CRITICAL LOGIC: Overwrite the timestamp & date
             invs[idx].timestamp = Date.now();
             invs[idx].date = getLocalYMD();
@@ -1149,7 +1164,7 @@ window.appLogic = {
         // FAST AUTO-CHECKOUT & PRINT (Bypass Preview Modal entirely)
         // Wait 100ms for QRCode library to finish rendering the canvas
         setTimeout(async () => {
-             await this.confirmCheckout(true);
+            await this.confirmCheckout(true);
         }, 100);
     },
 
@@ -1179,7 +1194,7 @@ window.appLogic = {
     updateCheckoutTotal() {
         const isVatActive = !!(window.tenantSettings && window.tenantSettings.taxNumber && window.tenantSettings.taxNumber.trim() !== "");
         const mult = isVatActive ? 1.15 : 1;
-        
+
         const subt = this.cart.reduce((s, i) => s + (i.unitPrice * i.qty), 0);
         let baseVal = subt + this.deliveryFee;
         let totalVal = baseVal * mult;
@@ -1441,7 +1456,7 @@ window.appLogic = {
                     { services: ['000018f0-0000-1000-8000-00805f9b34fb'] }
                 ],
                 optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb', '49535343-fe7d-4ae5-8fa9-9fafd205e455', 'e7810a71-73ae-499d-8c15-faa9aef0c3f2', '00001101-0000-1000-8000-00805f9b34fb']
-            }).catch(function() {
+            }).catch(function () {
                 return navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
                     optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb', '49535343-fe7d-4ae5-8fa9-9fafd205e455', 'e7810a71-73ae-499d-8c15-faa9aef0c3f2', '00001101-0000-1000-8000-00805f9b34fb']
@@ -1463,13 +1478,13 @@ window.appLogic = {
             }
 
             if (!printerChar) throw new Error('لا توجد خدمة طباعة متاحة في هذا الجهاز');
-            
+
             window.bluetoothCharacteristic = printerChar;
             window.connectedBluetoothPrinter = device;
-            
+
             var btnText = document.getElementById('bt-printer-status');
             if (btnText) btnText.innerText = 'متصل: ' + device.name;
-            
+
             alert('تم الاتصال بالطابعة بنجاح!');
         } catch (err) {
             alert('لم يتم التوصيل: ' + err.message);
@@ -1478,12 +1493,12 @@ window.appLogic = {
 
     async printThermalReceipt() {
         if (!this.currentInvoice) return;
-        
+
         try {
             var container = document.getElementById('invoice-preview-container');
             var originalBtn = document.querySelector('button[onclick="appLogic.printThermalReceipt()"]');
             var origHTML = originalBtn ? originalBtn.innerHTML : '';
-            if(originalBtn) originalBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري إرسال الطباعة...';
+            if (originalBtn) originalBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري إرسال الطباعة...';
 
             var invoiceInnerHTML = container.innerHTML;
 
@@ -1528,12 +1543,12 @@ window.appLogic = {
             `);
             doc.close();
 
-            await new Promise(function(resolve) { setTimeout(resolve, 400); });
+            await new Promise(function (resolve) { setTimeout(resolve, 400); });
 
-            var canvas = await html2canvas(doc.body, { 
-                width: 768, 
-                windowWidth: 768, 
-                scale: 1, 
+            var canvas = await html2canvas(doc.body, {
+                width: 768,
+                windowWidth: 768,
+                scale: 1,
                 useCORS: true,
                 x: 0,
                 y: 0,
@@ -1544,14 +1559,14 @@ window.appLogic = {
             document.body.removeChild(iframe);
 
             var base64ImageString = canvas.toDataURL('image/png');
-            
+
             window.location.href = "intent:" + base64ImageString + "#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;";
 
-            if(originalBtn) originalBtn.innerHTML = origHTML;
+            if (originalBtn) originalBtn.innerHTML = origHTML;
         } catch (err) {
             alert('حدث خطأ أثناء الطباعة: ' + err.message);
             var btn = document.querySelector('button[onclick="appLogic.printThermalReceipt()"]');
-            if(btn) btn.innerHTML = '<i class="fa-solid fa-print"></i> <span>طباعة إيصال حراري (80mm)</span>';
+            if (btn) btn.innerHTML = '<i class="fa-solid fa-print"></i> <span>طباعة إيصال حراري (80mm)</span>';
         }
     },
 
@@ -2090,12 +2105,12 @@ window.appLogic = {
                         const rowStyle = isCancelled
                             ? 'border-bottom:1px solid var(--border); opacity:0.55; background:rgba(255,70,70,0.06);'
                             : 'border-bottom:1px solid var(--border);';
-                            
+
                         let refundBadge = '';
                         if (i.status === 'مسترجع بالكامل' || i.status === 'مسترجع جزئياً') {
                             refundBadge = `<span style="display:inline-block; background:#ef4444; color:#fff; font-size:11px; font-weight:900; padding:2px 8px; border-radius:12px; margin-right:6px;">${i.status}</span>`;
                         }
-                        
+
                         const totalDisplay = isCancelled
                             ? `<span style="text-decoration:line-through; color:#f44336">${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${rsLabel}</span> <span style="display:inline-block; background:#c62828; color:#fff; font-size:11px; font-weight:900; padding:2px 8px; border-radius:12px; margin-right:6px;">${cancelL}</span>`
                             : `${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${rsLabel} ${refundBadge} ${partnerBadge}`;
@@ -2321,41 +2336,41 @@ window.appLogic = {
     async openRefundModal(id) {
         let invs = await localforage.getItem('invoices') || [];
         const invoice = invs.find(i => i.id == id);
-        
+
         if (!invoice) {
             alert('الفاتورة غير موجودة.');
             return;
         }
 
         if (invoice.isCancelled) {
-             alert('هذه الفاتورة ملغاة بالكامل مسبقاً.');
-             return;
+            alert('هذه الفاتورة ملغاة بالكامل مسبقاً.');
+            return;
         }
 
         document.getElementById('refund-target-id').value = id;
         document.getElementById('refund-invoice-id').innerText = id;
-        
+
         const container = document.getElementById('refund-items-container');
         container.innerHTML = '';
-        
+
         // Render items to refund
         (invoice.items || []).forEach((item, index) => {
-             let alreadyRefunded = item.refundedQty || 0;
-             let maxRef = item.qty - alreadyRefunded;
-             
-             if (maxRef <= 0) return; // skip fully refunded items
-             
-             let unitPrice = parseFloat(item.unitPrice || item.price || item.cost || 0); 
-             // Express fee inclusion safely
-             if (item.speed === 'express') {
-                  const svcs = JSON.parse(localStorage.getItem('sahab_services')) || [];
-                  const s = svcs.find(x => x.name === item.name);
-                  if (s && s.pricing && s.pricing.expressFee) unitPrice += s.pricing.expressFee;
-             }
-             
-             let row = document.createElement('div');
-             row.style.cssText = "display:flex; justify-content:space-between; align-items:center; padding:10px; border-bottom:1px solid var(--border);";
-             row.innerHTML = `
+            let alreadyRefunded = item.refundedQty || 0;
+            let maxRef = item.qty - alreadyRefunded;
+
+            if (maxRef <= 0) return; // skip fully refunded items
+
+            let unitPrice = parseFloat(item.unitPrice || item.price || item.cost || 0);
+            // Express fee inclusion safely
+            if (item.speed === 'express') {
+                const svcs = JSON.parse(localStorage.getItem('sahab_services')) || [];
+                const s = svcs.find(x => x.name === item.name);
+                if (s && s.pricing && s.pricing.expressFee) unitPrice += s.pricing.expressFee;
+            }
+
+            let row = document.createElement('div');
+            row.style.cssText = "display:flex; justify-content:space-between; align-items:center; padding:10px; border-bottom:1px solid var(--border);";
+            row.innerHTML = `
                  <div style="flex:2">
                      <strong style="color:var(--primary);">${item.name}</strong>
                      <div style="color:var(--text-muted); font-size:12px;">سعر الوحدة: ${unitPrice.toFixed(2)} ر.س | متوفر للإرجاع: ${maxRef}</div>
@@ -2364,14 +2379,14 @@ window.appLogic = {
                      <input type="number" class="refund-qty-input" data-index="${index}" data-price="${unitPrice}" data-max="${maxRef}" min="0" max="${maxRef}" value="" placeholder="0" onchange="appLogic.calculateRefundTotal()" style="width:70px; padding:8px; text-align:center; background:#000; border:1px solid var(--border); color:#fff; border-radius:4px;">
                  </div>
              `;
-             container.appendChild(row);
+            container.appendChild(row);
         });
 
-        if(container.innerHTML === '') {
-             container.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-muted);">تم إرجاع جميع أصناف هذه الفاتورة مسبقاً.</div>';
-             document.querySelector('#refund-invoice-modal .btn-danger').style.display = 'none';
+        if (container.innerHTML === '') {
+            container.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-muted);">تم إرجاع جميع أصناف هذه الفاتورة مسبقاً.</div>';
+            document.querySelector('#refund-invoice-modal .btn-danger').style.display = 'none';
         } else {
-             document.querySelector('#refund-invoice-modal .btn-danger').style.display = 'block';
+            document.querySelector('#refund-invoice-modal .btn-danger').style.display = 'block';
         }
 
         document.getElementById('refund-grand-total').innerText = '0.00 ر.س';
@@ -2381,12 +2396,12 @@ window.appLogic = {
     calculateRefundTotal() {
         let total = 0;
         document.querySelectorAll('.refund-qty-input').forEach(input => {
-             let qty = parseInt(input.value) || 0;
-             let price = parseFloat(input.getAttribute('data-price')) || 0;
-             let max = parseInt(input.getAttribute('data-max')) || 0;
-             if (qty > max) { qty = max; input.value = max; }
-             if (qty < 0) { qty = 0; input.value = 0; }
-             total += (qty * price);
+            let qty = parseInt(input.value) || 0;
+            let price = parseFloat(input.getAttribute('data-price')) || 0;
+            let max = parseInt(input.getAttribute('data-max')) || 0;
+            if (qty > max) { qty = max; input.value = max; }
+            if (qty < 0) { qty = 0; input.value = 0; }
+            total += (qty * price);
         });
         document.getElementById('refund-grand-total').innerText = total.toFixed(2) + ' ر.س';
         return total;
@@ -2395,34 +2410,34 @@ window.appLogic = {
     async processRefund() {
         const id = document.getElementById('refund-target-id').value;
         const totalRefund = this.calculateRefundTotal();
-        
+
         if (totalRefund <= 0) {
             alert('الرجاء تحديد كميات لإرجاعها.');
             return;
         }
 
-        if(!confirm(`هل أنت متأكد من إرجاع مبلغ بقيمة ${totalRefund.toFixed(2)} ر.س من الفاتورة ${id}؟\n(سيتم خصم هذا المبلغ من يومية الكاشير)`)) return;
+        if (!confirm(`هل أنت متأكد من إرجاع مبلغ بقيمة ${totalRefund.toFixed(2)} ر.س من الفاتورة ${id}؟\n(سيتم خصم هذا المبلغ من يومية الكاشير)`)) return;
 
         let invs = await localforage.getItem('invoices') || [];
         const idx = invs.findIndex(i => i.id == id);
-        
+
         if (idx === -1) return;
-        
+
         let invoice = invs[idx];
-        
+
         let fullyRefunded = true;
         document.querySelectorAll('.refund-qty-input').forEach(input => {
-             let qty = parseInt(input.value) || 0;
-             let index = parseInt(input.getAttribute('data-index'));
-             if (qty > 0) {
-                 if (!invoice.items[index].refundedQty) invoice.items[index].refundedQty = 0;
-                 invoice.items[index].refundedQty += qty;
-             }
-             
-             let totalRefundedForItem = invoice.items[index].refundedQty || 0;
-             if (totalRefundedForItem < invoice.items[index].qty) {
-                 fullyRefunded = false;
-             }
+            let qty = parseInt(input.value) || 0;
+            let index = parseInt(input.getAttribute('data-index'));
+            if (qty > 0) {
+                if (!invoice.items[index].refundedQty) invoice.items[index].refundedQty = 0;
+                invoice.items[index].refundedQty += qty;
+            }
+
+            let totalRefundedForItem = invoice.items[index].refundedQty || 0;
+            if (totalRefundedForItem < invoice.items[index].qty) {
+                fullyRefunded = false;
+            }
         });
 
         invoice.refundAmount = (invoice.refundAmount || 0) + totalRefund;
@@ -2747,7 +2762,7 @@ window.appLogic = {
             // Laundry Services Section
             const services = window.appLogic.services || [];
             const svcCount = Array.isArray(services) ? services.length : 0;
-            
+
             html += `
             <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px;">
                 <h3 style="margin-bottom:15px; border-bottom:1px solid var(--border); padding-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
@@ -2785,7 +2800,7 @@ window.appLogic = {
                     let expLbl = '0.00';
                     if (item.expressFee) {
                         if (typeof item.expressFee === 'object') expLbl = 'متغير';
-                        else expLbl = `+${((parseFloat(item.expressFee)||0) * mult).toFixed(2)}`;
+                        else expLbl = `+${((parseFloat(item.expressFee) || 0) * mult).toFixed(2)}`;
                     }
 
                     html += `
@@ -3323,7 +3338,7 @@ window.appLogic = {
 
             // DYNAMIC ROLLING TOTALS
             const isInRange = (rTime >= startBound && (endBound === Infinity || rTime <= endBound));
-            
+
             let refundAmt = parseFloat(i.refundAmount || 0);
             if (i.isCancelled) refundAmt = amt; // if fully cancelled previously without refundAmount prop
             const netAmt = amt - refundAmt;
@@ -3365,7 +3380,7 @@ window.appLogic = {
                 if (!isUnpaid) {
                     totalAllInvoices += amt;
                     totalRefunds += refundAmt;
-                    
+
                     if (i.isCancelled === true) {
                         // Handled inside totalRefunds already
                     } else {
@@ -4015,9 +4030,9 @@ window.appLogic = {
                 await localforage.clear();
 
                 // Restore Address Data
-                if(_city) localStorage.setItem('invoiceCity', _city);
-                if(_hood) localStorage.setItem('invoiceNeighborhood', _hood);
-                if(_street) localStorage.setItem('invoiceStreet', _street);
+                if (_city) localStorage.setItem('invoiceCity', _city);
+                if (_hood) localStorage.setItem('invoiceNeighborhood', _hood);
+                if (_street) localStorage.setItem('invoiceStreet', _street);
 
                 firebase.auth().signOut().then(() => {
                     window.location.reload();
@@ -4145,9 +4160,9 @@ window.appLogic = {
         sessionStorage.clear();
 
         // Restore Address Data
-        if(_city) localStorage.setItem('invoiceCity', _city);
-        if(_hood) localStorage.setItem('invoiceNeighborhood', _hood);
-        if(_street) localStorage.setItem('invoiceStreet', _street);
+        if (_city) localStorage.setItem('invoiceCity', _city);
+        if (_hood) localStorage.setItem('invoiceNeighborhood', _hood);
+        if (_street) localStorage.setItem('invoiceStreet', _street);
 
         localStorage.removeItem('sahab_session_uid'); // Purge session marker
         window.currentUID = null;
@@ -4160,10 +4175,10 @@ window.appLogic = {
         document.getElementById('setting-name').value = s.name || '';
         document.getElementById('setting-phone').value = s.phone || '';
         document.getElementById('setting-tax').value = s.taxNumber || '';
-        
-        if(document.getElementById('setting-city')) document.getElementById('setting-city').value = s.addressCity || localStorage.getItem('invoiceCity') || '';
-        if(document.getElementById('setting-hood')) document.getElementById('setting-hood').value = s.addressNeighborhood || localStorage.getItem('invoiceNeighborhood') || '';
-        if(document.getElementById('setting-street')) document.getElementById('setting-street').value = s.addressStreet || localStorage.getItem('invoiceStreet') || '';
+
+        if (document.getElementById('setting-city')) document.getElementById('setting-city').value = s.addressCity || localStorage.getItem('invoiceCity') || '';
+        if (document.getElementById('setting-hood')) document.getElementById('setting-hood').value = s.addressNeighborhood || localStorage.getItem('invoiceNeighborhood') || '';
+        if (document.getElementById('setting-street')) document.getElementById('setting-street').value = s.addressStreet || localStorage.getItem('invoiceStreet') || '';
 
         // PWA Button Gatekeeper Logic
         let isPwaAllowed = s.canInstallPWA === true;
@@ -4174,7 +4189,7 @@ window.appLogic = {
                     isPwaAllowed = snap.val() === true;
                     s.canInstallPWA = isPwaAllowed; // Update local cache
                 }
-            } catch (ignore) {}
+            } catch (ignore) { }
         }
 
         const installBtn = document.getElementById('pwa-install-btn');
@@ -4182,11 +4197,11 @@ window.appLogic = {
             if (isPwaAllowed && !isStandalone) {
                 installBtn.classList.remove('hidden');
                 installBtn.style.display = 'block'; // Ensure visibility
-                
+
                 installBtn.onclick = async (e) => {
                     e.preventDefault();
                     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-                    
+
                     if (isIOS) {
                         alert('في متصفح سفاري: اضغط على أيقونة المشاركة 📤 ثم اختر "إضافة إلى الصفحة الرئيسية"');
                     } else if (deferredPrompt) {
@@ -4367,7 +4382,7 @@ window.appLogic = {
             '#settings-modal .selector-group:nth-of-type(3) label': { ar: 'رقم الجوال', en: 'Phone Number' },
             '#settings-modal .selector-group:nth-of-type(4) label': { ar: 'الرقم الضريبي (اختياري)', en: 'Tax Number (Optional)' },
             '#settings-modal .selector-group:nth-of-type(5) label': { ar: 'مظهر النظام (Theme)', en: 'System Theme' },
-            '#trial-banner': { ar: 'نسخة تجريبية: متبقي <span id="trial-days"></span> أيام', en: 'Trial version: <span id="trial-days">5</span> days left' },
+            '#trial-banner': { ar: 'نسخة تجريبية: متبقي <span id="trial-days" style="font-weight:bold; margin:0 4px;"></span>&nbsp; أيام', en: 'Trial version: &nbsp;<span id="trial-days" style="font-weight:bold; margin:0 4px;"></span>&nbsp; days left' },
             '#initial-loader h2': { ar: 'جاري التحميل...', en: 'Loading...' },
 
             // Expense Modal Option Selectors (Deep Form Translation)
@@ -4799,9 +4814,9 @@ window.appLogic = {
         // Wait... there may be invoices that didn't match the KSA date but ARE from today's shift visually?
         // To be absolutely safe and prevent rogue ghost invoices from persisting: 
         // EXCEPTION: Unpaid "Pay Later" invoices MUST persist across daily closures.
-        invoices.forEach(i => { 
+        invoices.forEach(i => {
             if (i && i.paymentStatus !== 'unpaid') {
-                i.isZReported = true; 
+                i.isZReported = true;
             }
         });
         exps.forEach(e => { if (e) e.isZReported = true; });
