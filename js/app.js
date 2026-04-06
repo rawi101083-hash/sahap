@@ -1593,9 +1593,9 @@ window.appLogic = {
             ? `<p style="margin:2px 0; font-size:14px; color:#444;">الرقم الضريبي: &nbsp;&nbsp; <strong style="direction:ltr; display:inline-block;">${_invoiceTax}</strong></p>` : '';
         const _storeWA = (window.tenantSettings || {}).phone
             ? `<p style="margin:2px 0; font-size:14px; color:#444;">رقم جوال النشاط: &nbsp;&nbsp; <strong style="direction:ltr; display:inline-block;">${window.tenantSettings.phone}</strong></p>` : '';
-        const _iCity = localStorage.getItem('invoiceCity') || '';
-        const _iHood = localStorage.getItem('invoiceNeighborhood') || '';
-        const _iStreet = localStorage.getItem('invoiceStreet') || '';
+        const _iCity = (window.tenantSettings || {}).addressCity || localStorage.getItem('invoiceCity') || '';
+        const _iHood = (window.tenantSettings || {}).addressNeighborhood || localStorage.getItem('invoiceNeighborhood') || '';
+        const _iStreet = (window.tenantSettings || {}).addressStreet || localStorage.getItem('invoiceStreet') || '';
         const _addrParts = [];
         if (_iCity) _addrParts.push(_iCity);
         if (_iHood) _addrParts.push(_iHood);
@@ -1858,9 +1858,9 @@ window.appLogic = {
         const _invoiceTax = data.taxNumber;
         const storeTax = _invoiceTax
             ? `<p style="margin:0;"><span class="label">الرقم الضريبي:</span> <span class="number">${_invoiceTax}</span></p>` : '';
-        const _iCity = localStorage.getItem('invoiceCity') || '';
-        const _iHood = localStorage.getItem('invoiceNeighborhood') || '';
-        const _iStreet = localStorage.getItem('invoiceStreet') || '';
+        const _iCity = (window.tenantSettings || {}).addressCity || localStorage.getItem('invoiceCity') || '';
+        const _iHood = (window.tenantSettings || {}).addressNeighborhood || localStorage.getItem('invoiceNeighborhood') || '';
+        const _iStreet = (window.tenantSettings || {}).addressStreet || localStorage.getItem('invoiceStreet') || '';
         const _addrParts = [];
         if (_iCity) _addrParts.push(_iCity);
         if (_iHood) _addrParts.push(_iHood);
@@ -4112,9 +4112,9 @@ window.appLogic = {
         document.getElementById('setting-phone').value = s.phone || '';
         document.getElementById('setting-tax').value = s.taxNumber || '';
         
-        if(document.getElementById('setting-city')) document.getElementById('setting-city').value = localStorage.getItem('invoiceCity') || '';
-        if(document.getElementById('setting-hood')) document.getElementById('setting-hood').value = localStorage.getItem('invoiceNeighborhood') || '';
-        if(document.getElementById('setting-street')) document.getElementById('setting-street').value = localStorage.getItem('invoiceStreet') || '';
+        if(document.getElementById('setting-city')) document.getElementById('setting-city').value = s.addressCity || localStorage.getItem('invoiceCity') || '';
+        if(document.getElementById('setting-hood')) document.getElementById('setting-hood').value = s.addressNeighborhood || localStorage.getItem('invoiceNeighborhood') || '';
+        if(document.getElementById('setting-street')) document.getElementById('setting-street').value = s.addressStreet || localStorage.getItem('invoiceStreet') || '';
 
         // PWA Button Gatekeeper Logic
         let isPwaAllowed = s.canInstallPWA === true;
@@ -4482,15 +4482,17 @@ window.appLogic = {
         }
         const tax = vatValue;
 
-        // Merge locally so we don't destroy pre-existing properties like pin or status
-        window.tenantSettings = {
-            
-            name, phone, taxNumber: tax
-        };
-
         const city = document.getElementById('setting-city') ? document.getElementById('setting-city').value.trim() : '';
         const hood = document.getElementById('setting-hood') ? document.getElementById('setting-hood').value.trim() : '';
         const street = document.getElementById('setting-street') ? document.getElementById('setting-street').value.trim() : '';
+
+        // Merge locally so we don't destroy pre-existing properties like pin or status
+        window.tenantSettings = {
+            ...(window.tenantSettings || {}),
+            name, phone, taxNumber: tax,
+            addressCity: city, addressNeighborhood: hood, addressStreet: street
+        };
+
         localStorage.setItem('invoiceCity', city);
         localStorage.setItem('invoiceNeighborhood', hood);
         localStorage.setItem('invoiceStreet', street);
@@ -4508,6 +4510,9 @@ window.appLogic = {
                 updates[`users/${window.currentUID}/settings/name`] = name;
                 updates[`users/${window.currentUID}/settings/phone`] = phone;
                 updates[`users/${window.currentUID}/settings/taxNumber`] = tax;
+                updates[`users/${window.currentUID}/settings/addressCity`] = city;
+                updates[`users/${window.currentUID}/settings/addressNeighborhood`] = hood;
+                updates[`users/${window.currentUID}/settings/addressStreet`] = street;
                 if (window._tempLogoBase64) updates[`users/${window.currentUID}/settings/logo`] = window._tempLogoBase64;
 
                 // CRITICAL SYNC: Mirror updates to accountDetails so the Master Dashboard knows instantly
