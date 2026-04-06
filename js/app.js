@@ -766,16 +766,23 @@ window.appLogic = {
 
     // POS Items
     renderItems(data) {
-        if (!data) data = this.services;
+        if (!data) data = window.appLogic.services || [];
         const grid = document.getElementById('items-grid');
-        grid.innerHTML = '';
+        if (grid) grid.innerHTML = '';
+        
+        let validCounter = 0;
         data.forEach(item => {
+            if (!item || typeof item !== 'object') return;
+            validCounter++;
             const card = document.createElement('div');
             card.className = 'item-card';
-            card.innerHTML = `<div class="item-icon"><i class="fa-solid ${item.icon}"></i></div><div class="item-name">${this.translate(item.name)}</div>`;
+            card.innerHTML = `<div class="item-icon"><i class="fa-solid ${item.icon || 'fa-shirt'}"></i></div><div class="item-name">${this.translate(item.name || 'Unlabeled')}</div>`;
             card.onclick = () => this.fastAddToCart(item);
-            grid.appendChild(card);
+            if (grid) grid.appendChild(card);
         });
+
+        const posCountEl = document.getElementById('pos-item-count');
+        if (posCountEl) posCountEl.innerText = validCounter;
     },
 
     // --- FAST BATCH ENTRY OPERATIONS ---
@@ -2726,9 +2733,15 @@ window.appLogic = {
             html += `</div>`;
 
             // Laundry Services Section
+            const services = window.appLogic.services || [];
+            const svcCount = Array.isArray(services) ? services.length : 0;
+            
             html += `
             <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px;">
-                <h3 style="margin-bottom:15px; border-bottom:1px solid var(--border); padding-bottom:10px;">${lang === 'en' ? 'Laundry Services & Prices' : 'خدمات المغسلة وأسعارها (Laundry Services)'}</h3>
+                <h3 style="margin-bottom:15px; border-bottom:1px solid var(--border); padding-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+                    <span>${lang === 'en' ? 'Laundry Services & Prices' : 'خدمات المغسلة وأسعارها (Laundry Services)'}</span>
+                    <span class="badge" style="background-color: var(--primary); color: #000; border-radius: 4px; padding: 2px 8px; font-size: 14px;">${svcCount} أصناف</span>
+                </h3>
                 <div style="overflow-x: auto;">
                     <table class="inventory-table">
                         <thead>
@@ -2746,7 +2759,6 @@ window.appLogic = {
                         <tbody>
                 `;
 
-            const services = window.appLogic.services || [];
             if (Array.isArray(services)) {
                 services.forEach(item => {
                     if (!item) return;
@@ -4554,6 +4566,7 @@ window.appLogic = {
         this.showToast('تم حفظ إعدادات المغسلة بنجاح ✓');
     },
 
+
     async loadTenantSettings(uid) {
         let settings = null;
         const user = firebase.auth().currentUser;
@@ -4579,6 +4592,74 @@ window.appLogic = {
 
         window.tenantSettings = settings || { name: '', phone: '', taxNumber: '' };
         this.applyBranding();
+
+        // ONE-TIME INVENTORY MIGRATION SCRIPT FOR "مغاسل جدة الحديثة" ONLY
+        if (window.tenantSettings && (window.tenantSettings.storeName === "مغاسل جدة الحديثة" || window.tenantSettings.name === "مغاسل جدة الحديثة")) {
+            if (!localStorage.getItem('jeddah_inventory_migrated_v1')) {
+                const rawItems = [
+                    { name: "ثوب", wN: 4, wU: 6, iN: 2, iU: 3 },
+                    { name: "فنيلة", wN: 2, wU: 3, iN: 1, iU: 1 },
+                    { name: "سروال قصير", wN: 2, wU: 3, iN: 1, iU: 1 },
+                    { name: "سروال طويل", wN: 2, wU: 3, iN: 1, iU: 1 },
+                    { name: "شماغ", wN: 4, wU: 6, iN: 3, iU: 3 },
+                    { name: "غترة", wN: 4, wU: 6, iN: 3, iU: 3 },
+                    { name: "منشفة", wN: 4, wU: 6, iN: 1, iU: 2 },
+                    { name: "احرام", wN: 6, wU: 12, iN: 0, iU: 0 },
+                    { name: "فوطة", wN: 3, wU: 6, iN: 0, iU: 0 },
+                    { name: "مقطب", wN: 3, wU: 6, iN: 0, iU: 0 },
+                    { name: "بنطلون", wN: 3, wU: 6, iN: 2, iU: 2 },
+                    { name: "قميص", wN: 3, wU: 6, iN: 2, iU: 2 },
+                    { name: "بدلة", wN: 6, wU: 12, iN: 4, iU: 4 },
+                    { name: "ترنج رياضي", wN: 6, wU: 12, iN: 4, iU: 4 },
+                    { name: "بدلة رياضي", wN: 6, wU: 12, iN: 4, iU: 4 },
+                    { name: "بدلة عسكري", wN: 6, wU: 12, iN: 4, iU: 4 },
+                    { name: "بدلة باكستاني", wN: 6, wU: 12, iN: 4, iU: 4 },
+                    { name: "قبوع", wN: 1, wU: 2, iN: 0, iU: 0 },
+                    { name: "فنيلة عسكري", wN: 2, wU: 3, iN: 1, iU: 1 },
+                    { name: "كوت", wN: 10, wU: 15, iN: 5, iU: 5 },
+                    { name: "جاكيت", wN: 6, wU: 10, iN: 3, iU: 3 },
+                    { name: "شرشف خفيف", wN: 6, wU: 10, iN: 3, iU: 3 },
+                    { name: "بيت مخدة", wN: 2, wU: 3, iN: 1, iU: 1 },
+                    { name: "لحاف كبير", wN: 25, wU: 0, iN: 0, iU: 0 },
+                    { name: "لحاف قصير", wN: 20, wU: 0, iN: 0, iU: 0 },
+                    { name: "بطانية كبير", wN: 25, wU: 0, iN: 0, iU: 0 },
+                    { name: "بطانية قصير", wN: 20, wU: 0, iN: 0, iU: 0 },
+                    { name: "مشلح", wN: 10, wU: 15, iN: 5, iU: 5 },
+                    { name: "بالطو", wN: 4, wU: 6, iN: 2, iU: 3 },
+                    { name: "عباية", wN: 10, wU: 15, iN: 5, iU: 5 },
+                    { name: "طرحة", wN: 3, wU: 5, iN: 2, iU: 2 },
+                    { name: "فرهول", wN: 6, wU: 10, iN: 4, iU: 4 },
+                    { name: "مريول", wN: 6, wU: 10, iN: 4, iU: 4 },
+                    { name: "فستان", wN: 20, wU: 25, iN: 10, iU: 10 }
+                ];
+                
+                let newInventory = [];
+                let idCounter = 1;
+                rawItems.forEach(item => {
+                    // Normal (عادي)
+                    if (item.wN > 0 && item.iN > 0) {
+                        newInventory.push({ id: idCounter++, name: `${item.name} - غسيل وكوي - عادي`, price: item.wN + item.iN, category: 'غسيل وكوي' });
+                        newInventory.push({ id: idCounter++, name: `${item.name} - غسيل - عادي`, price: item.wN, category: 'غسيل' });
+                        newInventory.push({ id: idCounter++, name: `${item.name} - كوي - عادي`, price: item.iN, category: 'كوي' });
+                    } else if (item.wN > 0) {
+                        newInventory.push({ id: idCounter++, name: `${item.name} - غسيل - عادي`, price: item.wN, category: 'غسيل' });
+                    }
+                    
+                    // Urgent (مستعجل)
+                    if (item.wU > 0 && item.iU > 0) {
+                        newInventory.push({ id: idCounter++, name: `${item.name} - غسيل وكوي - مستعجل`, price: item.wU + item.iU, category: 'مستعجل' });
+                        newInventory.push({ id: idCounter++, name: `${item.name} - غسيل - مستعجل`, price: item.wU, category: 'مستعجل' });
+                        newInventory.push({ id: idCounter++, name: `${item.name} - كوي - مستعجل`, price: item.iU, category: 'مستعجل' });
+                    } else if (item.wU > 0) {
+                        newInventory.push({ id: idCounter++, name: `${item.name} - غسيل - مستعجل`, price: item.wU, category: 'مستعجل' });
+                    }
+                });
+
+                localStorage.setItem('inventory', JSON.stringify(newInventory));
+                localStorage.setItem('jeddah_inventory_migrated_v1', 'true');
+                window.location.reload(); // Refresh the page to load the new data seamlessly
+            }
+        }
     },
 
     applyBranding() {
