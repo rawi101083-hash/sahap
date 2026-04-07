@@ -1863,8 +1863,8 @@ window.appLogic = {
             });
 
             const iframe = document.createElement('iframe');
-            // Allow height to grow automatically based on content
             iframe.style.width = '576px';
+            iframe.style.height = '4000px'; // CRITICAL: MASSIVE HEIGHT TO PREVENT ANY CLIPPING BEFORE CAPTURE
             iframe.style.position = 'absolute';
             iframe.style.left = '-9999px';
             document.body.appendChild(iframe);
@@ -1877,28 +1877,26 @@ window.appLogic = {
             body { margin: 0; padding: 0; background: white; color: black; font-family: 'Tajawal', sans-serif; }
             * { color: black !important; }
             
-            /* FORCE CONTAINER TO EXACT 80MM WIDTH */
-            #rtl-wrapper { width: 576px !important; padding: 15px; box-sizing: border-box; background: white; overflow: hidden; }
+            /* FORCE CONTAINER TO 80MM WIDTH */
+            #rtl-wrapper { width: 576px !important; padding: 15px 25px; box-sizing: border-box; background: white; }
             
-            /* FORCE TABLE TO SPREAD 100% */
-            table { width: 100% !important; border-collapse: collapse; margin-bottom: 20px; }
+            /* SPREAD TABLE */
+            table { width: 100% !important; border-collapse: collapse; margin-bottom: 25px; table-layout: fixed; }
             td, th { font-size: 26px !important; font-weight: 900 !important; padding: 12px 0 !important; border-bottom: 2px dashed #000; }
             
-            /* EXACT COLUMN PERCENTAGES TO PREVENT SQUISHING */
-            th:nth-child(1), td:nth-child(1) { text-align: right; width: 55%; padding-right: 5px !important; }
-            th:nth-child(2), td:nth-child(2) { text-align: center; width: 15%; }
-            th:nth-child(3), td:nth-child(3) { text-align: left; width: 30%; padding-left: 5px !important; }
+            th:nth-child(1), td:nth-child(1) { text-align: right; width: 50%; padding-right: 5px; }
+            th:nth-child(2), td:nth-child(2) { text-align: center; width: 20%; }
+            th:nth-child(3), td:nth-child(3) { text-align: left; width: 30%; padding-left: 5px; }
             
             .receipt-header { text-align: center; border-bottom: 2px dashed #000; padding-bottom: 15px; margin-bottom: 20px; width: 100%; }
             .receipt-header div:nth-child(2) { font-size: 46px !important; font-weight: 900 !important; margin-bottom: 10px !important; }
             .receipt-header p, .receipt-header div { font-size: 24px !important; font-weight: bold !important; line-height: 1.5; }
             
-            /* ALIGN TOTALS TO SPREAD */
-            .totals-row { display: flex; justify-content: space-between; width: 100%; font-size: 24px !important; font-weight: bold !important; margin-bottom: 5px; }
-            .grand-total { font-size: 32px !important; font-weight: 900 !important; border-top: 2px solid #000; padding-top: 10px; margin-top: 10px; }
+            .totals-row { display: flex; justify-content: space-between; width: 100%; font-size: 26px !important; font-weight: bold !important; margin-bottom: 8px; }
+            .grand-total { font-size: 34px !important; font-weight: 900 !important; border-top: 2px solid #000; padding-top: 15px; margin-top: 15px; }
             
-            /* QR CODE CENTERING */
-            #temp-qr-render { margin-top: 30px; display: flex; justify-content: center; width: 100%; padding-bottom: 20px; }
+            /* QR CODE AT THE VERY BOTTOM */
+            #temp-qr-render { margin-top: 40px; display: flex; justify-content: center; width: 100%; padding-bottom: 50px; }
             #temp-qr-render img { width: 220px !important; height: 220px !important; display: block; margin: 0 auto; }
             </style></head><body>
             <div id="rtl-wrapper">${tempContainer.innerHTML}</div>
@@ -1906,13 +1904,18 @@ window.appLogic = {
             `);
             doc.close();
 
-            await new Promise(r => setTimeout(r, 850));
+            // Wait exactly 1 second to GUARANTEE the QR code is fully drawn before taking the picture
+            await new Promise(r => setTimeout(r, 1000));
 
-            // CRITICAL: Capture the exact wrapper div, NOT the body. This prevents QR code cutoff 100%.
             const wrapperElement = doc.getElementById('rtl-wrapper');
-            
+            // Calculate the EXACT height of the fully rendered receipt
+            const exactHeight = wrapperElement.scrollHeight;
+
             const canvas = await html2canvas(wrapperElement, { 
                 width: 576, 
+                height: exactHeight,
+                windowWidth: 576, 
+                windowHeight: exactHeight,
                 scale: 1, 
                 useCORS: true, 
                 logging: false 
