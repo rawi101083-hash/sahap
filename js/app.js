@@ -1470,76 +1470,7 @@ window.appLogic = {
 
     async printThermalReceipt() {
         if (!this.currentInvoice) return;
-        try {
-            var container = document.getElementById('invoice-preview-container');
-            var originalBtn = document.querySelector('button[onclick="appLogic.printThermalReceipt()"]');
-            var origHTML = originalBtn ? originalBtn.innerHTML : '';
-            if (originalBtn) originalBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري إرسال الطباعة...';
-
-            var invoiceInnerHTML = container.innerHTML;
-
-            var iframe = document.createElement('iframe');
-            // 576px is the exact pixel width for 80mm thermal paper at 203 DPI
-            iframe.style.width = '576px';
-            iframe.style.position = 'absolute';
-            iframe.style.left = '-9999px';
-            document.body.appendChild(iframe);
-
-            var doc = iframe.contentWindow.document;
-            doc.open();
-            doc.write(`
-            <html>
-            <head>
-            <style>
-            @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@700;900&display=swap');
-            body {
-                margin: 0; padding: 0; width: 576px;
-                background: white; color: black;
-                direction: ltr;
-            }
-            #rtl-wrapper {
-                direction: rtl;
-                padding: 5px;
-                width: 100%;
-                box-sizing: border-box;
-                font-family: 'Tajawal', sans-serif;
-            }
-            /* Override inline widths to fill the 576px canvas perfectly */
-            #rtl-wrapper > div { width: 100% !important; margin: 0 !important; padding: 10px !important; }
-            table { width: 100% !important; }
-            </style>
-            </head>
-            <body>
-            <div id="rtl-wrapper">
-                ${invoiceInnerHTML}
-            </div>
-            </body>
-            </html>
-            `);
-            doc.close();
-
-            await new Promise(function (resolve) { setTimeout(resolve, 500); });
-
-            var canvas = await html2canvas(doc.body, {
-                width: 576,
-                windowWidth: 576,
-                scale: 1,
-                useCORS: true
-            });
-
-            document.body.removeChild(iframe);
-
-            var base64ImageString = canvas.toDataURL('image/png');
-
-            // Send to RawBT via Intent
-            window.location.href = "intent:" + base64ImageString + "#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;";
-
-            if (originalBtn) originalBtn.innerHTML = origHTML;
-        } catch (err) {
-            alert('حدث خطأ أثناء الطباعة: ' + err.message);
-            var btn = document.querySelector('button[onclick="appLogic.printThermalReceipt()"]');
-            if (btn) btn.innerHTML = '<i class="fa-solid fa-print"></i> <span>طباعة إيصال حراري (80mm)</span>';
-        }
+        await this.printInvoice(this.currentInvoice);
     },
 
 
@@ -1947,18 +1878,69 @@ window.appLogic = {
     },
 
     // 80mm Thermal Receipt Layout
-    printInvoice(data) {
-        document.getElementById('invoice-print-container').innerHTML = this.generateThermalHTML(data, 'print-qr-render');
+    async printInvoice(data) {
+        if (!data) return;
+        try {
+            var originalBtn = document.querySelector('button[onclick="appLogic.printThermalReceipt()"]');
+            var origHTML = originalBtn ? originalBtn.innerHTML : '';
+            if (originalBtn) originalBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري الطباعة...';
 
-        const bizName = (window.tenantSettings || {}).name || 'سحاب POS';
-        const zatcaQRBase64 = generateZatcaBase64(bizName, data.taxNumber || "000000000000000", data.timestamp, data.grandTotal, data.vatAmount);
-        new QRCode(document.getElementById('print-qr-render'), {
-            text: zatcaQRBase64,
-            width: 120, height: 120,
-            colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L
-        });
+            const tempContainer = document.createElement('div');
+            tempContainer.innerHTML = this.generateThermalHTML(data, 'temp-qr-render');
+            
+            const bizName = (window.tenantSettings || {}).name || 'سحاب POS';
+            const zatcaQRBase64 = generateZatcaBase64(bizName, (window.tenantSettings || {}).taxNumber || "000000000000000", data.timestamp, data.grandTotal, data.vatAmount);
+            new QRCode(tempContainer.querySelector('#temp-qr-render'), {
+                text: zatcaQRBase64, width: 150, height: 150, colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L
+            });
 
-        window.print();
+            // Create hidden iframe with strict 400px width for perfect 80mm proportions
+            const iframe = document.createElement('iframe');
+            iframe.style.width = '400px';
+            iframe.style.position = 'absolute';
+            iframe.style.left = '-9999px';
+            document.body.appendChild(iframe);
+
+            const doc = iframe.contentWindow.document;
+            doc.open();
+            doc.write(`
+            <html dir="rtl"><head><style>
+            @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@700;900&display=swap');
+            body { margin: 0; padding: 0; width: 400px; background: white; color: black; font-family: 'Tajawal', sans-serif; }
+            * { color: black !important; }
+            #rtl-wrapper { padding: 10px; box-sizing: border-box; }
+            /* FORCE UPSCALING FOR THERMAL CLARITY */
+            table { width: 100% !important; border-collapse: collapse; }
+            td, th { font-size: 20px !important; font-weight: 900 !important; padding: 8px 2px !important; border-color: #000 !important; }
+            .receipt-header { text-align: center; border-bottom: 2px dashed #000; padding-bottom: 10px; margin-bottom: 10px; }
+            .receipt-header div:nth-child(2) { font-size: 32px !important; font-weight: 900 !important; margin-bottom: 5px !important; }
+            .receipt-header p, .receipt-header div { font-size: 18px !important; font-weight: bold !important; }
+            #temp-qr-render { margin-top: 15px; text-align: center; }
+            #temp-qr-render img { display: block; margin: 0 auto; width: 180px !important; height: 180px !important; }
+            </style></head><body>
+            <div id="rtl-wrapper">${tempContainer.innerHTML}</div>
+            </body></html>
+            `);
+            doc.close();
+
+            // Wait for fonts and QR code to render fully
+            await new Promise(r => setTimeout(r, 700));
+
+            // Capture with scale: 1.5 to create a 600px image (Perfect for 203 DPI 80mm printers)
+            const canvas = await html2canvas(doc.body, { width: 400, windowWidth: 400, scale: 1.5, useCORS: true });
+            document.body.removeChild(iframe);
+
+            const base64ImageString = canvas.toDataURL('image/png');
+
+            // Send to RawBT silently
+            window.location.href = "intent:" + base64ImageString + "#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;";
+            
+            if (originalBtn) originalBtn.innerHTML = origHTML;
+        } catch (err) {
+            console.error('Print Error:', err);
+            alert('خطأ في الطباعة: ' + err.message);
+            if (originalBtn) originalBtn.innerHTML = '<i class="fa-solid fa-print"></i> <span>طباعة إيصال حراري</span>';
+        }
     },
 
     // History & Invoice Management
