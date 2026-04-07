@@ -1850,7 +1850,7 @@ window.appLogic = {
         try {
             var originalBtn = document.querySelector('button[onclick="appLogic.printThermalReceipt()"]');
             var origHTML = originalBtn ? originalBtn.innerHTML : '';
-            if (originalBtn) originalBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري تجهيز الفاتورة...';
+            if (originalBtn) originalBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري الطباعة...';
 
             const tempContainer = document.createElement('div');
             tempContainer.innerHTML = this.generateThermalHTML(data, 'temp-qr-render');
@@ -1860,12 +1860,13 @@ window.appLogic = {
             
             // Generate QR Code
             new QRCode(tempContainer.querySelector('#temp-qr-render'), {
-                text: zatcaQRBase64, width: 170, height: 170, colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L
+                text: zatcaQRBase64, width: 220, height: 220, colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L
             });
 
-            // Setup isolated iframe for perfect 80mm layout (400px width)
             const iframe = document.createElement('iframe');
-            iframe.style.width = '400px';
+            // Set 576px (exact 80mm width) and a massive height to prevent any clipping before capture
+            iframe.style.width = '576px';
+            iframe.style.height = '3000px'; 
             iframe.style.position = 'absolute';
             iframe.style.left = '-9999px';
             document.body.appendChild(iframe);
@@ -1875,37 +1876,50 @@ window.appLogic = {
             doc.write(`
             <html dir="rtl"><head><style>
             @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@700;900&display=swap');
-            body { margin: 0; padding: 0; width: 400px; background: white; color: black; font-family: 'Tajawal', sans-serif; }
+            body { margin: 0; padding: 0; width: 576px; background: white; color: black; font-family: 'Tajawal', sans-serif; }
             * { color: black !important; }
-            #rtl-wrapper { padding: 10px; box-sizing: border-box; width: 100%; }
+            #rtl-wrapper { padding: 10px 15px; box-sizing: border-box; width: 576px; }
             
-            /* MASSIVELY INCREASED FONT SIZES FOR THERMAL CLARITY */
-            table { width: 100% !important; border-collapse: collapse; margin-bottom: 15px; }
-            td, th { font-size: 24px !important; font-weight: 900 !important; padding: 10px 2px !important; border-bottom: 2px dashed #000; text-align: center; }
+            /* SPREAD CONTENT ACROSS FULL WIDTH */
+            table { width: 100% !important; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed; }
+            td, th { font-size: 26px !important; font-weight: 900 !important; padding: 12px 2px !important; border-bottom: 2px dashed #000; }
             
-            .receipt-header { text-align: center; border-bottom: 2px dashed #000; padding-bottom: 15px; margin-bottom: 15px; }
-            .receipt-header div:nth-child(2) { font-size: 40px !important; font-weight: 900 !important; margin-bottom: 8px !important; }
-            .receipt-header p, .receipt-header div { font-size: 22px !important; font-weight: bold !important; line-height: 1.4; }
+            /* Align columns to stretch properly */
+            th:nth-child(1), td:nth-child(1) { text-align: right; width: 50%; }
+            th:nth-child(2), td:nth-child(2) { text-align: center; width: 20%; }
+            th:nth-child(3), td:nth-child(3) { text-align: left; width: 30%; }
             
-            /* QR CODE CENTERING */
-            #temp-qr-render { margin-top: 20px; display: flex; justify-content: center; width: 100%; }
-            #temp-qr-render img { width: 180px !important; height: 180px !important; display: block; margin: 0 auto; }
+            .receipt-header { text-align: center; border-bottom: 2px dashed #000; padding-bottom: 15px; margin-bottom: 20px; }
+            .receipt-header div:nth-child(2) { font-size: 46px !important; font-weight: 900 !important; margin-bottom: 10px !important; }
+            .receipt-header p, .receipt-header div { font-size: 24px !important; font-weight: bold !important; line-height: 1.5; }
+            
+            /* QR CODE FIX */
+            #temp-qr-render { margin-top: 30px; display: flex; justify-content: center; width: 100%; padding-bottom: 40px; }
+            #temp-qr-render img { width: 220px !important; height: 220px !important; display: block; margin: 0 auto; }
             </style></head><body>
             <div id="rtl-wrapper">${tempContainer.innerHTML}</div>
             </body></html>
             `);
             doc.close();
 
-            // CRITICAL FIX: Wait 850ms to GUARANTEE QR code and custom fonts load completely before capturing. Prevents blank pages!
             await new Promise(r => setTimeout(r, 850));
 
-            // Capture the canvas with stable scale
-            const canvas = await html2canvas(doc.body, { width: 400, windowWidth: 400, scale: 1.5, useCORS: true, logging: false });
+            // Get exact height of the content to prevent cutoff
+            const contentHeight = doc.getElementById('rtl-wrapper').offsetHeight + 20;
+
+            // Capture at exactly 1:1 scale for 80mm
+            const canvas = await html2canvas(doc.body, { 
+                width: 576, 
+                height: contentHeight,
+                windowWidth: 576, 
+                windowHeight: contentHeight,
+                scale: 1, 
+                useCORS: true, 
+                logging: false 
+            });
             document.body.removeChild(iframe);
 
             const base64ImageString = canvas.toDataURL('image/png');
-
-            // Send to RawBT
             window.location.href = "intent:" + base64ImageString + "#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;";
             
             if (originalBtn) originalBtn.innerHTML = origHTML;
