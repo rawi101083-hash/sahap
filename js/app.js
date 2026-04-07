@@ -1038,7 +1038,7 @@ window.appLogic = {
             if (document.getElementById('golden-trigger-total')) document.getElementById('golden-trigger-total').innerText = finalValue;
         }
 
-        this.updateCheckoutTotal();
+        this.renderCheckoutDeliveryButtons();
     },
 
     syncCustomerData(source) {
@@ -1064,29 +1064,6 @@ window.appLogic = {
         }
         this.customer.name = name;
         this.customer.phone = phone;
-    },
-
-    openCheckoutModal() {
-        if (this.cart.length === 0) return alert('السلة فارغة!');
-
-        // Fix 6: Disable annoying auto-fill of Cash Customer if nothing was typed
-        const sideName = (document.getElementById('sidebar-customer-name') || {}).value || '';
-        const sidePhone = (document.getElementById('sidebar-customer-phone') || {}).value || '';
-        document.getElementById('checkout-customer-name').value = sideName || '';
-        document.getElementById('checkout-customer-phone').value = sidePhone || '';
-
-        const errEl = document.getElementById('checkout-phone-error');
-        if (errEl) errEl.style.display = 'none';
-
-        this.renderCheckoutDeliveryButtons();
-        this.setPaymentMethod('cash');
-        this.updateCheckoutTotal();
-
-        document.getElementById('checkout-modal').classList.remove('hidden');
-    },
-
-    closeCheckoutModal() {
-        document.getElementById('checkout-modal').classList.add('hidden');
     },
 
     closePaymentModal() {
@@ -1175,7 +1152,7 @@ window.appLogic = {
             const isActive = this.deliveryFee === opt.amount;
             container.innerHTML += `
                 <button class="btn-delivery ${isActive ? 'active' : ''}" 
-                        onclick="appLogic.setDelivery(${opt.amount}, this); appLogic.updateCheckoutTotal(); appLogic.renderCheckoutDeliveryButtons();">
+                        onclick="appLogic.setDelivery(${opt.amount}, this);">
                     ${opt.name}${opt.amount > 0 ? ': ' + opt.amount + ' ر.س' : ''}
                 </button>
             `;
@@ -1183,16 +1160,7 @@ window.appLogic = {
     },
 
     updateCheckoutTotal() {
-        const subt = this.cart.reduce((s, i) => s + (i.unitPrice * i.qty), 0);
-        let totalVal = subt + this.deliveryFee;
-        let totalStr = totalVal.toFixed(2);
-
-        const modalTotal = document.getElementById('checkout-grand-total');
-        if (modalTotal) modalTotal.innerText = totalStr;
-
-        // Keep sidebar total in sync if needed
-        const sidebarTotal = document.getElementById('grand-total');
-        if (sidebarTotal) sidebarTotal.innerText = totalStr;
+        // Obsolete function, safely bypassed.
     },
 
     renderDeliveryButtons() {
@@ -1309,8 +1277,7 @@ window.appLogic = {
 
         this.pendingInvoice = invoiceData;
 
-        // Fix 5: Open Payment Method Modal (New Step 2)
-        this.closeCheckoutModal();
+        // Fix 5: Open Payment Method Modal directly
         const payLaterBtn = document.getElementById('method-paylater');
         if (payLaterBtn) {
             payLaterBtn.style.display = 'flex';
@@ -1353,18 +1320,10 @@ window.appLogic = {
         this.currentInvoice = this.pendingInvoice;
         this.pendingInvoice = null;
 
-        // Switch Modal State
-        document.getElementById('success-invoice-ref').innerText = (this.currentInvoice.id || '').toString().replace(/^INV-/, '');
-        document.getElementById('modal-actions-preview').classList.add('hidden');
-        document.getElementById('modal-actions-success').classList.remove('hidden');
-
-        // Fix 8: Automatic Invoice OS Print
-        setTimeout(() => {
-            if (this.currentInvoice) {
-                this.printInvoice(this.currentInvoice);
-                console.log('Invoice auto-printed successfully.');
-            }
-        }, 1200);
+        // Instant Auto-Print
+        if (this.currentInvoice) {
+            this.printInvoice(this.currentInvoice);
+        }
 
         // WhatsApp sharing
         const _waBtnEl = document.getElementById('btn-whatsapp-share');
@@ -1376,6 +1335,13 @@ window.appLogic = {
         // Final hard reset for next checkout cycle
         this.deliveryFee = 0;
         this.cart = [];
+        
+        // Reset Fast Checkout UI Inputs
+        const cNameInp = document.getElementById('checkout-customer-name');
+        const cPhoneInp = document.getElementById('checkout-customer-phone');
+        if(cNameInp) cNameInp.value = '';
+        if(cPhoneInp) cPhoneInp.value = '';
+
         this.updateCartUI();
     },
     closeInvoicePreview() {

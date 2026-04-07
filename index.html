@@ -253,14 +253,24 @@
                             <button class="btn-trash" onclick="appLogic.clearCart()" title="مسح السلة">
                                 <i class="fa-solid fa-trash"></i>
                             </button>
-                            <!-- Yellow Total Button (Checkout Trigger) -->
-                            <button class="btn-total-trigger" onclick="appLogic.openCheckoutModal()">
+                            <!-- Yellow Total Button (Checkout Trigger - Now Opens Payment Method directly) -->
+                            <button class="btn-total-trigger" onclick="appLogic.previewCheckout()">
                                 الإجمالي: <span id="grand-total">0.00</span> ر.س
                             </button>
                         </div>
+                        
+                        <!-- NEW FAST-CHECKOUT FIELDS -->
+                        <div class="fast-checkout-info" style="margin-top: 15px;">
+                            <input type="text" placeholder="اسم العميل (اختياري)" id="checkout-customer-name" style="width:100%; padding:10px; background:var(--bg-elevated); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm); margin-bottom:10px; font-size:14px; text-align: right; direction: rtl;">
+                            <input type="tel" placeholder="رقم الجوال (اختياري)" id="checkout-customer-phone" style="width:100%; padding:10px; background:var(--bg-elevated); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm); margin-bottom:10px; font-size:14px; text-align: right; direction: rtl;" maxlength="10">
+                            
+                            <h4 style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">خيارات التوصيل</h4>
+                            <div class="delivery-buttons" id="checkout-delivery-buttons" style="display:flex; gap:5px; flex-wrap:wrap;">
+                                <!-- Injected by JS -->
+                            </div>
+                        </div>
                     </div>
                 </section>
-
             </div>
 
             <!-- History View -->
@@ -554,61 +564,7 @@
         </div>
     </div>
 
-    <!-- Checkout Step Modal (Step 2) -->
-    <div class="modal-overlay hidden" id="checkout-modal">
-        <div class="modal" style="width: 500px; max-width: 95%;">
-            <div class="modal-header"
-                style="background: linear-gradient(135deg, var(--bg-surface), var(--bg-elevated)); border-bottom: 2px solid var(--primary); padding: 15px 24px; display: flex; justify-content: space-between; align-items: center;">
-                <h3 style="margin: 0; font-size: 18px; color: var(--primary);"><i class="fa-solid fa-cart-check"></i>
-                    إكمال الطلب</h3>
-                <button class="close-modal" onclick="appLogic.closeCheckoutModal()"
-                    style="color: var(--text-muted); font-size: 18px; padding: 5px;"><i
-                        class="fa-solid fa-arrow-left"></i></button>
-            </div>
-            <div class="modal-body" style="padding: 24px;">
-                <div class="customer-info-checkout" style="margin-bottom: 24px;">
-                    <h4
-                        style="color:var(--text-muted); font-size:13px; margin-bottom:12px; text-transform:uppercase; font-weight:800;">
-                        بيانات العميل</h4>
-                    <input type="text" placeholder="اسم العميل (اختياري)" id="checkout-customer-name"
-                        style="width:100%; padding:14px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-md); font-size:15px; margin-bottom:12px; text-align: right; direction: rtl;">
-                    <input type="tel" placeholder="رقم الجوال (اختياري)" id="checkout-customer-phone"
-                        style="width:100%; padding:14px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-md); font-size:15px; text-align: right; direction: rtl;"
-                        maxlength="10">
-                    <span id="checkout-phone-error"
-                        style="display:none; color:var(--danger); font-size:12px; margin-top:6px; font-weight:600;"></span>
-                </div>
-
-                <div class="delivery-info-checkout"
-                    style="margin-bottom: 24px; padding-top: 20px; border-top: 1px solid var(--border);">
-                    <h4
-                        style="color:var(--text-muted); font-size:13px; margin-bottom:12px; text-transform:uppercase; font-weight:800;">
-                        خيارات التوصيل</h4>
-                    <div class="delivery-buttons" id="checkout-delivery-buttons">
-                        <!-- Injected by JS -->
-                    </div>
-                </div>
-
-                <!-- Payment Toggle removed from here - moved to Step 2 Modal -->
-
-                <div class="final-total-checkout"
-                    style="background:var(--bg-elevated); padding:20px; border-radius:var(--radius-md); text-align:center; border:1px solid var(--primary); margin-bottom: 24px;">
-                    <span style="display:block; font-size:14px; color:var(--text-muted); margin-bottom:5px;">الإجمالي
-                        النهائي المستحق:</span>
-                    <h2 id="checkout-grand-total" style="font-size:32px; font-weight:900; color:var(--primary);">0.00
-                        ر.س</h2>
-                </div>
-
-                <button class="btn btn-primary w-100" onclick="appLogic.previewCheckout()"
-                    style="padding:18px; font-size:18px;">
-                    تأكيد إنشاء الفاتورة <i class="fa-solid fa-check-double"></i>
-                </button>
-            </div>
-        </div>
-    </div>
-
-
-    <!-- Refund Invoice Modal -->
+        <!-- Refund Invoice Modal -->
     <div class="modal-overlay hidden" id="refund-invoice-modal">
         <div class="modal" style="width: 600px; max-width: 95%;">
             <div class="modal-header" style="background: linear-gradient(135deg, #ef4444, #dc2626); border-bottom: 2px solid #b91c1c; padding: 15px 24px;">
