@@ -1850,67 +1850,87 @@ window.appLogic = {
         try {
             var originalBtn = document.querySelector('button[onclick="appLogic.printThermalReceipt()"]');
             var origHTML = originalBtn ? originalBtn.innerHTML : '';
-            if (originalBtn) originalBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري تجهيز الفاتورة...';
-
-            const tempContainer = document.createElement('div');
-            tempContainer.innerHTML = this.generateThermalHTML(data, 'temp-qr-render');
+            if (originalBtn) originalBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري التجهيز...';
 
             const bizName = (window.tenantSettings || {}).name || 'سحاب POS';
             const zatcaQRBase64 = generateZatcaBase64(bizName, (window.tenantSettings || {}).taxNumber || "000000000000000", data.timestamp, data.grandTotal, data.vatAmount);
+            
+            const tempQrDiv = document.createElement('div');
+            new QRCode(tempQrDiv, { text: zatcaQRBase64, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.L });
+            
+            await new Promise(r => setTimeout(r, 100));
+            const qrCanvas = tempQrDiv.querySelector('canvas');
+            const qrDataUrl = qrCanvas ? qrCanvas.toDataURL('image/png') : '';
 
-            // Generate QR Code
-            new QRCode(tempContainer.querySelector('#temp-qr-render'), {
-                text: zatcaQRBase64, width: 170, height: 170, colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L
-            });
+            const receiptHTML = this.generateThermalHTML(data, 'sunmi-native-qr');
 
-            // Setup isolated iframe for perfect 80mm layout (400px width)
+            // Remove old frame if exists instead of auto-deleting it on timer
+            const oldFrame = document.getElementById('universal-print-frame');
+            if (oldFrame) oldFrame.remove();
+
             const iframe = document.createElement('iframe');
-            iframe.style.width = '400px';
-            iframe.style.position = 'absolute';
-            iframe.style.left = '-9999px';
+            iframe.id = 'universal-print-frame';
+            // Make it 1px to bypass PC blocks, but invisible to the user
+            iframe.style.position = 'fixed';
+            iframe.style.right = '0';
+            iframe.style.bottom = '0';
+            iframe.style.width = '1px';
+            iframe.style.height = '1px';
+            iframe.style.opacity = '0';
+            iframe.style.border = '0';
             document.body.appendChild(iframe);
 
             const doc = iframe.contentWindow.document;
             doc.open();
             doc.write(`
-            <html dir="rtl"><head><style>
-            @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@700;900&display=swap');
-            body { margin: 0; padding: 0; width: 400px; background: white; color: black; font-family: 'Tajawal', sans-serif; }
-            * { color: black !important; }
-            #rtl-wrapper { padding: 10px; box-sizing: border-box; width: 100%; }
-            
-            /* MASSIVELY INCREASED FONT SIZES FOR THERMAL CLARITY */
-            table { width: 100% !important; border-collapse: collapse; margin-bottom: 15px; }
-            td, th { font-size: 24px !important; font-weight: 900 !important; padding: 10px 2px !important; border-bottom: 2px dashed #000; text-align: center; }
-            
-            .receipt-header { text-align: center; border-bottom: 2px dashed #000; padding-bottom: 15px; margin-bottom: 15px; }
-            .receipt-header div:nth-child(2) { font-size: 40px !important; font-weight: 900 !important; margin-bottom: 8px !important; }
-            .receipt-header p, .receipt-header div { font-size: 22px !important; font-weight: bold !important; line-height: 1.4; }
-            
-            /* QR CODE CENTERING */
-            #temp-qr-render { margin-top: 20px; display: flex; justify-content: center; width: 100%; }
-            #temp-qr-render img { width: 180px !important; height: 180px !important; display: block; margin: 0 auto; }
-            </style></head><body>
-            <div id="rtl-wrapper">${tempContainer.innerHTML}</div>
-            </body></html>
+            <html dir="rtl">
+            <head>
+                <title>سحاب POS - فاتورة</title>
+                <style>
+                    body { margin: 0; padding: 0; background: white; color: black; font-family: system-ui, sans-serif; width: 80mm; }
+                    * { color: black !important; }
+                    #rtl-wrapper { width: 100%; padding: 5px; box-sizing: border-box; }
+                    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed; }
+                    td, th { font-size: 20px; font-weight: bold; padding: 5px 0; border-bottom: 2px dashed #000; }
+                    th:nth-child(1), td:nth-child(1) { text-align: right; width: 50%; padding-right: 5px; }
+                    th:nth-child(2), td:nth-child(2) { text-align: center; width: 20%; }
+                    th:nth-child(3), td:nth-child(3) { text-align: left; width: 30%; padding-left: 5px; }
+                    .receipt-header { text-align: center; border-bottom: 2px dashed #000; padding-bottom: 10px; margin-bottom: 15px; }
+                    .receipt-header div:nth-child(2) { font-size: 28px; font-weight: bold; margin-bottom: 5px; }
+                    .receipt-header p, .receipt-header div { font-size: 18px; font-weight: bold; }
+                    .totals-row { display: flex; justify-content: space-between; font-size: 20px; font-weight: bold; margin-bottom: 5px; }
+                    .grand-total { font-size: 26px; font-weight: bold; border-top: 2px solid #000; padding-top: 10px; margin-top: 10px; }
+                    .qr-container { text-align: center; margin-top: 20px; padding-bottom: 30px; }
+                    .qr-container img { display: block; margin: 0 auto; width: 200px; height: 200px; }
+                    #sunmi-native-qr { display: none; }
+                    
+                    @media print {
+                        @page { margin: 0; size: 80mm auto; }
+                        body { margin: 0; width: 80mm; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div id="rtl-wrapper">
+                    ${receiptHTML}
+                    <div class="qr-container">
+                        <img src="${qrDataUrl}" />
+                    </div>
+                </div>
+            </body>
+            </html>
             `);
             doc.close();
 
-            // CRITICAL FIX: Wait 850ms to GUARANTEE QR code and custom fonts load completely before capturing. Prevents blank pages!
-            await new Promise(r => setTimeout(r, 850));
+            // Give it half a second to render, then open PC print dialog
+            setTimeout(() => {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+                if (originalBtn) originalBtn.innerHTML = origHTML;
+            }, 500);
 
-            // Capture the canvas with stable scale
-            const canvas = await html2canvas(doc.body, { width: 400, windowWidth: 400, scale: 1.5, useCORS: true, logging: false });
-            document.body.removeChild(iframe);
-
-            const base64ImageString = canvas.toDataURL('image/png');
-
-            // Send to RawBT
-            window.location.href = "intent:" + base64ImageString + "#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;";
-
-            if (originalBtn) originalBtn.innerHTML = origHTML;
         } catch (err) {
-            console.error('Print Error:', err);
+            console.error('Universal Print Error:', err);
             alert('حدث خطأ أثناء الطباعة: ' + err.message);
             if (originalBtn) originalBtn.innerHTML = '<i class="fa-solid fa-print"></i> <span>طباعة</span>';
         }
