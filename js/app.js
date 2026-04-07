@@ -815,6 +815,11 @@ window.appLogic = {
             }
         }
 
+        const isVatActive = !!(window.tenantSettings && window.tenantSettings.taxNumber && window.tenantSettings.taxNumber.trim() !== "");
+        if (isVatActive) {
+            basePrice = basePrice * 1.15;
+        }
+
         if (basePrice <= 0) {
             if (this.showToast) {
                 this.showToast('هذه الخدمة غير متوفرة بهذا الخيار');
@@ -915,6 +920,11 @@ window.appLogic = {
             }
         }
 
+        const isVatActive = !!(window.tenantSettings && window.tenantSettings.taxNumber && window.tenantSettings.taxNumber.trim() !== "");
+        if (isVatActive) {
+            basePrice = basePrice * 1.15;
+        }
+
         this.modalState.price = basePrice * qty;
         const btnAdd = document.getElementById('btn-add-to-cart');
 
@@ -945,7 +955,7 @@ window.appLogic = {
                 type: this.modalState.type,
                 speed: this.modalState.speed,
                 qty: this.modalState.qty,
-                unitPrice: this.modalState.price
+                unitPrice: this.modalState.price / this.modalState.qty
             });
         }
 
@@ -1128,7 +1138,7 @@ window.appLogic = {
 
         // Re-render QR for preview
         const bizNamePreview = (window.tenantSettings || {}).name || 'سحاب';
-        const zatcaQRBase64 = generateZatcaBase64(bizNamePreview, (window.tenantSettings || {}).taxNumber || "000000000000000", this.pendingInvoice.timestamp, this.pendingInvoice.grandTotal, this.pendingInvoice.vatAmount);
+        const zatcaQRBase64 = generateZatcaBase64(bizNamePreview, this.pendingInvoice.taxNumber || "000000000000000", this.pendingInvoice.timestamp, this.pendingInvoice.grandTotal, this.pendingInvoice.vatAmount);
 
         const qrBox = document.getElementById('preview-qr-render');
         if (qrBox) {
@@ -1285,12 +1295,13 @@ window.appLogic = {
             partnerLaundryNeighborhood: pHood,
             laundryPaid: pPaid,
             status: 'completed',
-            paymentMethod: this.paymentMethod || 'cash'
+            paymentMethod: this.paymentMethod || 'cash',
+            taxNumber: (window.tenantSettings || {}).taxNumber || ''
         };
 
-        // Calculate 15% Inclusive VAT: Subtotal = Total / 1.15, VAT = Total - Subtotal
         const _total = parseFloat(grT) || 0;
-        const _subtotalNet = _total / 1.15;
+        const _hasValTax = !!((window.tenantSettings || {}).taxNumber && (window.tenantSettings || {}).taxNumber.trim() !== '');
+        const _subtotalNet = _hasValTax ? (_total / 1.15) : _total;
         const _vatAmount = _total - _subtotalNet;
 
         invoiceData.subtotalNet = _subtotalNet;
@@ -1583,23 +1594,23 @@ window.appLogic = {
         const _subtotal = _grand - _vatAmt;
         const _invId = (data.id || '').toString().replace(/^INV-/, '');
         const _custName = (!data.customer.name || data.customer.name === 'عميل نقدي' || data.customer.name === 'عميل دون اسم') ? '' : data.customer.name;
-        const _storeTax = (window.tenantSettings || {}).taxNumber
-            ? `<p style="margin:2px 0; font-size:14px; color:#444;">الرقم الضريبي: &nbsp;&nbsp; <strong style="direction:ltr; display:inline-block;">${window.tenantSettings.taxNumber}</strong></p>` : '';
+        const _storeTax = (data.taxNumber && data.taxNumber.trim() !== '')
+            ? `<p style="margin:2px 0; font-size:14px; color:#444;">الرقم الضريبي: &nbsp;&nbsp; <strong style="direction:ltr; display:inline-block;">${data.taxNumber}</strong></p>` : '';
         const _storeWA = (window.tenantSettings || {}).phone
             ? `<p style="margin:2px 0; font-size:14px; color:#444;">رقم جوال النشاط: &nbsp;&nbsp; <strong style="direction:ltr; display:inline-block;">${window.tenantSettings.phone}</strong></p>` : '';
-    const _iCity = (window.tenantSettings || {}).addressCity || localStorage.getItem('invoiceCity') || '';
-    const _iHood = (window.tenantSettings || {}).addressNeighborhood || localStorage.getItem('invoiceNeighborhood') || '';
-    const _iStreet = (window.tenantSettings || {}).addressStreet || localStorage.getItem('invoiceStreet') || '';
-    const _addrParts = [];
-    if (_iCity) _addrParts.push(_iCity);
-    if (_iHood) _addrParts.push(_iHood);
-    if (_iStreet) _addrParts.push(_iStreet);
-    const _addressText = _addrParts.length > 0 ? _addrParts.join(' - ') : '';
+        const _iCity = (window.tenantSettings || {}).addressCity || localStorage.getItem('invoiceCity') || '';
+        const _iHood = (window.tenantSettings || {}).addressNeighborhood || localStorage.getItem('invoiceNeighborhood') || '';
+        const _iStreet = (window.tenantSettings || {}).addressStreet || localStorage.getItem('invoiceStreet') || '';
+        const _addrParts = [];
+        if (_iCity) _addrParts.push(_iCity);
+        if (_iHood) _addrParts.push(_iHood);
+        if (_iStreet) _addrParts.push(_iStreet);
+        const _addressText = _addrParts.length > 0 ? _addrParts.join(' - ') : '';
 
-    const _storeAddress = _addressText 
-        ? `<p style="margin:2px 0; font-size:14px; color:#444;">العنوان: &nbsp;&nbsp; <strong style="direction:rtl; display:inline-block;">${_addressText}</strong></p>` 
-        : '';
-        const _hasValTax = !!(window.tenantSettings && window.tenantSettings.taxNumber && window.tenantSettings.taxNumber.trim() !== '');
+        const _storeAddress = _addressText
+            ? `<p style="margin:2px 0; font-size:14px; color:#444;">العنوان: &nbsp;&nbsp; <strong style="direction:rtl; display:inline-block;">${_addressText}</strong></p>`
+            : '';
+        const _hasValTax = !!(data.taxNumber && data.taxNumber.trim() !== '');
         const _invType = _hasValTax ? 'فاتورة ضريبية مبسطة' : 'فاتورة مبيعات';
 
         let _itemRows = '', _rn = 1;
@@ -1695,7 +1706,7 @@ window.appLogic = {
                         <td style="padding:6px 0; padding-right:20px; font-weight:bold; direction:ltr; text-align:left;">${{ 'cash': 'نقدي', 'mada': 'مدى', 'visa': 'فيزا', 'mastercard': 'ماستركارد', 'network': 'شبكة' }[data.paymentMethod] || data.paymentMethod}</td>
                     </tr>
                     <tr style="border-top:1px solid #000;">
-                        <td style="padding:10px 0; font-size:16px; font-weight:900; color:#000;">الإجمالي النهائي</td>
+                        <td style="padding:10px 0; font-size:16px; font-weight:900; color:#000;">${_hasValTax ? 'الإجمالي الشامل' : 'الإجمالي'}</td>
                         <td style="padding:10px 0; padding-right:20px; font-size:18px; font-weight:900; color:#000; direction:ltr; text-align:left;">${_grand.toFixed(2)} ر.س</td>
                     </tr>
                 </table>
@@ -1714,7 +1725,7 @@ window.appLogic = {
 
         // Standard ZATCA QR (Updated with Real Tax)
         const bizName = (window.tenantSettings || {}).name || 'سحاب';
-        const zatcaQRBase64 = generateZatcaBase64(bizName, (window.tenantSettings || {}).taxNumber || "000000000000000", data.timestamp, data.grandTotal, data.vatAmount);
+        const zatcaQRBase64 = generateZatcaBase64(bizName, data.taxNumber || "000000000000000", data.timestamp, data.grandTotal, data.vatAmount);
         new QRCode(container.querySelector('#pdf-qr-container'), {
             text: zatcaQRBase64,
             width: 140, height: 140,
@@ -1811,7 +1822,7 @@ window.appLogic = {
 
     // HTML Generator for Thermal Receipt (Zero Ink — white background, RTL Arabic)
     generateThermalHTML(data, qrContainerId) {
-        const _hasValTax = !!(window.tenantSettings && window.tenantSettings.taxNumber && window.tenantSettings.taxNumber.trim() !== '');
+        const _hasValTax = !!(data.taxNumber && data.taxNumber.trim() !== '');
         const dObj = new Date(data.timestamp);
         const dStr = dObj.toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
         const _invId = (data.id || '').toString().replace(/^INV-/, '');
@@ -1849,18 +1860,18 @@ window.appLogic = {
 
         const storePhone = (window.tenantSettings || {}).phone
             ? `<p style="margin:0;"><span class="label">رقم جوال النشاط:</span> <span class="number">${window.tenantSettings.phone}</span></p>` : '';
-        const storeTax = (window.tenantSettings || {}).taxNumber
-            ? `<p style="margin:0;"><span class="label">الرقم الضريبي:</span> <span class="number">${window.tenantSettings.taxNumber}</span></p>` : '';
-    const _iCity = (window.tenantSettings || {}).addressCity || localStorage.getItem('invoiceCity') || '';
-    const _iHood = (window.tenantSettings || {}).addressNeighborhood || localStorage.getItem('invoiceNeighborhood') || '';
-    const _iStreet = (window.tenantSettings || {}).addressStreet || localStorage.getItem('invoiceStreet') || '';
-    const _addrParts = [];
-    if (_iCity) _addrParts.push(_iCity);
-    if (_iHood) _addrParts.push(_iHood);
-    if (_iStreet) _addrParts.push(_iStreet);
-    const _addressText = _addrParts.length > 0 ? _addrParts.join(' - ') : '';
+        const storeTax = (data.taxNumber && data.taxNumber.trim() !== '')
+            ? `<p style="margin:0;"><span class="label">الرقم الضريبي:</span> <span class="number">${data.taxNumber}</span></p>` : '';
+        const _iCity = (window.tenantSettings || {}).addressCity || localStorage.getItem('invoiceCity') || '';
+        const _iHood = (window.tenantSettings || {}).addressNeighborhood || localStorage.getItem('invoiceNeighborhood') || '';
+        const _iStreet = (window.tenantSettings || {}).addressStreet || localStorage.getItem('invoiceStreet') || '';
+        const _addrParts = [];
+        if (_iCity) _addrParts.push(_iCity);
+        if (_iHood) _addrParts.push(_iHood);
+        if (_iStreet) _addrParts.push(_iStreet);
+        const _addressText = _addrParts.length > 0 ? _addrParts.join(' - ') : '';
 
-    const storeAddress = _addressText ? `<p style="margin:0;"><span class="label">العنوان:</span> <span class="number" style="direction:rtl; display:inline-block;">${_addressText}</span></p>` : '';
+        const storeAddress = _addressText ? `<p style="margin:0;"><span class="label">العنوان:</span> <span class="number" style="direction:rtl; display:inline-block;">${_addressText}</span></p>` : '';
 
         return `
         <style>
@@ -1926,7 +1937,7 @@ window.appLogic = {
                     <td style="text-align:left; font-weight:bold;">${{ 'cash': 'نقدي', 'mada': 'مدى', 'visa': 'فيزا', 'mastercard': 'ماستركارد', 'network': 'شبكة' }[data.paymentMethod] || data.paymentMethod}</td>
                 </tr>
                 <tr style="border-top:1px solid #000;">
-                    <td style="padding:5px 0; font-size:14px; font-weight:900;">الإجمالي النهائي</td>
+                    <td style="padding:5px 0; font-size:14px; font-weight:900;">${_hasValTax ? 'الإجمالي الشامل' : 'الإجمالي'}</td>
                     <td style="text-align:left; font-size:14px; font-weight:900; direction:ltr;">${grandTotal.toLocaleString(displayLocale, displayOpts)} ر.س</td>
                 </tr>
             </table>
@@ -1945,7 +1956,7 @@ window.appLogic = {
         document.getElementById('invoice-print-container').innerHTML = this.generateThermalHTML(data, 'print-qr-render');
 
         const bizName = (window.tenantSettings || {}).name || 'سحاب POS';
-        const zatcaQRBase64 = generateZatcaBase64(bizName, (window.tenantSettings || {}).taxNumber || "000000000000000", data.timestamp, data.grandTotal, data.vatAmount);
+        const zatcaQRBase64 = generateZatcaBase64(bizName, data.taxNumber || "000000000000000", data.timestamp, data.grandTotal, data.vatAmount);
         new QRCode(document.getElementById('print-qr-render'), {
             text: zatcaQRBase64,
             width: 120, height: 120,
@@ -2250,7 +2261,7 @@ window.appLogic = {
         this.currentInvoice = invoiceData;
         document.getElementById('invoice-preview-container').innerHTML = this.generateThermalHTML(invoiceData, 'preview-qr-render');
 
-        const zatcaQRBase64 = generateZatcaBase64((window.tenantSettings || {}).name || "Sahab POS", (window.tenantSettings || {}).taxNumber || "000000000000000", invoiceData.timestamp, invoiceData.grandTotal, invoiceData.vatAmount || 0);
+        const zatcaQRBase64 = generateZatcaBase64((window.tenantSettings || {}).name || "Sahab POS", invoiceData.taxNumber || "000000000000000", invoiceData.timestamp, invoiceData.grandTotal, invoiceData.vatAmount || 0);
         new QRCode(document.getElementById('preview-qr-render'), {
             text: zatcaQRBase64,
             width: 100, height: 100,
@@ -2333,7 +2344,7 @@ window.appLogic = {
                      <div style="color:var(--text-muted); font-size:12px;">سعر الوحدة: ${unitPrice.toFixed(2)} ر.س | متوفر للإرجاع: ${maxRef}</div>
                  </div>
                  <div style="flex:1; display:flex; justify-content:flex-end; align-items:center; gap:10px;">
-                     <input type="number" class="refund-qty-input" data-index="${index}" data-price="${unitPrice}" data-max="${maxRef}" min="0" max="${maxRef}" value="0" onchange="appLogic.calculateRefundTotal()" style="width:70px; padding:8px; text-align:center; background:#000; border:1px solid var(--border); color:#fff; border-radius:4px;">
+                     <input type="number" class="refund-qty-input" data-index="${index}" data-price="${unitPrice}" data-max="${maxRef}" min="0" max="${maxRef}" value="" placeholder="0" onchange="appLogic.calculateRefundTotal()" style="width:70px; padding:8px; text-align:center; background:#000; border:1px solid var(--border); color:#fff; border-radius:4px; font-family: system-ui, sans-serif; direction: ltr;">
                  </div>
              `;
             container.appendChild(row);
@@ -2741,15 +2752,22 @@ window.appLogic = {
             if (Array.isArray(services)) {
                 services.forEach(item => {
                     if (!item) return;
+                    const isVatActive = !!(window.tenantSettings && window.tenantSettings.taxNumber && window.tenantSettings.taxNumber.trim() !== "");
                     const p = item.prices || {};
-                    const iron = parseFloat(p.iron) || 0;
-                    const washIron = parseFloat(p.wash_iron) || 0;
-                    const wash = parseFloat(p.wash) || 0;
+                    let iron = parseFloat(p.iron) || 0;
+                    let washIron = parseFloat(p.wash_iron) || 0;
+                    let wash = parseFloat(p.wash) || 0;
+                    
+                    if (isVatActive) {
+                        iron *= 1.15;
+                        washIron *= 1.15;
+                        wash *= 1.15;
+                    }
 
                     let expLbl = '0.00';
                     if (item.expressFee) {
                         if (typeof item.expressFee === 'object') expLbl = 'متغير';
-                        else expLbl = `+${parseFloat(item.expressFee).toFixed(2)}`;
+                        else expLbl = `+${(parseFloat(item.expressFee) * (isVatActive ? 1.15 : 1)).toFixed(2)}`;
                     }
 
                     html += `
@@ -4115,13 +4133,13 @@ window.appLogic = {
         document.getElementById('setting-name').value = s.name || '';
         document.getElementById('setting-phone').value = s.phone || '';
         document.getElementById('setting-tax').value = s.taxNumber || '';
-        
+
         const cityEl = document.getElementById('setting-city');
         const hoodEl = document.getElementById('setting-hood');
         const streetEl = document.getElementById('setting-street');
-        if(cityEl) cityEl.value = s.addressCity || (typeof lsGet === 'function' ? lsGet('invoiceCity') : localStorage.getItem('invoiceCity')) || '';
-        if(hoodEl) hoodEl.value = s.addressNeighborhood || (typeof lsGet === 'function' ? lsGet('invoiceNeighborhood') : localStorage.getItem('invoiceNeighborhood')) || '';
-        if(streetEl) streetEl.value = s.addressStreet || (typeof lsGet === 'function' ? lsGet('invoiceStreet') : localStorage.getItem('invoiceStreet')) || '';
+        if (cityEl) cityEl.value = s.addressCity || (typeof lsGet === 'function' ? lsGet('invoiceCity') : localStorage.getItem('invoiceCity')) || '';
+        if (hoodEl) hoodEl.value = s.addressNeighborhood || (typeof lsGet === 'function' ? lsGet('invoiceNeighborhood') : localStorage.getItem('invoiceNeighborhood')) || '';
+        if (streetEl) streetEl.value = s.addressStreet || (typeof lsGet === 'function' ? lsGet('invoiceStreet') : localStorage.getItem('invoiceStreet')) || '';
 
         // PWA Button Gatekeeper Logic
         let isPwaAllowed = s.canInstallPWA === true;
