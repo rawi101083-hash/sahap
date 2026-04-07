@@ -1864,7 +1864,7 @@ window.appLogic = {
 
             const iframe = document.createElement('iframe');
             iframe.style.width = '576px';
-            iframe.style.height = '4000px'; // CRITICAL: MASSIVE HEIGHT TO PREVENT ANY CLIPPING BEFORE CAPTURE
+            iframe.style.height = '3000px'; 
             iframe.style.position = 'absolute';
             iframe.style.left = '-9999px';
             document.body.appendChild(iframe);
@@ -1873,30 +1873,27 @@ window.appLogic = {
             doc.open();
             doc.write(`
             <html dir="rtl"><head><style>
-            @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@700;900&display=swap');
-            body { margin: 0; padding: 0; background: white; color: black; font-family: 'Tajawal', sans-serif; }
+            /* STRICTLY SYSTEM FONTS ONLY - NO EXTERNAL IMPORTS TO PREVENT CORS CRASH */
+            body { margin: 0; padding: 0; background: white; color: black; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
             * { color: black !important; }
             
-            /* FORCE CONTAINER TO 80MM WIDTH */
-            #rtl-wrapper { width: 576px !important; padding: 15px 25px; box-sizing: border-box; background: white; }
+            #rtl-wrapper { width: 576px !important; padding: 15px 20px; box-sizing: border-box; background: white; }
             
-            /* SPREAD TABLE */
-            table { width: 100% !important; border-collapse: collapse; margin-bottom: 25px; table-layout: fixed; }
-            td, th { font-size: 26px !important; font-weight: 900 !important; padding: 12px 0 !important; border-bottom: 2px dashed #000; }
+            table { width: 100% !important; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed; }
+            td, th { font-size: 26px !important; font-weight: bold !important; padding: 10px 0 !important; border-bottom: 2px dashed #000; }
             
-            th:nth-child(1), td:nth-child(1) { text-align: right; width: 50%; padding-right: 5px; }
-            th:nth-child(2), td:nth-child(2) { text-align: center; width: 20%; }
+            th:nth-child(1), td:nth-child(1) { text-align: right; width: 55%; padding-right: 5px; }
+            th:nth-child(2), td:nth-child(2) { text-align: center; width: 15%; }
             th:nth-child(3), td:nth-child(3) { text-align: left; width: 30%; padding-left: 5px; }
             
             .receipt-header { text-align: center; border-bottom: 2px dashed #000; padding-bottom: 15px; margin-bottom: 20px; width: 100%; }
-            .receipt-header div:nth-child(2) { font-size: 46px !important; font-weight: 900 !important; margin-bottom: 10px !important; }
+            .receipt-header div:nth-child(2) { font-size: 42px !important; font-weight: bold !important; margin-bottom: 10px !important; }
             .receipt-header p, .receipt-header div { font-size: 24px !important; font-weight: bold !important; line-height: 1.5; }
             
             .totals-row { display: flex; justify-content: space-between; width: 100%; font-size: 26px !important; font-weight: bold !important; margin-bottom: 8px; }
-            .grand-total { font-size: 34px !important; font-weight: 900 !important; border-top: 2px solid #000; padding-top: 15px; margin-top: 15px; }
+            .grand-total { font-size: 34px !important; font-weight: bold !important; border-top: 2px solid #000; padding-top: 15px; margin-top: 15px; }
             
-            /* QR CODE AT THE VERY BOTTOM */
-            #temp-qr-render { margin-top: 40px; display: flex; justify-content: center; width: 100%; padding-bottom: 50px; }
+            #temp-qr-render { margin-top: 30px; display: flex; justify-content: center; width: 100%; padding-bottom: 30px; }
             #temp-qr-render img { width: 220px !important; height: 220px !important; display: block; margin: 0 auto; }
             </style></head><body>
             <div id="rtl-wrapper">${tempContainer.innerHTML}</div>
@@ -1904,11 +1901,10 @@ window.appLogic = {
             `);
             doc.close();
 
-            // Wait exactly 1 second to GUARANTEE the QR code is fully drawn before taking the picture
-            await new Promise(r => setTimeout(r, 1000));
+            // Quick wait (no external fonts to download anymore)
+            await new Promise(r => setTimeout(r, 400));
 
             const wrapperElement = doc.getElementById('rtl-wrapper');
-            // Calculate the EXACT height of the fully rendered receipt
             const exactHeight = wrapperElement.scrollHeight;
 
             const canvas = await html2canvas(wrapperElement, { 
@@ -1918,6 +1914,7 @@ window.appLogic = {
                 windowHeight: exactHeight,
                 scale: 1, 
                 useCORS: true, 
+                allowTaint: true,
                 logging: false 
             });
             
