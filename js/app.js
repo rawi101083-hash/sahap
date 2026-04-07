@@ -18,19 +18,13 @@
         const trialDays = document.getElementById('trial-days');
 
         if (isSubscribedLocal === 'true') {
-            if (banner) {
-                banner.classList.add('hidden');
-                banner.style.display = 'none';
-            }
+            if (banner) banner.classList.add('hidden');
         } else if (trialExpiryLocal) {
             const exactDaysLeft = (parseInt(trialExpiryLocal) - Date.now()) / (1000 * 60 * 60 * 24);
             const daysLeft = Math.ceil(exactDaysLeft);
             if (exactDaysLeft > 0) {
                 if (trialDays) trialDays.innerText = daysLeft;
-                if (banner) {
-                    banner.classList.remove('hidden');
-                    banner.style.display = 'flex';
-                }
+                if (banner) banner.classList.remove('hidden');
             } else {
                 // Hard visual lock on start if localstorage knows it's expired
                 console.warn("[Fast-Guard] Trial Expired.");
@@ -39,10 +33,7 @@
                     expiredOverlay.classList.remove('hidden');
                     expiredOverlay.style.display = 'flex';
                 }
-                if (banner) {
-                    banner.classList.add('hidden');
-                    banner.style.display = 'none';
-                }
+                if (banner) banner.classList.add('hidden');
             }
         }
     } else {
@@ -237,25 +228,24 @@ const accountingEngine = {
         };
         journals.unshift(jEntry);
         await localforage.setItem('journal_entries', journals);
-        manualSyncToCloud('journal_entries', jEntry, jEntry.id).catch(console.error);
+        await manualSyncToCloud('journal_entries', journals);
 
         let taxRecords = await localforage.getItem('tax_records') || [];
-        let taxRecord = {
+        taxRecords.unshift({
             id: `TAX-${Date.now()}`,
             date: invoice.timestamp,
             ref_invoice: invoice.id,
             grossTotal: total,
             netTotal: subtotal,
             vatCollected: vat
-        };
-        taxRecords.unshift(taxRecord);
+        });
         await localforage.setItem('tax_records', taxRecords);
-        manualSyncToCloud('tax_records', taxRecord, taxRecord.id).catch(console.error);
+        await manualSyncToCloud('tax_records', taxRecords);
 
-        // Let inventory remain intact natively without blasting entire unchanged massive arrays to cloud.
-        // let inventory = await localforage.getItem('inventory') || [];
-        // await localforage.setItem('inventory', inventory);
-        // await manualSyncToCloud('inventory', inventory);
+        let inventory = await localforage.getItem('inventory') || [];
+        // Future-proof: Logic to deduct raw materials if required
+        await localforage.setItem('inventory', inventory);
+        await manualSyncToCloud('inventory', inventory);
 
         return invoice;
     }
@@ -282,42 +272,31 @@ if (typeof firebase !== 'undefined' && !firebase.apps.length) {
     }
 }
 
-// Configure localforage BEFORE capturing originals — ensures all operations
-// use the correct named store from the very first call.
-localforage.config({ name: 'SahabPOS', storeName: 'pos_data' });
-
-const collectionsToSync = ['customers', 'invoices', 'journal_entries', 'tax_records', 'inventory', 'services', 'expenses', 'delivery_options', 'zreports', 'reports', 'archived_z_reports'];
+const collectionsToSync = ['customers', 'invoices', 'journal_entries', 'tax_records', 'inventory', 'services', 'expenses', 'delivery_options'];
 const originalSetItem = localforage.setItem;
-const originalGetItem = localforage.getItem;
-const originalRemoveItem = localforage.removeItem;
-
 window.isDataInitialized = false; // THE MASTER LOCK: App starts in strict READ-ONLY mode
 window.__syncingFromFirebase = false;
 
 // 0. STRICT MULTI-TENANCY NAMESPACE ISOLATION
-// CRITICAL: If currentUID is not set, we must NEVER read or write tenant data.
-// This prevents data written to un-namespaced keys from leaking across accounts.
-function getTenantKey(key) {
-    if (!window.currentUID) {
-        // Return a dead-end key that will never collide with real data
-        // Writing to this is safe (goes nowhere useful), reading returns null
-        return '__NO_UID_GUARD__' + key;
-    }
-    return `${window.currentUID}_${key}`;
+function lsSet(key, value) {
+    if (!window.currentUID) return;
+    localStorage.setItem(key + '_' + window.currentUID, value);
+}
+function lsGet(key, defaultVal) {
+    if (!window.currentUID) return defaultVal !== undefined ? defaultVal : null;
+    let val = localStorage.getItem(key + '_' + window.currentUID);
+    return val !== null ? val : (defaultVal !== undefined ? defaultVal : null);
+}
+function lsRemove(key) {
+    if (!window.currentUID) return;
+    localStorage.removeItem(key + '_' + window.currentUID);
 }
 
-// 1. SIMPLE STORAGE: localforage now strictly routes to isolated tenant namespaces
+// 1. SIMPLE STORAGE: localforage now ONLY handles local database
 localforage.setItem = async function (key, value) {
-    return await originalSetItem.call(localforage, getTenantKey(key), value);
-};
-localforage.getItem = async function (key) {
-    return await originalGetItem.call(localforage, getTenantKey(key));
-};
-localforage.removeItem = async function (key) {
-    return await originalRemoveItem.call(localforage, getTenantKey(key));
+    return await originalSetItem.call(localforage, key, value);
 };
 
-window._activeSyncs = 0;
 // 2. EXPLICIT SYNC: Targeted helper to send specific records or collections to Firebase (UID-scoped)
 async function manualSyncToCloud(key, value, recordId = null) {
     if (!window.isDataInitialized) {
@@ -327,22 +306,13 @@ async function manualSyncToCloud(key, value, recordId = null) {
 
     if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "YOUR_API_KEY" && !!firebaseConfig.apiKey) {
         const path = recordId ? `${key}/${recordId}` : key;
-        window._activeSyncs++;
         try {
             console.log(`[Manual-Sync] Sending ${path} to cloud...`);
             const safePayload = JSON.parse(JSON.stringify(value, (k, v) => (v === undefined ? null : v)));
-
-        if (key === 'invoices') {
-                console.log(`[Manual-Sync] Syncing invoices to cloud path: ${getDbPath(path)}`);
-            }
-
             await firebase.database().ref(getDbPath(path)).set(safePayload);
             console.log(`[Manual-Sync] ${path} saved successfully.`);
         } catch (err) {
             console.error(`[Manual-Sync] Error saving ${path}:`, err);
-            alert(`حدث خطأ أثناء مزامنة ${path}: ` + err.message);
-        } finally {
-            window._activeSyncs--;
         }
     }
 }
@@ -353,42 +323,6 @@ function getDbPath(key) {
     if (window.currentUID) return `users/${window.currentUID}/${key}`;
     return key; // fallback
 }
-
-// ============================================================
-// TENANT-ISOLATED localStorage HELPERS
-// ALL runtime data keys MUST go through these helpers.
-// They auto-namespace with the current UID so Account A
-// can NEVER read Account B's cached values.
-// ============================================================
-function lsSet(key, value) {
-    var uid = window.currentUID;
-    if (!uid) { console.warn('[lsSet] No UID — skipping write for key:', key); return; }
-    localStorage.setItem(key + '_' + uid, value);
-}
-function lsGet(key, defaultVal) {
-    var uid = window.currentUID;
-    if (!uid) return (defaultVal !== undefined ? defaultVal : null);
-    var val = localStorage.getItem(key + '_' + uid);
-    return val !== null ? val : (defaultVal !== undefined ? defaultVal : null);
-}
-function lsRemove(key) {
-    var uid = window.currentUID;
-    if (!uid) return;
-    localStorage.removeItem(key + '_' + uid);
-}
-// Wipe ALL tenant-scoped keys for a given UID (used on logout/reset)
-function lsPurgeAllForUID(uid) {
-    if (!uid) return;
-    var suffix = '_' + uid;
-    var toDelete = [];
-    for (var i = 0; i < localStorage.length; i++) {
-        var k = localStorage.key(i);
-        if (k && k.endsWith(suffix)) toDelete.push(k);
-    }
-    toDelete.forEach(function(k) { localStorage.removeItem(k); });
-    console.log('[lsPurgeAllForUID] Purged ' + toDelete.length + ' keys for UID:', uid);
-}
-// ============================================================
 
 // 3. RECOVERY LOGIC: Fetch-Only initialization (UID-scoped)
 async function initFirebaseSync() {
@@ -406,6 +340,12 @@ async function initFirebaseSync() {
         return new Promise((resolve) => {
             let dbRef = firebase.database().ref(getDbPath(key));
 
+            // OPTIMIZATION: Only fetch last 400 days for heavy transactional collections
+            if (key === 'invoices' || key === 'expenses') {
+                console.log(`[Recovery] Applying 400-day optimization for ${key}...`);
+                dbRef = dbRef.orderByChild('timestamp').startAt(fourHundredDaysAgo);
+            }
+
             console.log(`[Recovery] Requesting ${key} from cloud...`);
 
             dbRef.once('value', async (snapshot) => {
@@ -418,26 +358,27 @@ async function initFirebaseSync() {
                         cloudData = cloudData.filter(item => item !== null && typeof item === 'object');
                     }
                     window.__syncingFromFirebase = true;
-                    await originalSetItem.call(localforage, getTenantKey(key), cloudData);
+                    await originalSetItem.call(localforage, key, cloudData);
                     window.__syncingFromFirebase = false;
                 } else {
-                    console.log(`[Multi-Tenant] Cloud is empty for ${key}. Enforcing zero state.`);
+                    console.log(`[Multi-Tenant] Cloud is empty for ${key}. Checking local redundancy.`);
 
-                    // If invoices are empty on Cloud, it means a Factory Reset occurred!
-                    // Wipe all legacy localStorage caches and auxiliary local-only states.
-                    if (key === 'invoices') {
-                        console.warn('Factory Reset detected from Cloud! Wiping all auxiliary local caches...');
-                        if (window.currentUID) {
-                            lsRemove('laundryHistory');
-                            lsRemove('laundry_balances');
-                            lsRemove('sahab_invoiceCounter');
-                        }
-                        originalRemoveItem.call(localforage, getTenantKey('laundry_balances')).catch(e=>console.warn(e));
-                        originalRemoveItem.call(localforage, getTenantKey('invoiceCounter')).catch(e=>console.warn(e));
+                    // REDUNDANCY CHECK: If local storage has data, don't zero it yet!
+                    const localBackup = localStorage.getItem(key);
+                    if (localBackup && (key === 'expenses' || key === 'invoices')) {
+                        try {
+                            const parsed = JSON.parse(localBackup);
+                            if (parsed && parsed.length > 0) {
+                                console.log(`[Recovery] Cloud empty but localStorage has ${key}. Using local data.`);
+                                await originalSetItem.call(localforage, key, parsed);
+                                resolve();
+                                return;
+                            }
+                        } catch (e) { }
                     }
 
                     window.__syncingFromFirebase = true;
-                    await originalSetItem.call(localforage, getTenantKey(key), []); // STRICT ZERO STATE
+                    await originalSetItem.call(localforage, key, []); // ZERO STATE PROMISE!
                     window.__syncingFromFirebase = false;
                 }
                 resolve();
@@ -456,24 +397,12 @@ async function initFirebaseSync() {
                     if (typeof cloudData === 'object' && !Array.isArray(cloudData)) sanitized = Object.values(cloudData);
                     else if (Array.isArray(cloudData)) sanitized = cloudData;
                     sanitized = sanitized.filter(item => item !== null && typeof item === 'object');
-                } else {
-                    // cloudData === null means this node was DELETED from Firebase (factory reset!)
-                    console.warn(`[Factory-Reset-Detected] "${key}" was deleted from cloud. Wiping local cache...`);
-                    sanitized = []; // Force empty
-
-                    // If invoices wiped → full auxiliary local wipe
-                    if (key === 'invoices') {
-                        lsRemove('laundryHistory');
-                        lsRemove('laundry_balances');
-                        lsRemove('sahab_invoiceCounter');
-                        originalRemoveItem.call(localforage, getTenantKey('laundry_balances')).catch(() => {});
-                    }
                 }
 
                 console.log(`[Realtime-Sync] Update received for ${key}: ${sanitized.length} items.`);
 
                 window.__syncingFromFirebase = true;
-                await originalSetItem.call(localforage, getTenantKey(key), sanitized);
+                await originalSetItem.call(localforage, key, sanitized);
                 window.__syncingFromFirebase = false;
 
                 if (window.appLogic) {
@@ -482,7 +411,9 @@ async function initFirebaseSync() {
                         window.appLogic.deliveryOptions = sanitized;
                         window.appLogic.updateCartUI();
                     }
-                    window.appLogic.refreshActiveView();
+                    if (window.isDataInitialized) {
+                        window.appLogic.refreshActiveView();
+                    }
                 }
             });
         });
@@ -491,68 +422,6 @@ async function initFirebaseSync() {
     await Promise.all(fetchPromises);
     window.isDataInitialized = true;
     console.log("[Recovery] --- SYSTEM READY (READ-WRITE ENABLED) ---");
-
-    // ⚡ START RESET TOKEN WATCHER
-    // This listens for factory-reset signals from the admin panel.
-    // When the resetToken changes, wipe all local caches and reload.
-    startResetTokenWatcher();
-}
-
-// ==========================================================
-// RESET TOKEN WATCHER — Detects Admin Factory Reset in realtime
-// ==========================================================
-function startResetTokenWatcher() {
-    if (!window.currentUID || typeof firebase === 'undefined') return;
-
-    const resetTokenRef = firebase.database().ref(getDbPath('settings/resetToken'));
-    // Use SAME key as the boot-time check in firebase.auth().onAuthStateChanged
-    const localResetKey = 'sahab_reset_token_' + window.currentUID;
-
-    // Watch for changes in real-time (catches admin factory-reset while cashier is logged in)
-    resetTokenRef.on('value', function(snap) {
-        var newToken = snap.val();
-        if (!newToken) return;
-
-        // localResetKey is already UID-scoped (e.g. 'sahab_reset_token_abc123')
-        var lastToken = localStorage.getItem(localResetKey);
-
-        // If this is a new token different from what we saw at startup, WIPE & RELOAD
-        if (lastToken && newToken !== lastToken) {
-            console.warn('[Factory-Reset-Watcher] New resetToken detected! Wiping local caches and reloading...');
-
-            // Save the new token first so after reload we don't loop
-            localStorage.setItem(localResetKey, newToken);
-
-            // Wipe transactional/financial local cache only.
-            // DO NOT wipe: 'services', 'delivery_options', 'inventory'
-            var allCollections = [
-                'invoices', 'expenses', 'customers', 'journal_entries',
-                'tax_records', 'zreports', 'reports', 'archived_z_reports',
-                'laundry_balances', 'invoiceCounter', 'settings'
-            ];
-            var wipePromises = allCollections.map(function(col) {
-                return originalRemoveItem.call(localforage, getTenantKey(col)).catch(function() {});
-            });
-
-            Promise.all(wipePromises).then(function() {
-                // Purge ALL UID-scoped localStorage keys (metrics, laundryHistory, etc.)
-                if (window.currentUID) lsPurgeAllForUID(window.currentUID);
-
-                // Show a brief toast then reload
-                if (window.appLogic && window.appLogic.showToast) {
-                    window.appLogic.showToast('تم تطبيق إعادة ضبط المصنع. سيتم إعادة تحميل النظام...');
-                }
-                setTimeout(function() {
-                    window.location.reload();
-                }, 1500);
-            });
-        } else if (!lastToken) {
-            // First time this session — just store it
-            localStorage.setItem(localResetKey, newToken);
-        }
-    });
-
-    console.log('[Reset-Watcher] Watching settings/resetToken for factory reset signals...');
 }
 // ---------------------------------------------
 
@@ -713,8 +582,7 @@ window.appLogic = {
         console.log("[App] !!! STARTING CRITICAL INITIALIZATION !!!");
         console.log("[App] Environment:", window.location.protocol);
 
-        // localforage.config is already set at module level (above)
-        // Re-assigning here is a no-op but kept for clarity
+        localforage.config({ name: 'SahabPOS', storeName: 'pos_data' });
 
         // Required Log: Verify local storage is accessible
         try {
@@ -781,13 +649,13 @@ window.appLogic = {
         });
 
         await localforage.setItem('laundry_balances', balances);
-        lsSet('laundry_balances', JSON.stringify(balances));
+        localStorage.setItem('laundry_balances', JSON.stringify(balances));
     },
 
     async updateLaundryDatalist() {
         try {
-            // Memory Source 1: UID-scoped localStorage history
-            const history = JSON.parse(lsGet('laundryHistory', '{"names":[], "hoods":[]}'));
+            // Memory Source 1: localStorage history (Persistent 'laundryHistory')
+            const history = JSON.parse(localStorage.getItem('laundryHistory') || '{"names":[], "hoods":[]}');
             const laundries = new Set(history.names);
             const hoods = new Set(history.hoods);
 
@@ -812,8 +680,8 @@ window.appLogic = {
                 hoodDatalist.innerHTML = Array.from(hoods).sort().map(hood => `<option value="${hood}">`).join('');
             }
 
-            // Sync back to history using UID-scoped key
-            lsSet('laundryHistory', JSON.stringify({
+            // Sync back to history if unique discoveries were found
+            localStorage.setItem('laundryHistory', JSON.stringify({
                 names: Array.from(laundries),
                 hoods: Array.from(hoods)
             }));
@@ -906,23 +774,16 @@ window.appLogic = {
 
     // POS Items
     renderItems(data) {
-        if (!data) data = window.appLogic.services || [];
+        if (!data) data = this.services;
         const grid = document.getElementById('items-grid');
-        if (grid) grid.innerHTML = '';
-
-        let validCounter = 0;
+        grid.innerHTML = '';
         data.forEach(item => {
-            if (!item || typeof item !== 'object') return;
-            validCounter++;
             const card = document.createElement('div');
             card.className = 'item-card';
-            card.innerHTML = `<div class="item-icon"><i class="fa-solid ${item.icon || 'fa-shirt'}"></i></div><div class="item-name">${this.translate(item.name || 'Unlabeled')}</div>`;
+            card.innerHTML = `<div class="item-icon"><i class="fa-solid ${item.icon}"></i></div><div class="item-name">${this.translate(item.name)}</div>`;
             card.onclick = () => this.fastAddToCart(item);
-            if (grid) grid.appendChild(card);
+            grid.appendChild(card);
         });
-
-        const posCountEl = document.getElementById('pos-item-count');
-        if (posCountEl) posCountEl.innerText = validCounter;
     },
 
     // --- FAST BATCH ENTRY OPERATIONS ---
@@ -1117,9 +978,6 @@ window.appLogic = {
         const container = document.getElementById('cart-items');
         container.innerHTML = '';
 
-        const isVatActive = !!(window.tenantSettings && window.tenantSettings.taxNumber && window.tenantSettings.taxNumber.trim() !== "");
-        const mult = isVatActive ? 1.15 : 1;
-
         if (this.cart.length === 0) {
             container.innerHTML = `<div class="empty-cart-msg">${this.currentLang === 'en' ? 'Cart is empty, please select items.' : 'السلة فارغة، يرجى اختيار أصناف.'}</div>`;
         } else {
@@ -1131,8 +989,6 @@ window.appLogic = {
                     ? (item.speed === 'normal' ? 'Normal' : 'Express')
                     : (item.speed === 'normal' ? 'عادي' : 'مستعجل');
 
-                let displayPrice = (item.unitPrice * item.qty) * mult;
-
                 container.innerHTML += `
                     <div class="cart-item">
                         <div class="cart-item-header">
@@ -1141,7 +997,7 @@ window.appLogic = {
                                 <span class="cart-item-qty num-en">x${item.qty}</span>
                             </div>
                             <div class="cart-item-price-block">
-                                <div class="cart-item-price num-en">${displayPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                <div class="cart-item-price num-en">${(item.unitPrice * item.qty).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                                 <button class="btn-remove" onclick="appLogic.removeFromCart(${index})">
                                     <i class="fa-solid fa-times"></i>
                                 </button>
@@ -1153,10 +1009,12 @@ window.appLogic = {
             });
         }
 
+        // Auto-Scroll to Bottom for immediate visibility of new items
         container.scrollTop = container.scrollHeight;
 
         const subt = this.cart.reduce((s, i) => s + (i.unitPrice * i.qty), 0);
 
+        // Fix 1: Strict Total Logic
         if (this.cart.length === 0) {
             this.deliveryFee = 0;
             const zeroValue = (0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -1164,7 +1022,7 @@ window.appLogic = {
             if (document.getElementById('mobile-grand-total')) document.getElementById('mobile-grand-total').innerText = zeroValue;
             if (document.getElementById('golden-trigger-total')) document.getElementById('golden-trigger-total').innerText = zeroValue;
         } else {
-            const finalValue = ((subt + this.deliveryFee) * mult).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const finalValue = (subt + this.deliveryFee).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             document.getElementById('grand-total').innerText = finalValue;
             if (document.getElementById('mobile-grand-total')) document.getElementById('mobile-grand-total').innerText = finalValue;
             if (document.getElementById('golden-trigger-total')) document.getElementById('golden-trigger-total').innerText = finalValue;
@@ -1247,7 +1105,7 @@ window.appLogic = {
             invs[idx].date = getLocalYMD();
 
             await localforage.setItem('invoices', invs);
-            await manualSyncToCloud('invoices', invs[idx], invs[idx].id);
+            await manualSyncToCloud('invoices', invs);
 
             const settlementId = this.settlingInvoiceId;
             this.closePaymentModal();
@@ -1282,12 +1140,10 @@ window.appLogic = {
             });
         }
 
+        // CLOSE PAYMENT MODAL IMMEDIATELY
         this.closePaymentModal();
 
-        this.closePaymentModal();
-
-        // FAST AUTO-CHECKOUT & PRINT (Bypass Preview Modal entirely)
-        // Wait 100ms for QRCode library to finish rendering the canvas
+        // WAIT 100ms FOR QR TO RENDER, THEN AUTO-CHECKOUT (TRUE)
         setTimeout(async () => {
             await this.confirmCheckout(true);
         }, 100);
@@ -1317,12 +1173,8 @@ window.appLogic = {
     },
 
     updateCheckoutTotal() {
-        const isVatActive = !!(window.tenantSettings && window.tenantSettings.taxNumber && window.tenantSettings.taxNumber.trim() !== "");
-        const mult = isVatActive ? 1.15 : 1;
-
         const subt = this.cart.reduce((s, i) => s + (i.unitPrice * i.qty), 0);
-        let baseVal = subt + this.deliveryFee;
-        let totalVal = baseVal * mult;
+        let totalVal = subt + this.deliveryFee;
         let totalStr = totalVal.toFixed(2);
 
         const modalTotal = document.getElementById('checkout-grand-total');
@@ -1399,12 +1251,12 @@ window.appLogic = {
                 }
             });
             newInvId = String(max + 1).padStart(6, '0');
-            lsSet('sahab_invoiceCounter', max + 1);
+            localStorage.setItem('sahab_invoiceCounter', max + 1);
         }
 
         // Prepare Invoice Details (Not Saved Yet)
         let subT = this.cart.reduce((s, i) => s + (i.unitPrice * i.qty), 0);
-        let baseGrT = subT + this.deliveryFee; // Pure Base Price
+        let grT = subT + this.deliveryFee;
 
         let pName = document.getElementById('pos-laundry-name') ? document.getElementById('pos-laundry-name').value.trim() : '';
         let pHood = document.getElementById('pos-laundry-hood') ? document.getElementById('pos-laundry-hood').value.trim() : '';
@@ -1421,29 +1273,28 @@ window.appLogic = {
             }
         }
 
-        const isVatActive = !!(window.tenantSettings && window.tenantSettings.taxNumber && window.tenantSettings.taxNumber.trim() !== "");
-        const mult = isVatActive ? 1.15 : 1;
-        const finalGrT = baseGrT * mult;
-        const vatAmountCalculated = finalGrT - baseGrT;
-
         let invoiceData = {
             id: newInvId, timestamp: Date.now(), customer: { phone: cPhone, name: cName },
             items: [].concat(this.cart),
             deliveryFee: parseFloat(this.deliveryFee) || 0,
-            total: parseFloat(baseGrT) || 0,        // Base total (0% VAT)
-            grandTotal: parseFloat(finalGrT) || 0,  // Final inclusive total
-            subtotalNet: parseFloat(baseGrT) || 0,  // Same as base
-            vatAmount: parseFloat(vatAmountCalculated) || 0,
-            hasVatApplied: isVatActive,             // Core engine boolean for historical locking
+            total: parseFloat(grT) || 0,
+            grandTotal: parseFloat(grT) || 0,
             laundryCost: pCost,
             partnerLaundryCost: pCost,
             partnerLaundryName: pName,
             partnerLaundryNeighborhood: pHood,
             laundryPaid: pPaid,
             status: 'completed',
-            paymentMethod: this.paymentMethod || 'cash',
-            taxNumber: (window.tenantSettings || {}).taxNumber || ''
+            paymentMethod: this.paymentMethod || 'cash'
         };
+
+        // Calculate 15% Inclusive VAT: Subtotal = Total / 1.15, VAT = Total - Subtotal
+        const _total = parseFloat(grT) || 0;
+        const _subtotalNet = _total / 1.15;
+        const _vatAmount = _total - _subtotalNet;
+
+        invoiceData.subtotalNet = _subtotalNet;
+        invoiceData.vatAmount = _vatAmount;
 
         this.pendingInvoice = invoiceData;
 
@@ -1456,7 +1307,7 @@ window.appLogic = {
         document.getElementById('payment-method-modal').classList.remove('hidden');
     },
 
-    async confirmCheckout(isAutoCheckout = false) {
+    async confirmCheckout() {
         console.log('Button Clicked: confirmCheckout - Start confirming invoice');
         if (!this.pendingInvoice) return;
 
@@ -1467,7 +1318,7 @@ window.appLogic = {
             let cData = { phone: this.customer.phone, name: this.customer.name || '', timestamp: Date.now() };
             if (cIdx >= 0) customers[cIdx] = cData; else customers.push(cData);
             await localforage.setItem('customers', customers);
-            await manualSyncToCloud('customers', cData, cData.phone);
+            await manualSyncToCloud('customers', customers);
         }
 
         // Pass to Wafeq Accounting Engine
@@ -1486,40 +1337,27 @@ window.appLogic = {
         }
 
         await localforage.setItem('invoices', invoices);
-        
-        // MULTI-DEVICE FIX: Only push the specific pending invoice to its own ID node!
-        // DO NOT AWAIT to prevent network latency from blocking the print command
-        manualSyncToCloud('invoices', this.pendingInvoice, this.pendingInvoice.id).catch(console.error);
+        await manualSyncToCloud('invoices', invoices);
 
         this.currentInvoice = this.pendingInvoice;
         this.pendingInvoice = null;
 
-        if (isAutoCheckout) {
-            // Trigger instant thermal print intent off the hidden rendered container (for Sunmi/Android)
-            await this.printThermalReceipt();
+        // Switch Modal State
+        document.getElementById('success-invoice-ref').innerText = (this.currentInvoice.id || '').toString().replace(/^INV-/, '');
+        document.getElementById('modal-actions-preview').classList.add('hidden');
+        document.getElementById('modal-actions-success').classList.remove('hidden');
 
-            // Clear internal state quietly
-            this.currentInvoice = null;
-            this.paymentMethod = 'cash';
-            this.showToast('تم الطباعة بنجاح ✓');
-        } else {
-            // Switch Modal State for historical viewing / non-auto flows
-            document.getElementById('success-invoice-ref').innerText = (this.currentInvoice.id || '').toString().replace(/^INV-/, '');
-            document.getElementById('modal-actions-preview').classList.add('hidden');
-            document.getElementById('modal-actions-success').classList.remove('hidden');
+        // Fix 8: Automatic Invoice OS Print
+        setTimeout(() => {
+            if (this.currentInvoice) {
+                this.printInvoice(this.currentInvoice);
+                console.log('Invoice auto-printed successfully.');
+            }
+        }, 1200);
 
-            // Automatic Invoice PDF Download
-            setTimeout(() => {
-                if (this.currentInvoice) {
-                    this.downloadDigitalPDF(null);
-                    console.log('Invoice PDF auto-downloaded successfully.');
-                }
-            }, 1200);
-
-            // WhatsApp sharing
-            const _waBtnEl = document.getElementById('btn-whatsapp-share');
-            if (_waBtnEl) _waBtnEl.style.display = 'block';
-        }
+        // WhatsApp sharing
+        const _waBtnEl = document.getElementById('btn-whatsapp-share');
+        if (_waBtnEl) _waBtnEl.style.display = 'block';
 
         this.updateCartUI();
         await this.updateLaundryDatalist();
@@ -1694,7 +1532,7 @@ window.appLogic = {
         } catch (err) {
             alert('حدث خطأ أثناء الطباعة: ' + err.message);
             var btn = document.querySelector('button[onclick="appLogic.printThermalReceipt()"]');
-            if (btn) btn.innerHTML = '<i class="fa-solid fa-print"></i> <span>طباعة إيصال حراري (80mm)</span>';
+            if (btn) btn.innerHTML = '<i class="fa-solid fa-print"></i> <span>طباعة إيصال حراري</span>';
         }
     },
 
@@ -1745,23 +1583,22 @@ window.appLogic = {
         const _subtotal = _grand - _vatAmt;
         const _invId = (data.id || '').toString().replace(/^INV-/, '');
         const _custName = (!data.customer.name || data.customer.name === 'عميل نقدي' || data.customer.name === 'عميل دون اسم') ? '' : data.customer.name;
-        const _invoiceTax = data.taxNumber;
-        const _storeTax = _invoiceTax
-            ? `<p style="margin:2px 0; font-size:14px; color:#444;">الرقم الضريبي: &nbsp;&nbsp; <strong style="direction:ltr; display:inline-block;">${_invoiceTax}</strong></p>` : '';
+        const _storeTax = (window.tenantSettings || {}).taxNumber
+            ? `<p style="margin:2px 0; font-size:14px; color:#444;">الرقم الضريبي: &nbsp;&nbsp; <strong style="direction:ltr; display:inline-block;">${window.tenantSettings.taxNumber}</strong></p>` : '';
         const _storeWA = (window.tenantSettings || {}).phone
             ? `<p style="margin:2px 0; font-size:14px; color:#444;">رقم جوال النشاط: &nbsp;&nbsp; <strong style="direction:ltr; display:inline-block;">${window.tenantSettings.phone}</strong></p>` : '';
-        const _iCity = (window.tenantSettings || {}).addressCity || localStorage.getItem('invoiceCity') || '';
-        const _iHood = (window.tenantSettings || {}).addressNeighborhood || localStorage.getItem('invoiceNeighborhood') || '';
-        const _iStreet = (window.tenantSettings || {}).addressStreet || localStorage.getItem('invoiceStreet') || '';
-        const _addrParts = [];
-        if (_iCity) _addrParts.push(_iCity);
-        if (_iHood) _addrParts.push(_iHood);
-        if (_iStreet) _addrParts.push(_iStreet);
-        const _addressText = _addrParts.length > 0 ? _addrParts.join(' - ') : '';
+    const _iCity = (window.tenantSettings || {}).addressCity || localStorage.getItem('invoiceCity') || '';
+    const _iHood = (window.tenantSettings || {}).addressNeighborhood || localStorage.getItem('invoiceNeighborhood') || '';
+    const _iStreet = (window.tenantSettings || {}).addressStreet || localStorage.getItem('invoiceStreet') || '';
+    const _addrParts = [];
+    if (_iCity) _addrParts.push(_iCity);
+    if (_iHood) _addrParts.push(_iHood);
+    if (_iStreet) _addrParts.push(_iStreet);
+    const _addressText = _addrParts.length > 0 ? _addrParts.join(' - ') : '';
 
-        const _storeAddress = _addressText
-            ? `<p style="margin:2px 0; font-size:14px; color:#444;">العنوان: &nbsp;&nbsp; <strong style="direction:rtl; display:inline-block;">${_addressText}</strong></p>`
-            : ``;
+    const _storeAddress = _addressText 
+        ? `<p style="margin:2px 0; font-size:14px; color:#444;">العنوان: &nbsp;&nbsp; <strong style="direction:rtl; display:inline-block;">${_addressText}</strong></p>` 
+        : '';
         const _hasValTax = !!(window.tenantSettings && window.tenantSettings.taxNumber && window.tenantSettings.taxNumber.trim() !== '');
         const _invType = _hasValTax ? 'فاتورة ضريبية مبسطة' : 'فاتورة مبيعات';
 
@@ -1974,10 +1811,7 @@ window.appLogic = {
 
     // HTML Generator for Thermal Receipt (Zero Ink — white background, RTL Arabic)
     generateThermalHTML(data, qrContainerId) {
-        let _hasValTax = false;
-        if (typeof data.hasVatApplied !== 'undefined') _hasValTax = data.hasVatApplied;
-        else _hasValTax = !!(data.taxNumber && data.taxNumber.trim() !== '');
-
+        const _hasValTax = !!(window.tenantSettings && window.tenantSettings.taxNumber && window.tenantSettings.taxNumber.trim() !== '');
         const dObj = new Date(data.timestamp);
         const dStr = dObj.toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
         const _invId = (data.id || '').toString().replace(/^INV-/, '');
@@ -1990,48 +1824,43 @@ window.appLogic = {
 
         const displayLocale = 'en-US';
         const displayOpts = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
-        const mult = _hasValTax ? 1.15 : 1;
+
 
         let itemsHtml = '';
         data.items.forEach(item => {
             if (!item) return;
             let tLbl = item.type === 'iron' ? 'كوي' : (item.type === 'wash_iron' ? 'غسيل وكوي' : 'غسيل');
             let sLbl = item.speed === 'normal' ? 'عادي' : 'سريع';
-            let lineTotal = (item.unitPrice * item.qty) * mult;
             itemsHtml += `
             <tr>
                 <td style="padding:4px 0; border-bottom:1px dashed #bbb; text-align:right;">${item.name} <span style="font-size:10px;"> &nbsp;-&nbsp; ${tLbl} &nbsp;-&nbsp; ${sLbl}</span></td>
                 <td style="padding:4px 0; border-bottom:1px dashed #bbb; text-align:center;">${item.qty}</td>
-                <td style="padding:4px 0; border-bottom:1px dashed #bbb; text-align:left; direction:ltr;">${lineTotal.toLocaleString(displayLocale, displayOpts)}</td>
+                <td style="padding:4px 0; border-bottom:1px dashed #bbb; text-align:left; direction:ltr;">${(item.unitPrice * item.qty).toLocaleString(displayLocale, displayOpts)}</td>
             </tr>`;
         });
         if (deliveryFee > 0) {
-            let deliveryDisplay = deliveryFee * mult;
             itemsHtml += `
             <tr>
                 <td style="padding:4px 0; border-bottom:1px dashed #bbb; text-align:right;">رسوم التوصيل</td>
                 <td style="padding:4px 0; border-bottom:1px dashed #bbb; text-align:center;">1</td>
-                <td style="padding:4px 0; border-bottom:1px dashed #bbb; text-align:left; direction:ltr;">${deliveryDisplay.toLocaleString(displayLocale, displayOpts)}</td>
+                <td style="padding:4px 0; border-bottom:1px dashed #bbb; text-align:left; direction:ltr;">${deliveryFee.toLocaleString(displayLocale, displayOpts)}</td>
             </tr>`;
         }
 
         const storePhone = (window.tenantSettings || {}).phone
             ? `<p style="margin:0;"><span class="label">رقم جوال النشاط:</span> <span class="number">${window.tenantSettings.phone}</span></p>` : '';
-        const _invoiceTax = data.taxNumber;
-        const storeTax = _invoiceTax
-            ? `<p style="margin:0;"><span class="label">الرقم الضريبي:</span> <span class="number">${_invoiceTax}</span></p>` : '';
-        const _iCity = (window.tenantSettings || {}).addressCity || localStorage.getItem('invoiceCity') || '';
-        const _iHood = (window.tenantSettings || {}).addressNeighborhood || localStorage.getItem('invoiceNeighborhood') || '';
-        const _iStreet = (window.tenantSettings || {}).addressStreet || localStorage.getItem('invoiceStreet') || '';
-        const _addrParts = [];
-        if (_iCity) _addrParts.push(_iCity);
-        if (_iHood) _addrParts.push(_iHood);
-        if (_iStreet) _addrParts.push(_iStreet);
-        const _addressText = _addrParts.length > 0 ? _addrParts.join(' - ') : '';
+        const storeTax = (window.tenantSettings || {}).taxNumber
+            ? `<p style="margin:0;"><span class="label">الرقم الضريبي:</span> <span class="number">${window.tenantSettings.taxNumber}</span></p>` : '';
+    const _iCity = (window.tenantSettings || {}).addressCity || localStorage.getItem('invoiceCity') || '';
+    const _iHood = (window.tenantSettings || {}).addressNeighborhood || localStorage.getItem('invoiceNeighborhood') || '';
+    const _iStreet = (window.tenantSettings || {}).addressStreet || localStorage.getItem('invoiceStreet') || '';
+    const _addrParts = [];
+    if (_iCity) _addrParts.push(_iCity);
+    if (_iHood) _addrParts.push(_iHood);
+    if (_iStreet) _addrParts.push(_iStreet);
+    const _addressText = _addrParts.length > 0 ? _addrParts.join(' - ') : '';
 
-        const storeAddress = _addressText
-            ? `<p style="margin:0;"><span class="label">العنوان:</span> <span class="number">${_addressText}</span></p>`
-            : ``;
+    const storeAddress = _addressText ? `<p style="margin:0;"><span class="label">العنوان:</span> <span class="number" style="direction:rtl; display:inline-block;">${_addressText}</span></p>` : '';
 
         return `
         <style>
@@ -2155,7 +1984,6 @@ window.appLogic = {
             });
         }
         // 📅 GLOBAL DATE FILTER: Strictly isolate Live Shift from Archived data
-        let invoicesBeforeFilter = invoices.length;
         invoices = invoices.filter(inv => {
             if (!inv) return false;
 
@@ -2164,11 +1992,8 @@ window.appLogic = {
 
             // Normalize dates to KSA Local YYYY-MM-DD for comparison ensuring 100% strict match
             const invDate = getLocalYMD(inv.timestamp || inv.date);
-
-
             return invDate === (this.currentViewDate || todayYMD);
         });
-
 
         // Search Filter (Secondary)
         if (searchTerm) {
@@ -2252,7 +2077,7 @@ window.appLogic = {
                             : `<button class="btn-action-icon btn-action-delete" type="button" data-action="cancel_inv" data-id="${i.id}" title="${actCancelTitle}"><i class="fa-solid fa-ban" style="pointer-events:none;"></i></button>`;
 
                         const markPaidBtn = (isUnpaidSection && !isCancelled)
-                            ? `<button class="btn-action-icon" type="button" data-action="mark_paid" data-id="${i.id}" title="${lang === 'en' ? 'Mark as Paid' : 'تسديد الفاتورة'}" style="color: #4CAF50; background: rgba(76, 175, 80, 0.1); border: 1px solid #4CAF50; padding: 8px 24px; min-width: 60px; border-radius: 6px;"><i class="fa-solid fa-check" style="pointer-events:none;"></i></button>`
+                            ? `<button class="btn-action-icon" type="button" data-action="mark_paid" data-id="${i.id}" style="color: #fff; background: #22c55e; border: none; padding: 10px 25px; min-width: 100px; border-radius: 8px; font-weight: 900; font-size: 14px; box-shadow: 0 4px 10px rgba(34,197,94,0.4);" title="${lang === 'en' ? 'Mark as Paid' : 'تسديد الفاتورة'}"><i class="fa-solid fa-check" style="pointer-events:none; margin-left:6px;"></i> ${lang === 'en' ? 'Pay' : 'تسديد'}</button>`
                             : '';
 
                         sectionHtml += `<tr style="${rowStyle}">
@@ -2356,7 +2181,7 @@ window.appLogic = {
 
         invs[idx].laundryPaid = !invs[idx].laundryPaid;
         await localforage.setItem('invoices', invs);
-        await manualSyncToCloud('invoices', invs[idx], invs[idx].id);
+        await manualSyncToCloud('invoices', invs);
 
         this.renderHistory();
         this.renderReports();
@@ -2390,7 +2215,7 @@ window.appLogic = {
         invs[idx].partnerLaundryCost = cost; // Mirror for safety/back-compat
 
         await localforage.setItem('invoices', invs);
-        await manualSyncToCloud('invoices', invs[idx], invs[idx].id);
+        await manualSyncToCloud('invoices', invs);
 
         // Update Cumulative Balance Store
         let balances = await localforage.getItem('laundry_balances') || {};
@@ -2457,7 +2282,7 @@ window.appLogic = {
         invs[idx].status = 'cancelled';
 
         await localforage.setItem('invoices', invs);
-        await manualSyncToCloud('invoices', invs[idx], invs[idx].id);
+        await manualSyncToCloud('invoices', invs);
 
         await this.renderHistory();
         await this.renderReports();
@@ -2508,7 +2333,7 @@ window.appLogic = {
                      <div style="color:var(--text-muted); font-size:12px;">سعر الوحدة: ${unitPrice.toFixed(2)} ر.س | متوفر للإرجاع: ${maxRef}</div>
                  </div>
                  <div style="flex:1; display:flex; justify-content:flex-end; align-items:center; gap:10px;">
-                     <input type="number" class="refund-qty-input" data-index="${index}" data-price="${unitPrice}" data-max="${maxRef}" min="0" max="${maxRef}" value="" placeholder="0" onchange="appLogic.calculateRefundTotal()" style="width:70px; padding:8px; text-align:center; background:#000; border:1px solid var(--border); color:#fff; border-radius:4px;">
+                     <input type="number" class="refund-qty-input" data-index="${index}" data-price="${unitPrice}" data-max="${maxRef}" min="0" max="${maxRef}" value="0" onchange="appLogic.calculateRefundTotal()" style="width:70px; padding:8px; text-align:center; background:#000; border:1px solid var(--border); color:#fff; border-radius:4px;">
                  </div>
              `;
             container.appendChild(row);
@@ -2577,7 +2402,7 @@ window.appLogic = {
 
         invs[idx] = invoice;
         await localforage.setItem('invoices', invs);
-        await manualSyncToCloud('invoices', invs[idx], invs[idx].id);
+        await manualSyncToCloud('invoices', invs);
 
         this.closeRefundModal();
         this.renderHistory();
@@ -2892,15 +2717,9 @@ window.appLogic = {
             html += `</div>`;
 
             // Laundry Services Section
-            const services = window.appLogic.services || [];
-            const svcCount = Array.isArray(services) ? services.length : 0;
-
             html += `
             <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px;">
-                <h3 style="margin-bottom:15px; border-bottom:1px solid var(--border); padding-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
-                    <span>${lang === 'en' ? 'Laundry Services & Prices' : 'خدمات المغسلة وأسعارها (Laundry Services)'}</span>
-                    <span class="badge" style="background-color: var(--primary); color: #000; border-radius: 4px; padding: 2px 8px; font-size: 14px;">${svcCount} أصناف</span>
-                </h3>
+                <h3 style="margin-bottom:15px; border-bottom:1px solid var(--border); padding-bottom:10px;">${lang === 'en' ? 'Laundry Services & Prices' : 'خدمات المغسلة وأسعارها (Laundry Services)'}</h3>
                 <div style="overflow-x: auto;">
                     <table class="inventory-table">
                         <thead>
@@ -2918,21 +2737,19 @@ window.appLogic = {
                         <tbody>
                 `;
 
+            const services = window.appLogic.services || [];
             if (Array.isArray(services)) {
-                const isVatActive = !!(window.tenantSettings && window.tenantSettings.taxNumber && window.tenantSettings.taxNumber.trim() !== "");
-                const mult = isVatActive ? 1.15 : 1;
-
                 services.forEach(item => {
                     if (!item) return;
                     const p = item.prices || {};
-                    const iron = (parseFloat(p.iron) || 0) * mult;
-                    const washIron = (parseFloat(p.wash_iron) || 0) * mult;
-                    const wash = (parseFloat(p.wash) || 0) * mult;
+                    const iron = parseFloat(p.iron) || 0;
+                    const washIron = parseFloat(p.wash_iron) || 0;
+                    const wash = parseFloat(p.wash) || 0;
 
                     let expLbl = '0.00';
                     if (item.expressFee) {
                         if (typeof item.expressFee === 'object') expLbl = 'متغير';
-                        else expLbl = `+${((parseFloat(item.expressFee) || 0) * mult).toFixed(2)}`;
+                        else expLbl = `+${parseFloat(item.expressFee).toFixed(2)}`;
                     }
 
                     html += `
@@ -3370,7 +3187,7 @@ window.appLogic = {
 
         await localforage.setItem('expenses', exps);
         localStorage.setItem('expenses', JSON.stringify(exps));
-        await manualSyncToCloud('expenses', newExpense, newExpense.id);
+        await manualSyncToCloud('expenses', exps);
 
         this.closeExpenseModal();
         this.renderExpenses();
@@ -3455,8 +3272,8 @@ window.appLogic = {
         let totalRefunds = 0;
         let totalOperatingExpenses = 0;
         let totalLaundryDebt = 0;
-        let totalUncollected = 0; // مبالغ غير محصلة
-        let totalCollected = 0;   // مبالغ محصلة (مقبوضات)
+        let totalUncollected = 0; // NEW TRACKER
+        let totalCollected = 0;   // Collected amounts
 
         // 1. Process Invoices
         let cashTotal = 0, madaTotal = 0, visaTotal = 0, mastercardTotal = 0;
@@ -3636,6 +3453,7 @@ window.appLogic = {
                  data-mada="${madaTotal.toFixed(2)}"
                  data-visa="${visaTotal.toFixed(2)}"
                  data-mastercard="${mastercardTotal.toFixed(2)}"
+                 data-collected="${totalCollected.toFixed(2)}"
                  data-uncollected="${totalUncollected.toFixed(2)}">
             </div>
         </div>
@@ -3722,13 +3540,13 @@ window.appLogic = {
         </div>
         `;
 
-        // UID-scoped offline metric cache
-        lsSet('sahab_totalSales', totalAllInvoices);
-        lsSet('sahab_uncollectedAmounts', totalUncollected);
-        lsSet('sahab_cashTotal', cashTotal);
-        lsSet('sahab_madaTotal', madaTotal);
-        lsSet('sahab_visaTotal', visaTotal);
-        lsSet('sahab_mastercardTotal', mastercardTotal);
+        // 💾 OFFLINE SYNC: BIND METRICS STRICTLY TO LOCALSTORAGE OUTSIDE INDEXEDDB
+        localStorage.setItem('sahab_totalSales', totalAllInvoices);
+        localStorage.setItem('sahab_uncollectedAmounts', totalUncollected);
+        localStorage.setItem('sahab_cashTotal', cashTotal);
+        localStorage.setItem('sahab_madaTotal', madaTotal);
+        localStorage.setItem('sahab_visaTotal', visaTotal);
+        localStorage.setItem('sahab_mastercardTotal', mastercardTotal);
 
         document.getElementById('reports-content').innerHTML = html;
     },
@@ -4060,14 +3878,9 @@ window.appLogic = {
                     throw new Error('account-deactivated');
                 }
 
-                if (accountData.isSubscribed === true) {
-                    localStorage.setItem(`sahab_is_subscribed_${targetUID}`, 'true');
-                } else {
-                    localStorage.setItem(`sahab_is_subscribed_${targetUID}`, 'false');
-                    if (accountData.isTrial === true && accountData.trialEndDate) {
-                        if (Date.now() > accountData.trialEndDate) {
-                            throw new Error('trial-expired');
-                        }
+                if (accountData.isTrial === true && accountData.trialEndDate) {
+                    if (Date.now() > accountData.trialEndDate) {
+                        throw new Error('trial-expired');
                     }
                 }
             }
@@ -4160,17 +3973,9 @@ window.appLogic = {
                 console.warn("[SECURITY] Kill switch triggered! Account deactivated from Admin.");
                 const lang = localStorage.getItem('sahab-lang') || 'ar';
                 alert(lang === 'en' ? "System disabled. Please contact administration." : "النظام معطل، يرجى التواصل مع الإدارة");
-                // Preserve Address Data
-                const _city = localStorage.getItem('invoiceCity');
-                const _hood = localStorage.getItem('invoiceNeighborhood');
-                const _street = localStorage.getItem('invoiceStreet');
-
-
-                // Restore Address Data
-                if (_city) localStorage.setItem('invoiceCity', _city);
-                if (_hood) localStorage.setItem('invoiceNeighborhood', _hood);
-                if (_street) localStorage.setItem('invoiceStreet', _street);
-
+                localStorage.clear();
+                sessionStorage.clear();
+                await localforage.clear();
                 firebase.auth().signOut().then(() => {
                     window.location.reload();
                 });
@@ -4234,10 +4039,7 @@ window.appLogic = {
                     expiredOverlay.classList.add('hidden');
                     expiredOverlay.style.display = 'none';
                 }
-                if (banner) {
-                    banner.classList.add('hidden');
-                    banner.style.display = 'none';
-                }
+                if (banner) banner.classList.add('hidden');
             } else if (data.isTrial === true && effectiveTrialEndDate) {
                 const checkTrialExpiry = () => {
                     const exactDaysLeft = (effectiveTrialEndDate - Date.now()) / (1000 * 60 * 60 * 24);
@@ -4250,10 +4052,7 @@ window.appLogic = {
                             expiredOverlay.classList.remove('hidden');
                             expiredOverlay.style.display = 'flex'; // Ensure flex display for centering
                         }
-                        if (banner) {
-                            banner.classList.add('hidden');
-                            banner.style.display = 'none';
-                        }
+                        if (banner) banner.classList.add('hidden');
                     } else {
                         // Trial Active - Show Banner & Unlock
                         if (expiredOverlay) {
@@ -4263,7 +4062,6 @@ window.appLogic = {
                         if (banner && trialDays) {
                             trialDays.innerText = displayDays;
                             banner.classList.remove('hidden');
-                            banner.style.display = 'flex';
                         }
                     }
                 };
@@ -4285,81 +4083,30 @@ window.appLogic = {
     },
 
     async logoutUser() {
-        if (window._activeSyncs && window._activeSyncs > 0) {
-            const btn = document.querySelector('.logout-btn') || document.getElementById('setting-logout');
-            if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري مزامنة البيانات...';
-            setTimeout(() => this.logoutUser(), 1000);
-            return;
-        }
-
         this.closeSettingsModal();
-
-        const leavingUID = window.currentUID;
-
-        // ── STEP 1: NULL THE UID IMMEDIATELY ───────────────────────────────
-        // This ensures any in-flight writes after this point go to __NO_UID_GUARD__
-        // and can never corrupt another tenant's data.
-        window.currentUID = null;
-        window.isDataInitialized = false;
-
-        // ── STEP 2: Detach ALL Firebase realtime listeners ─────────────────
-        // Without this, old listeners continue firing and writing stale data
-        // when the next account logs in and changes window.currentUID.
-        try {
-            if (typeof firebase !== 'undefined' && leavingUID) {
-                collectionsToSync.forEach(function(key) {
-                    firebase.database().ref('users/' + leavingUID + '/' + key).off();
-                });
-                firebase.database().ref('users/' + leavingUID + '/settings/resetToken').off();
-                firebase.database().ref('users/' + leavingUID + '/accountDetails').off();
-                console.log('[Logout] Firebase listeners detached for UID:', leavingUID);
-            }
-        } catch (e) {
-            console.warn('[Logout] Listener detach error (non-critical):', e);
-        }
-
+        if (typeof firebase !== 'undefined' && firebase.database) firebase.database().ref().off();
         await firebase.auth().signOut();
 
-        // ── STEP 3: Clear all in-memory application state ────────────────
+        const departsUID = window.currentUID;
+        window.currentUID = null;
+        window.isDataInitialized = false;
         this.cart = [];
         this.services = [];
         this.expenses = [];
-        this.currentInvoice = null;
-        this.editingInvoiceId = null;
-        this.customer = { name: '', phone: '' };
-        this.deliveryFee = 0;
-        window.tenantSettings = { name: '', phone: '', taxNumber: '' };
 
-        // ── STEP 4: Wipe ALL UID-namespaced IndexedDB (localforage) keys ──
-        // We must manually iterate because localforage.clear() would destroy
-        // ALL tenants' data on a shared device. Instead, we surgically remove
-        // only the keys belonging to the departing tenant.
-        if (leavingUID) {
-            try {
-                // localforage.iterate gives us access to all stored keys
-                var keysToDelete = [];
-                await localforage.iterate(function(value, key) {
-                    if (key.indexOf(leavingUID + '_') === 0 || key === leavingUID) {
-                        keysToDelete.push(key);
-                    }
-                });
-                for (var i = 0; i < keysToDelete.length; i++) {
-                    await originalRemoveItem.call(localforage, keysToDelete[i]);
+        await localforage.clear();
+        sessionStorage.clear();
+
+        if (departsUID) {
+            for (let i = localStorage.length - 1; i >= 0; i--) {
+                const key = localStorage.key(i);
+                if (key && key.endsWith('_' + departsUID)) {
+                    localStorage.removeItem(key);
                 }
-                console.log('[Logout] Wiped ' + keysToDelete.length + ' IndexedDB keys for UID:', leavingUID);
-            } catch (e) {
-                console.warn('[Logout] IndexedDB wipe error:', e);
             }
         }
-
-        // ── STEP 5: Purge ALL UID-scoped localStorage keys ────────────────
-        if (leavingUID) {
-            lsPurgeAllForUID(leavingUID);
-        }
-
-        // ── STEP 6: Clear device-level session marker only ────────────────
+        localStorage.removeItem('sahab_active_view');
         localStorage.removeItem('sahab_session_uid');
-
         location.reload();
     },
 
@@ -4368,10 +4115,13 @@ window.appLogic = {
         document.getElementById('setting-name').value = s.name || '';
         document.getElementById('setting-phone').value = s.phone || '';
         document.getElementById('setting-tax').value = s.taxNumber || '';
-
-        if (document.getElementById('setting-city')) document.getElementById('setting-city').value = s.addressCity || lsGet('invoiceCity', '') || '';
-        if (document.getElementById('setting-hood')) document.getElementById('setting-hood').value = s.addressNeighborhood || lsGet('invoiceNeighborhood', '') || '';
-        if (document.getElementById('setting-street')) document.getElementById('setting-street').value = s.addressStreet || lsGet('invoiceStreet', '') || '';
+        
+        const cityEl = document.getElementById('setting-city');
+        const hoodEl = document.getElementById('setting-hood');
+        const streetEl = document.getElementById('setting-street');
+        if(cityEl) cityEl.value = s.addressCity || (typeof lsGet === 'function' ? lsGet('invoiceCity') : localStorage.getItem('invoiceCity')) || '';
+        if(hoodEl) hoodEl.value = s.addressNeighborhood || (typeof lsGet === 'function' ? lsGet('invoiceNeighborhood') : localStorage.getItem('invoiceNeighborhood')) || '';
+        if(streetEl) streetEl.value = s.addressStreet || (typeof lsGet === 'function' ? lsGet('invoiceStreet') : localStorage.getItem('invoiceStreet')) || '';
 
         // PWA Button Gatekeeper Logic
         let isPwaAllowed = s.canInstallPWA === true;
@@ -4575,7 +4325,7 @@ window.appLogic = {
             '#settings-modal .selector-group:nth-of-type(3) label': { ar: 'رقم الجوال', en: 'Phone Number' },
             '#settings-modal .selector-group:nth-of-type(4) label': { ar: 'الرقم الضريبي (اختياري)', en: 'Tax Number (Optional)' },
             '#settings-modal .selector-group:nth-of-type(5) label': { ar: 'مظهر النظام (Theme)', en: 'System Theme' },
-            '#trial-banner': { ar: 'نسخة تجريبية: متبقي <span id="trial-days" style="font-weight:bold; margin:0 2px;"></span> أيام', en: 'Trial version: <span id="trial-days" style="font-weight:bold; margin:0 2px;"></span> days left' },
+            '#trial-banner': { ar: 'نسخة تجريبية: متبقي <span id="trial-days"></span> أيام', en: 'Trial version: <span id="trial-days">5</span> days left' },
             '#initial-loader h2': { ar: 'جاري التحميل...', en: 'Loading...' },
 
             // Expense Modal Option Selectors (Deep Form Translation)
@@ -4632,7 +4382,7 @@ window.appLogic = {
             '#modal-actions-success h4': { ar: 'تم تسجيل الفاتورة بنجاح', en: 'Invoice Generated Successfully' },
             '#modal-actions-success p': { ar: 'العملية مقيدة بالمرجع <span id="success-invoice-ref"></span>', en: 'Reference: <span id="success-invoice-ref"></span>' },
             '#modal-actions-success h4:nth-of-type(2)': { ar: 'إجراءات الفاتورة:', en: 'Invoice Actions:' },
-            '#modal-actions-success button:nth-of-type(1) span': { ar: 'طباعة إيصال حراري (80mm)', en: 'Print Thermal Receipt (80mm)' },
+            '#modal-actions-success button:nth-of-type(1) span': { ar: 'طباعة إيصال حراري', en: 'Print Thermal Receipt' },
             '#modal-actions-success button:nth-of-type(2)': { ar: '<i class="fa-solid fa-file-pdf"></i> تحميل الفاتورة الرقمية (PDF)', en: '<i class="fa-solid fa-file-pdf"></i> Download PDF Invoice' },
 
             // Daily Report Headers
@@ -4742,17 +4492,22 @@ window.appLogic = {
         const city = document.getElementById('setting-city') ? document.getElementById('setting-city').value.trim() : '';
         const hood = document.getElementById('setting-hood') ? document.getElementById('setting-hood').value.trim() : '';
         const street = document.getElementById('setting-street') ? document.getElementById('setting-street').value.trim() : '';
+        if (typeof lsSet === 'function') {
+            lsSet('invoiceCity', city);
+            lsSet('invoiceNeighborhood', hood);
+            lsSet('invoiceStreet', street);
+        } else {
+            localStorage.setItem('invoiceCity', city);
+            localStorage.setItem('invoiceNeighborhood', hood);
+            localStorage.setItem('invoiceStreet', street);
+        }
 
         // Merge locally so we don't destroy pre-existing properties like pin or status
         window.tenantSettings = {
-            ...(window.tenantSettings || {}),
+            ...window.tenantSettings,
             name, phone, taxNumber: tax,
             addressCity: city, addressNeighborhood: hood, addressStreet: street
         };
-
-        lsSet('invoiceCity', city);
-        lsSet('invoiceNeighborhood', hood);
-        lsSet('invoiceStreet', street);
 
         // Attach logo if uploaded
         if (window._tempLogoBase64) {
@@ -4789,7 +4544,6 @@ window.appLogic = {
         this.showToast('تم حفظ إعدادات المغسلة بنجاح ✓');
     },
 
-
     async loadTenantSettings(uid) {
         let settings = null;
         const user = firebase.auth().currentUser;
@@ -4815,7 +4569,6 @@ window.appLogic = {
 
         window.tenantSettings = settings || { name: '', phone: '', taxNumber: '' };
         this.applyBranding();
-
     },
 
     applyBranding() {
@@ -4846,6 +4599,7 @@ window.appLogic = {
         const madaTotal = parseFloat(syncEl.dataset.mada) || 0;
         const visaTotal = parseFloat(syncEl.dataset.visa) || 0;
         const mastercardTotal = parseFloat(syncEl.dataset.mastercard) || 0;
+        const collected = parseFloat(syncEl.dataset.collected) || 0;
         const uncollected = parseFloat(syncEl.dataset.uncollected) || 0;
 
         // === KSA STRICT LOCAL DATE (prevents UTC timezone drift) ===
@@ -4947,6 +4701,10 @@ window.appLogic = {
                                         <tr style="background: #f1f8e9; border-bottom: 1px solid #a5d6a7;">
                                             <td style="padding: 8px 10px; color: #2e7d32; font-weight: 700;">${this.currentLang === 'en' ? 'Net Revenue' : 'صافي الإيرادات'}</td>
                                             <td style="padding: 8px 10px; text-align: left; font-weight: 900; direction: ltr; color: #2e7d32; font-size: 13px;">${netRev.toFixed(2)} ر.س</td>
+                                        </tr>
+                                        <tr style="background: #e1f5fe; border-bottom: 1px solid #81d4fa;">
+                                            <td style="padding: 8px 10px; color: #0288d1; font-weight: 700;">${this.currentLang === 'en' ? 'Collected Amounts' : 'المبالغ المحصلة (مقبوضات)'}</td>
+                                            <td style="padding: 8px 10px; text-align: left; font-weight: 900; direction: ltr; color: #0288d1; font-size: 13px;">${collected.toFixed(2)} ر.س</td>
                                         </tr>
                                         <tr style="background: #fff8f8; border-bottom: 2px solid #e0e0e0;">
                                             <td style="padding: 8px 10px; color: #c62828; font-weight: 700;">${this.currentLang === 'en' ? 'Total Expenses' : 'إجمالي المصاريف'}</td>
@@ -5099,6 +4857,7 @@ window.appLogic = {
         const madaTotal = parseFloat(syncEl.dataset.mada) || 0;
         const visaTotal = parseFloat(syncEl.dataset.visa) || 0;
         const mastercardTotal = parseFloat(syncEl.dataset.mastercard) || 0;
+        const collected = parseFloat(syncEl.dataset.collected) || 0;
         const uncollected = parseFloat(syncEl.dataset.uncollected) || 0;
 
         const format = (num) => num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -5151,6 +4910,13 @@ window.appLogic = {
                         <span class="label" style="color:#4caf50">${lang === 'en' ? 'Net Revenue' : 'صافي الإيرادات'}</span>
                     </div>
                     <span class="value" style="color:#4caf50">${format(netRev)} ر.س</span>
+                </div>
+                <div class="z-report-item" style="background: rgba(14, 165, 233, 0.1); border-color: rgba(14, 165, 233, 0.3);">
+                    <div class="info">
+                        <i class="fa-solid fa-hand-holding-dollar" style="color:#0ea5e9; margin-left:10px;"></i>
+                        <span class="label" style="color:#0ea5e9">${lang === 'en' ? 'Collected Amounts' : 'المبالغ المحصلة (مقبوضات)'}</span>
+                    </div>
+                    <span class="value" style="color:#0ea5e9">${format(collected)} ر.س</span>
                 </div>
                 <div class="z-report-item">
                     <div class="info">
@@ -5212,39 +4978,9 @@ document.addEventListener('DOMContentLoaded', () => {
     firebase.auth().onAuthStateChanged(async (user) => {
         const adminBtn = document.getElementById('admin-nav-btn');
         if (user) {
-            // ✅ LOGGED IN
+            // ✅ LOGGED IN - Mirror session in localStorage for tracking
             window.currentUID = user.uid;
             localStorage.setItem('sahab_session_uid', user.uid);
-
-            // ══════════════════════════════════════════════════════════
-            // ACCOUNT SWITCH DETECTOR — The most critical security check
-            // If the UID changed from previous session, wipe ALL IndexedDB
-            // data before loading anything. This is the nuclear option
-            // that guarantees zero cross-tenant contamination no matter
-            // what happened during logout.
-            // ══════════════════════════════════════════════════════════
-            const lastKnownUID = localStorage.getItem('sahab_last_uid');
-            if (lastKnownUID && lastKnownUID !== user.uid) {
-                console.warn('[SECURITY] Account switch detected! Last UID:', lastKnownUID, '→ New UID:', user.uid);
-                console.warn('[SECURITY] Purging ALL IndexedDB caches to prevent data cross-contamination...');
-                try {
-                    // Collect ALL keys in IndexedDB and delete them all
-                    var allIdbKeys = [];
-                    await localforage.iterate(function(value, key) {
-                        allIdbKeys.push(key);
-                    });
-                    for (var ki = 0; ki < allIdbKeys.length; ki++) {
-                        await originalRemoveItem.call(localforage, allIdbKeys[ki]);
-                    }
-                    // Also purge old UID's localStorage keys
-                    lsPurgeAllForUID(lastKnownUID);
-                    console.log('[SECURITY] IndexedDB purge complete. Wiped', allIdbKeys.length, 'keys.');
-                } catch (purgeErr) {
-                    console.error('[SECURITY] IndexedDB purge error:', purgeErr);
-                }
-            }
-            // Always stamp the current UID as "last known"
-            localStorage.setItem('sahab_last_uid', user.uid);
 
             // 🔐 INITIAL SECURITY CHECK (Kill Switch)
             // Ensure account is STILL active before allowing POS dashboard access
@@ -5274,43 +5010,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Load tenant settings & apply branding BEFORE init
             await appLogic.loadTenantSettings(user.uid);
-
-            // ═══ FACTORY RESET TOKEN CHECK ═══
-            // If admin did a factory reset, the cloud resetToken will differ from
-            // our locally-stored one. Force-wipe ALL local data before booting.
-            try {
-                const tokenSnap = await firebase.database().ref(`users/${user.uid}/settings/resetToken`).once('value');
-                const cloudToken = tokenSnap.val();
-                const localToken = localStorage.getItem(`sahab_reset_token_${user.uid}`);
-
-                if (cloudToken && cloudToken !== localToken) {
-                    console.warn('[FactoryReset] Reset token mismatch! Wiping ALL local data for UID:', user.uid);
-
-                    // 1. Wipe transactional/financial localforage keys only.
-                    // DO NOT wipe: 'services', 'delivery_options', 'inventory'
-                    const collectionsToWipeLocally = [
-                        'customers', 'invoices', 'journal_entries', 'tax_records',
-                        'expenses', 'zreports', 'reports', 'archived_z_reports',
-                        'laundry_balances', 'settings'
-                    ];
-                    for (const col of collectionsToWipeLocally) {
-                        await originalRemoveItem.call(localforage, `${user.uid}_${col}`);
-                    }
-
-                    // 2. Purge ALL UID-scoped localStorage keys (metrics, history, counters, etc.)
-                    lsPurgeAllForUID(user.uid);
-
-                    // 3. Save the new token locally so we don't re-wipe next time
-                    localStorage.setItem(`sahab_reset_token_${user.uid}`, cloudToken);
-                    console.log('[FactoryReset] Local wipe complete. System will boot clean.');
-                } else if (cloudToken && !localToken) {
-                    // First login after token was set — save it
-                    localStorage.setItem(`sahab_reset_token_${user.uid}`, cloudToken);
-                }
-            } catch (tokenErr) {
-                console.warn('[FactoryReset] Token check failed (non-critical):', tokenErr.message);
-            }
-            // ═══════════════════════════════════
 
             // Deploy Realtime SaaS Daemons (Kill Switch listener)
             appLogic.initRealtimeSecurity(user.uid);
