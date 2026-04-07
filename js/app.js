@@ -282,6 +282,10 @@ if (typeof firebase !== 'undefined' && !firebase.apps.length) {
     }
 }
 
+// Configure localforage BEFORE capturing originals — ensures all operations
+// use the correct named store from the very first call.
+localforage.config({ name: 'SahabPOS', storeName: 'pos_data' });
+
 const collectionsToSync = ['customers', 'invoices', 'journal_entries', 'tax_records', 'inventory', 'services', 'expenses', 'delivery_options', 'zreports', 'reports', 'archived_z_reports'];
 const originalSetItem = localforage.setItem;
 const originalGetItem = localforage.getItem;
@@ -291,9 +295,15 @@ window.isDataInitialized = false; // THE MASTER LOCK: App starts in strict READ-
 window.__syncingFromFirebase = false;
 
 // 0. STRICT MULTI-TENANCY NAMESPACE ISOLATION
+// CRITICAL: If currentUID is not set, we must NEVER read or write tenant data.
+// This prevents data written to un-namespaced keys from leaking across accounts.
 function getTenantKey(key) {
-    if (window.currentUID) return `${window.currentUID}_${key}`;
-    return key;
+    if (!window.currentUID) {
+        // Return a dead-end key that will never collide with real data
+        // Writing to this is safe (goes nowhere useful), reading returns null
+        return '__NO_UID_GUARD__' + key;
+    }
+    return `${window.currentUID}_${key}`;
 }
 
 // 1. SIMPLE STORAGE: localforage now strictly routes to isolated tenant namespaces
@@ -322,9 +332,8 @@ async function manualSyncToCloud(key, value, recordId = null) {
             console.log(`[Manual-Sync] Sending ${path} to cloud...`);
             const safePayload = JSON.parse(JSON.stringify(value, (k, v) => (v === undefined ? null : v)));
 
-            // EXTREME FIREBASE DEBUGGER
-            if (key === 'invoices') {
-                console.warn(`CRITICAL DEBUG: manualSyncToCloud called for invoices. Path: ${getDbPath(path)}. Payload Length: ${safePayload ? safePayload.length : 0}`);
+        if (key === 'invoices') {
+                console.log(`[Manual-Sync] Syncing invoices to cloud path: ${getDbPath(path)}`);
             }
 
             await firebase.database().ref(getDbPath(path)).set(safePayload);
@@ -344,6 +353,42 @@ function getDbPath(key) {
     if (window.currentUID) return `users/${window.currentUID}/${key}`;
     return key; // fallback
 }
+
+// ============================================================
+// TENANT-ISOLATED localStorage HELPERS
+// ALL runtime data keys MUST go through these helpers.
+// They auto-namespace with the current UID so Account A
+// can NEVER read Account B's cached values.
+// ============================================================
+function lsSet(key, value) {
+    var uid = window.currentUID;
+    if (!uid) { console.warn('[lsSet] No UID — skipping write for key:', key); return; }
+    localStorage.setItem(key + '_' + uid, value);
+}
+function lsGet(key, defaultVal) {
+    var uid = window.currentUID;
+    if (!uid) return (defaultVal !== undefined ? defaultVal : null);
+    var val = localStorage.getItem(key + '_' + uid);
+    return val !== null ? val : (defaultVal !== undefined ? defaultVal : null);
+}
+function lsRemove(key) {
+    var uid = window.currentUID;
+    if (!uid) return;
+    localStorage.removeItem(key + '_' + uid);
+}
+// Wipe ALL tenant-scoped keys for a given UID (used on logout/reset)
+function lsPurgeAllForUID(uid) {
+    if (!uid) return;
+    var suffix = '_' + uid;
+    var toDelete = [];
+    for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k && k.endsWith(suffix)) toDelete.push(k);
+    }
+    toDelete.forEach(function(k) { localStorage.removeItem(k); });
+    console.log('[lsPurgeAllForUID] Purged ' + toDelete.length + ' keys for UID:', uid);
+}
+// ============================================================
 
 // 3. RECOVERY LOGIC: Fetch-Only initialization (UID-scoped)
 async function initFirebaseSync() {
@@ -381,17 +426,14 @@ async function initFirebaseSync() {
                     // If invoices are empty on Cloud, it means a Factory Reset occurred!
                     // Wipe all legacy localStorage caches and auxiliary local-only states.
                     if (key === 'invoices') {
-                        console.warn('⚠️ Factory Reset detected from Cloud! Wiping all auxiliary local caches...');
-                        localStorage.removeItem('laundryHistory');
-                        localStorage.removeItem('laundry_balances');
+                        console.warn('Factory Reset detected from Cloud! Wiping all auxiliary local caches...');
+                        if (window.currentUID) {
+                            lsRemove('laundryHistory');
+                            lsRemove('laundry_balances');
+                            lsRemove('sahab_invoiceCounter');
+                        }
                         originalRemoveItem.call(localforage, getTenantKey('laundry_balances')).catch(e=>console.warn(e));
-                        localStorage.removeItem('sahab_invoiceCounter');
                         originalRemoveItem.call(localforage, getTenantKey('invoiceCounter')).catch(e=>console.warn(e));
-                        
-                        collectionsToSync.forEach(c => {
-                            localStorage.removeItem(c);
-                            localStorage.removeItem(getDbPath(c));
-                        });
                     }
 
                     window.__syncingFromFirebase = true;
@@ -421,9 +463,9 @@ async function initFirebaseSync() {
 
                     // If invoices wiped → full auxiliary local wipe
                     if (key === 'invoices') {
-                        localStorage.removeItem('laundryHistory');
-                        localStorage.removeItem('laundry_balances');
-                        localStorage.removeItem('sahab_invoiceCounter');
+                        lsRemove('laundryHistory');
+                        lsRemove('laundry_balances');
+                        lsRemove('sahab_invoiceCounter');
                         originalRemoveItem.call(localforage, getTenantKey('laundry_balances')).catch(() => {});
                     }
                 }
@@ -468,10 +510,11 @@ function startResetTokenWatcher() {
 
     // Watch for changes in real-time (catches admin factory-reset while cashier is logged in)
     resetTokenRef.on('value', function(snap) {
-        const newToken = snap.val();
+        var newToken = snap.val();
         if (!newToken) return;
 
-        const lastToken = localStorage.getItem(localResetKey);
+        // localResetKey is already UID-scoped (e.g. 'sahab_reset_token_abc123')
+        var lastToken = localStorage.getItem(localResetKey);
 
         // If this is a new token different from what we saw at startup, WIPE & RELOAD
         if (lastToken && newToken !== lastToken) {
@@ -481,8 +524,7 @@ function startResetTokenWatcher() {
             localStorage.setItem(localResetKey, newToken);
 
             // Wipe transactional/financial local cache only.
-            // ⚠️ DO NOT wipe: 'services', 'delivery_options', 'inventory'
-            // These belong to the user and must survive factory reset.
+            // DO NOT wipe: 'services', 'delivery_options', 'inventory'
             var allCollections = [
                 'invoices', 'expenses', 'customers', 'journal_entries',
                 'tax_records', 'zreports', 'reports', 'archived_z_reports',
@@ -493,12 +535,10 @@ function startResetTokenWatcher() {
             });
 
             Promise.all(wipePromises).then(function() {
-                // Also clear relevant localStorage keys
-                localStorage.removeItem('laundryHistory');
-                localStorage.removeItem('laundry_balances');
-                localStorage.removeItem('sahab_invoiceCounter');
+                // Purge ALL UID-scoped localStorage keys (metrics, laundryHistory, etc.)
+                if (window.currentUID) lsPurgeAllForUID(window.currentUID);
 
-                // Show a brief toast then reload to fetch fresh data from Firebase
+                // Show a brief toast then reload
                 if (window.appLogic && window.appLogic.showToast) {
                     window.appLogic.showToast('تم تطبيق إعادة ضبط المصنع. سيتم إعادة تحميل النظام...');
                 }
@@ -673,7 +713,8 @@ window.appLogic = {
         console.log("[App] !!! STARTING CRITICAL INITIALIZATION !!!");
         console.log("[App] Environment:", window.location.protocol);
 
-        localforage.config({ name: 'SahabPOS', storeName: 'pos_data' });
+        // localforage.config is already set at module level (above)
+        // Re-assigning here is a no-op but kept for clarity
 
         // Required Log: Verify local storage is accessible
         try {
@@ -740,13 +781,13 @@ window.appLogic = {
         });
 
         await localforage.setItem('laundry_balances', balances);
-        localStorage.setItem('laundry_balances', JSON.stringify(balances));
+        lsSet('laundry_balances', JSON.stringify(balances));
     },
 
     async updateLaundryDatalist() {
         try {
-            // Memory Source 1: localStorage history (Persistent 'laundryHistory')
-            const history = JSON.parse(localStorage.getItem('laundryHistory') || '{"names":[], "hoods":[]}');
+            // Memory Source 1: UID-scoped localStorage history
+            const history = JSON.parse(lsGet('laundryHistory', '{"names":[], "hoods":[]}'));
             const laundries = new Set(history.names);
             const hoods = new Set(history.hoods);
 
@@ -771,8 +812,8 @@ window.appLogic = {
                 hoodDatalist.innerHTML = Array.from(hoods).sort().map(hood => `<option value="${hood}">`).join('');
             }
 
-            // Sync back to history if unique discoveries were found
-            localStorage.setItem('laundryHistory', JSON.stringify({
+            // Sync back to history using UID-scoped key
+            lsSet('laundryHistory', JSON.stringify({
                 names: Array.from(laundries),
                 hoods: Array.from(hoods)
             }));
@@ -1358,7 +1399,7 @@ window.appLogic = {
                 }
             });
             newInvId = String(max + 1).padStart(6, '0');
-            localStorage.setItem('sahab_invoiceCounter', max + 1);
+            lsSet('sahab_invoiceCounter', max + 1);
         }
 
         // Prepare Invoice Details (Not Saved Yet)
@@ -2124,17 +2165,10 @@ window.appLogic = {
             // Normalize dates to KSA Local YYYY-MM-DD for comparison ensuring 100% strict match
             const invDate = getLocalYMD(inv.timestamp || inv.date);
 
-            // EXTREME FILTER DEBUGGER
-            if (invoicesBeforeFilter > 0) {
-                console.warn(`[Filter-Debug] Checking Invoice ID: ${inv.id}, Date: ${invDate}, TargetView: ${this.currentViewDate || todayYMD}, isLive: ${isLiveShift}, isZ: ${inv.isZReported}`);
-            }
 
             return invDate === (this.currentViewDate || todayYMD);
         });
 
-        if (invoicesBeforeFilter > 0 && invoices.length === 0) {
-            alert(`CRITICAL FILTER DEBUG: We had ${invoicesBeforeFilter} invoices before date filtering, but now we have 0! They DID fetch from DB! Check console logs for details.`);
-        }
 
         // Search Filter (Secondary)
         if (searchTerm) {
@@ -3688,13 +3722,13 @@ window.appLogic = {
         </div>
         `;
 
-        // 💾 OFFLINE SYNC: BIND METRICS STRICTLY TO LOCALSTORAGE OUTSIDE INDEXEDDB
-        localStorage.setItem('sahab_totalSales', totalAllInvoices);
-        localStorage.setItem('sahab_uncollectedAmounts', totalUncollected);
-        localStorage.setItem('sahab_cashTotal', cashTotal);
-        localStorage.setItem('sahab_madaTotal', madaTotal);
-        localStorage.setItem('sahab_visaTotal', visaTotal);
-        localStorage.setItem('sahab_mastercardTotal', mastercardTotal);
+        // UID-scoped offline metric cache
+        lsSet('sahab_totalSales', totalAllInvoices);
+        lsSet('sahab_uncollectedAmounts', totalUncollected);
+        lsSet('sahab_cashTotal', cashTotal);
+        lsSet('sahab_madaTotal', madaTotal);
+        lsSet('sahab_visaTotal', visaTotal);
+        lsSet('sahab_mastercardTotal', mastercardTotal);
 
         document.getElementById('reports-content').innerHTML = html;
     },
@@ -4259,21 +4293,73 @@ window.appLogic = {
         }
 
         this.closeSettingsModal();
-        await firebase.auth().signOut();
-        // Preserve Address Data
-        const _city = localStorage.getItem('invoiceCity');
-        const _hood = localStorage.getItem('invoiceNeighborhood');
-        const _street = localStorage.getItem('invoiceStreet');
 
+        const leavingUID = window.currentUID;
 
-        // Restore Address Data
-        if (_city) localStorage.setItem('invoiceCity', _city);
-        if (_hood) localStorage.setItem('invoiceNeighborhood', _hood);
-        if (_street) localStorage.setItem('invoiceStreet', _street);
-
-        localStorage.removeItem('sahab_session_uid'); // Purge session marker
+        // ── STEP 1: NULL THE UID IMMEDIATELY ───────────────────────────────
+        // This ensures any in-flight writes after this point go to __NO_UID_GUARD__
+        // and can never corrupt another tenant's data.
         window.currentUID = null;
         window.isDataInitialized = false;
+
+        // ── STEP 2: Detach ALL Firebase realtime listeners ─────────────────
+        // Without this, old listeners continue firing and writing stale data
+        // when the next account logs in and changes window.currentUID.
+        try {
+            if (typeof firebase !== 'undefined' && leavingUID) {
+                collectionsToSync.forEach(function(key) {
+                    firebase.database().ref('users/' + leavingUID + '/' + key).off();
+                });
+                firebase.database().ref('users/' + leavingUID + '/settings/resetToken').off();
+                firebase.database().ref('users/' + leavingUID + '/accountDetails').off();
+                console.log('[Logout] Firebase listeners detached for UID:', leavingUID);
+            }
+        } catch (e) {
+            console.warn('[Logout] Listener detach error (non-critical):', e);
+        }
+
+        await firebase.auth().signOut();
+
+        // ── STEP 3: Clear all in-memory application state ────────────────
+        this.cart = [];
+        this.services = [];
+        this.expenses = [];
+        this.currentInvoice = null;
+        this.editingInvoiceId = null;
+        this.customer = { name: '', phone: '' };
+        this.deliveryFee = 0;
+        window.tenantSettings = { name: '', phone: '', taxNumber: '' };
+
+        // ── STEP 4: Wipe ALL UID-namespaced IndexedDB (localforage) keys ──
+        // We must manually iterate because localforage.clear() would destroy
+        // ALL tenants' data on a shared device. Instead, we surgically remove
+        // only the keys belonging to the departing tenant.
+        if (leavingUID) {
+            try {
+                // localforage.iterate gives us access to all stored keys
+                var keysToDelete = [];
+                await localforage.iterate(function(value, key) {
+                    if (key.indexOf(leavingUID + '_') === 0 || key === leavingUID) {
+                        keysToDelete.push(key);
+                    }
+                });
+                for (var i = 0; i < keysToDelete.length; i++) {
+                    await originalRemoveItem.call(localforage, keysToDelete[i]);
+                }
+                console.log('[Logout] Wiped ' + keysToDelete.length + ' IndexedDB keys for UID:', leavingUID);
+            } catch (e) {
+                console.warn('[Logout] IndexedDB wipe error:', e);
+            }
+        }
+
+        // ── STEP 5: Purge ALL UID-scoped localStorage keys ────────────────
+        if (leavingUID) {
+            lsPurgeAllForUID(leavingUID);
+        }
+
+        // ── STEP 6: Clear device-level session marker only ────────────────
+        localStorage.removeItem('sahab_session_uid');
+
         location.reload();
     },
 
@@ -4283,9 +4369,9 @@ window.appLogic = {
         document.getElementById('setting-phone').value = s.phone || '';
         document.getElementById('setting-tax').value = s.taxNumber || '';
 
-        if (document.getElementById('setting-city')) document.getElementById('setting-city').value = s.addressCity || localStorage.getItem('invoiceCity') || '';
-        if (document.getElementById('setting-hood')) document.getElementById('setting-hood').value = s.addressNeighborhood || localStorage.getItem('invoiceNeighborhood') || '';
-        if (document.getElementById('setting-street')) document.getElementById('setting-street').value = s.addressStreet || localStorage.getItem('invoiceStreet') || '';
+        if (document.getElementById('setting-city')) document.getElementById('setting-city').value = s.addressCity || lsGet('invoiceCity', '') || '';
+        if (document.getElementById('setting-hood')) document.getElementById('setting-hood').value = s.addressNeighborhood || lsGet('invoiceNeighborhood', '') || '';
+        if (document.getElementById('setting-street')) document.getElementById('setting-street').value = s.addressStreet || lsGet('invoiceStreet', '') || '';
 
         // PWA Button Gatekeeper Logic
         let isPwaAllowed = s.canInstallPWA === true;
@@ -4664,9 +4750,9 @@ window.appLogic = {
             addressCity: city, addressNeighborhood: hood, addressStreet: street
         };
 
-        localStorage.setItem('invoiceCity', city);
-        localStorage.setItem('invoiceNeighborhood', hood);
-        localStorage.setItem('invoiceStreet', street);
+        lsSet('invoiceCity', city);
+        lsSet('invoiceNeighborhood', hood);
+        lsSet('invoiceStreet', street);
 
         // Attach logo if uploaded
         if (window._tempLogoBase64) {
@@ -5126,9 +5212,39 @@ document.addEventListener('DOMContentLoaded', () => {
     firebase.auth().onAuthStateChanged(async (user) => {
         const adminBtn = document.getElementById('admin-nav-btn');
         if (user) {
-            // ✅ LOGGED IN - Mirror session in localStorage for tracking
+            // ✅ LOGGED IN
             window.currentUID = user.uid;
             localStorage.setItem('sahab_session_uid', user.uid);
+
+            // ══════════════════════════════════════════════════════════
+            // ACCOUNT SWITCH DETECTOR — The most critical security check
+            // If the UID changed from previous session, wipe ALL IndexedDB
+            // data before loading anything. This is the nuclear option
+            // that guarantees zero cross-tenant contamination no matter
+            // what happened during logout.
+            // ══════════════════════════════════════════════════════════
+            const lastKnownUID = localStorage.getItem('sahab_last_uid');
+            if (lastKnownUID && lastKnownUID !== user.uid) {
+                console.warn('[SECURITY] Account switch detected! Last UID:', lastKnownUID, '→ New UID:', user.uid);
+                console.warn('[SECURITY] Purging ALL IndexedDB caches to prevent data cross-contamination...');
+                try {
+                    // Collect ALL keys in IndexedDB and delete them all
+                    var allIdbKeys = [];
+                    await localforage.iterate(function(value, key) {
+                        allIdbKeys.push(key);
+                    });
+                    for (var ki = 0; ki < allIdbKeys.length; ki++) {
+                        await originalRemoveItem.call(localforage, allIdbKeys[ki]);
+                    }
+                    // Also purge old UID's localStorage keys
+                    lsPurgeAllForUID(lastKnownUID);
+                    console.log('[SECURITY] IndexedDB purge complete. Wiped', allIdbKeys.length, 'keys.');
+                } catch (purgeErr) {
+                    console.error('[SECURITY] IndexedDB purge error:', purgeErr);
+                }
+            }
+            // Always stamp the current UID as "last known"
+            localStorage.setItem('sahab_last_uid', user.uid);
 
             // 🔐 INITIAL SECURITY CHECK (Kill Switch)
             // Ensure account is STILL active before allowing POS dashboard access
@@ -5171,8 +5287,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.warn('[FactoryReset] Reset token mismatch! Wiping ALL local data for UID:', user.uid);
 
                     // 1. Wipe transactional/financial localforage keys only.
-                    // ⚠️ DO NOT add: 'services', 'delivery_options', 'inventory'
-                    // These are user-owned setup data — must survive factory reset.
+                    // DO NOT wipe: 'services', 'delivery_options', 'inventory'
                     const collectionsToWipeLocally = [
                         'customers', 'invoices', 'journal_entries', 'tax_records',
                         'expenses', 'zreports', 'reports', 'archived_z_reports',
@@ -5182,15 +5297,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         await originalRemoveItem.call(localforage, `${user.uid}_${col}`);
                     }
 
-                    // 2. Wipe all relevant localStorage keys
-                    const lsKeysToWipe = [
-                        'laundryHistory', 'laundry_balances', 'sahab_invoiceCounter',
-                        ...collectionsToWipeLocally
-                    ];
-                    lsKeysToWipe.forEach(k => {
-                        localStorage.removeItem(k);
-                        localStorage.removeItem(`users/${user.uid}/${k}`);
-                    });
+                    // 2. Purge ALL UID-scoped localStorage keys (metrics, history, counters, etc.)
+                    lsPurgeAllForUID(user.uid);
 
                     // 3. Save the new token locally so we don't re-wipe next time
                     localStorage.setItem(`sahab_reset_token_${user.uid}`, cloudToken);
