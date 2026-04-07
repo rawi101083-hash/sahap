@@ -559,7 +559,7 @@
                     const canInstallPWA = storeInfo.canInstallPWA === true;
                     const pwaToggleBtn = `<button class="btn-action" style="background:${canInstallPWA ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)'}; color:${canInstallPWA ? '#22c55e' : '#f59e0b'}; margin-top:5px; border:1px solid ${canInstallPWA ? 'rgba(34,197,94,0.3)' : 'rgba(245,158,11,0.3)'}; display:block; width:100%; border-radius:4px; font-weight:bold; cursor:pointer;" onclick="masterApp.togglePWAStatus('${pin}', '${uid}', ${canInstallPWA})" title="تفعيل تطبيق الجوال (PWA)"><i class="fa-solid ${canInstallPWA ? 'fa-mobile-screen' : 'fa-mobile'}"></i> تطبيق الجوال (PWA)</button>`;
                     
-                    const deleteBtn = `<button class="btn-action" style="background:var(--danger); border:none; color:white; display:block; width:100%; margin-top:5px; border-radius:4px; font-weight:bold; cursor:pointer;" onclick="masterApp.deleteStore('${uid}', '${pin}')" title="فورمات شامل وضبط مصنع"><i class="fa-solid fa-skull-crossbones"></i> ضبط المصنع</button>`;
+                    const deleteBtn = `<button class="btn-action" style="background:var(--danger); border:none; color:white; display:block; width:100%; margin-top:5px; border-radius:4px; font-weight:bold; cursor:pointer;" onclick="masterApp.deleteStore('${uid}', '${pin}')" title="خيارات ضبط المصنع"><i class="fa-solid fa-skull-crossbones"></i> ضبط المصنع</button>`;
                     
                     const permanentDeleteBtn = `<button class="btn-action" style="background:#b91c1c; border:1px solid #7f1d1d; color:white; display:block; width:100%; margin-top:5px; border-radius:4px; font-weight:bold; cursor:pointer;" onclick="masterApp.permanentlyDeleteStore('${uid}', '${pin}')" title="حذف المغسلة نهائياً"><i class="fa-solid fa-trash-can"></i> حذف نهائي</button>`;
                     const safeName = name.replace(/'/g,"\\'").replace(/"/g,'&quot;');
@@ -727,17 +727,24 @@
 
             async deleteStore(uid, pin) {
                 const result = await Swal.fire({
-                    title: 'تأكيد إعادة ضبط المصنع ☠️',
-                    text: 'سيتم مسح كافة البيانات المالية (الفواتير، المصروفات، العملاء، التقارير) وتصفير العداد لتبدأ المغسلة من جديد. لن يتم حذف الحساب وسيبقى فعالاً. هل أنت متأكد؟',
+                    title: 'أنواع مسح البيانات (Factory Reset)',
+                    text: 'اختر نوع ضبط المصنع الذي ترغب به لهذا الحساب:',
                     icon: 'warning',
                     showCancelButton: true,
-                    confirmButtonColor: '#ef4444',
-                    cancelButtonColor: '#3f3f46',
-                    confirmButtonText: 'نعم، نفذ إعادة الضبط!',
-                    cancelButtonText: 'تراجع'
+                    showDenyButton: true,
+                    confirmButtonText: 'مسح جزئي (احتفاظ بالإعدادات)',
+                    denyButtonText: 'مسح شامل (كلي)',
+                    cancelButtonText: 'إلغاء الأمر',
+                    customClass: {
+                        confirmButton: 'swal2-confirm swal2-styled',
+                        denyButton: 'swal2-deny swal2-styled',
+                        cancelButton: 'swal2-cancel swal2-styled'
+                    }
                 });
 
-                if (!result.isConfirmed) return;
+                if (!result.isConfirmed && !result.isDenied) return;
+
+                const isSoft = result.isConfirmed;
 
                 if (!uid || uid === 'undefined') {
                     Swal.fire('خطأ', 'معرّف الحساب (UID) غير متوفر. يرجى إعادة تحميل الصفحة.', 'error');
@@ -747,34 +754,18 @@
                 // Show loading state
                 Swal.fire({
                     title: 'جارٍ تنفيذ إعادة الضبط...',
-                    text: 'يتم مسح جميع البيانات من الخادم. يرجى الانتظار.',
+                    text: 'يتم مسح البيانات من الخادم. يرجى الانتظار.',
                     allowOutsideClick: false,
                     didOpen: () => { Swal.showLoading(); }
                 });
 
                 try {
-                    // ================================================================
-                    // COMPLETE FACTORY RESET v3 — TRUE BLANK SLATE
-                    // Wipe EVERYTHING. Only PIN + activation status are preserved.
-                    // Name, phone, tax number, logo — all wiped.
-                    // ================================================================
-
-                    // Step 1: Preserve ONLY what's needed to keep the account working
                     const accountSnap = await db.ref(`users/${uid}/accountDetails`).once('value');
                     const currentAccount = accountSnap.val() || {};
                     const settingsSnap = await db.ref(`users/${uid}/settings`).once('value');
                     const currentSettings = settingsSnap.val() || {};
 
-                    // Only keep PIN + activation/trial/subscription booleans
-                    const savedPin = currentSettings.pin || currentAccount.pin || pin;
-                    const savedIsActivated = currentAccount.isActivated !== false;
-                    const savedIsTrial = currentAccount.isTrial === true;
-                    const savedTrialEndDate = currentAccount.trialEndDate || null;
-                    const savedIsSubscribed = currentAccount.isSubscribed === true;
-
-                    // Step 2: Wipe transactional & financial data only.
-                    // ⚠️ DO NOT add: 'services', 'delivery_options', 'inventory'
-                    // These belong to the user and must NEVER be deleted by factory reset.
+                    // Step 1: Wipe Cloud Collections
                     const collectionsToWipe = [
                         'invoices',
                         'expenses',
@@ -785,43 +776,64 @@
                         'reports',
                         'archived_z_reports',
                         'laundry_balances',
-                        'settings',
-                        'accountDetails'  // Wipe accountDetails too — rebuilt below
+                        'invoiceCounter'
                     ];
+
+                    // Wipe settings if Hard
+                    if (!isSoft) collectionsToWipe.push('settings', 'accountDetails');
 
                     const deletePromises = collectionsToWipe.map(col =>
                         db.ref(`users/${uid}/${col}`).set(null)
                     );
                     await Promise.all(deletePromises);
 
-                    // Step 3: Rebuild accountDetails as a blank new account
-                    // Name = empty, phone = empty, tax = empty, logo = gone
-                    await db.ref(`users/${uid}/accountDetails`).set({
-                        isActivated: savedIsActivated,
-                        isTrial: savedIsTrial,
-                        trialEndDate: savedTrialEndDate,
-                        isSubscribed: savedIsSubscribed,
-                        invoiceCounter: 0,
-                        lastInvoice: 0
-                    });
+                    if (!isSoft) {
+                        // REBUILD FOR FULL WIPE
+                        const savedPin = currentSettings.pin || currentAccount.pin || pin;
+                        // For a hard wipe, we keep activation status but lose name/phone
+                        const savedIsActivated = currentAccount.isActivated !== false;
+                        const savedIsTrial = currentAccount.isTrial === true;
+                        const savedTrialEndDate = currentAccount.trialEndDate || null;
+                        const savedIsSubscribed = currentAccount.isSubscribed === true;
 
-                    // Step 4: Rebuild settings as blank with resetToken
-                    // resetToken triggers ALL connected cashier devices to wipe local cache
-                    const newResetToken = 'reset_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-                    await db.ref(`users/${uid}/settings`).set({
-                        pin: savedPin,
-                        status: 'active',
-                        lastInvoice: 0,
-                        invoiceCount: 0,
-                        invoiceCounter: 0,
-                        resetToken: newResetToken
-                    });
+                        await db.ref(`users/${uid}/accountDetails`).set({
+                            isActivated: savedIsActivated,
+                            isTrial: savedIsTrial,
+                            trialEndDate: savedTrialEndDate,
+                            isSubscribed: savedIsSubscribed,
+                            invoiceCounter: 0,
+                            lastInvoice: 0
+                        });
 
-                    console.log('[Master-Sync] FACTORY RESET v3 COMPLETE for UID: ' + uid + ' (PIN: ' + pin + ')');
+                        const newResetToken = 'HARD_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                        await db.ref(`users/${uid}/settings`).set({
+                            pin: savedPin,
+                            status: 'active',
+                            lastInvoice: 0,
+                            invoiceCount: 0,
+                            invoiceCounter: 0,
+                            resetToken: newResetToken
+                        });
+                        console.log('[Master-Sync] FACTORY RESET (HARD) COMPLETE for UID: ' + uid);
+                    } else {
+                        // PARTIAL (SOFT) WIPE
+                        const newResetToken = 'SOFT_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                        await db.ref(`users/${uid}/accountDetails/resetToken`).set(newResetToken);
+                        
+                        // We also need to reset invoice counters if they exist in DB
+                        const updates = {};
+                        updates[`users/${uid}/settings/lastInvoice`] = 0;
+                        updates[`users/${uid}/settings/invoiceCount`] = 0;
+                        updates[`users/${uid}/settings/invoiceCounter`] = 0;
+                        updates[`users/${uid}/accountDetails/invoiceCounter`] = 0;
+                        await db.ref().update(updates);
+                        
+                        console.log('[Master-Sync] FACTORY RESET (SOFT) COMPLETE for UID: ' + uid);
+                    }
 
                     Swal.fire(
                         'تم التنفيذ! ✅',
-                        'تمت إعادة ضبط المصنع بالكامل. تم مسح كل شيء: الفواتير، العملاء، الاسم، الجوال، الرقم الضريبي، الشعار، المصروفات، والتقارير. الحساب الآن حساب جديد تماماً.',
+                        isSoft ? 'تم المسح الجزئي للبيانات والأرصدة بنجاح (مع الاحتفاظ بالإعدادات).' : 'تمت إعادة ضبط المصنع بالكامل. تم مسح كل شيء: الفواتير، الإعدادات، العملاء.',
                         'success'
                     );
                     this.fetchData();

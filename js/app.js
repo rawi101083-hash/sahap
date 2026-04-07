@@ -3719,6 +3719,7 @@ window.appLogic = {
                                 <button class="btn" style="background:${s.canInstallPWA ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)'}; color:${s.canInstallPWA ? '#22c55e' : '#f59e0b'}; padding:5px 10px; border:1px solid ${s.canInstallPWA ? 'rgba(34,197,94,0.2)' : 'rgba(245,158,11,0.2)'}; border-radius:4px; font-size:11px; cursor:pointer; margin-right:5px; margin-bottom:5px;" onclick="appLogic.togglePWAStatus('${pin}', ${!!s.canInstallPWA})">
                                     <i class="fa-solid ${s.canInstallPWA ? 'fa-mobile-screen' : 'fa-mobile'}"></i> ${s.canInstallPWA ? 'منع PWA' : 'سماح PWA'}
                                 </button>
+                                <button class="btn" style="background:rgba(245,158,11,0.1); color:#f59e0b; padding:5px 10px; border:1px solid rgba(245,158,11,0.2); border-radius:4px; font-size:11px; cursor:pointer; margin-right:5px; margin-bottom:5px;" onclick="appLogic.triggerFactoryReset('${pin}')" title="ضبط المصنع"><i class="fa-solid fa-rotate-left"></i></button>
                                 <button class="btn" style="background:rgba(239,68,68,0.1); color:#ef4444; padding:5px 10px; border:1px solid rgba(239,68,68,0.2); border-radius:4px; font-size:11px; cursor:pointer; margin-right:5px; margin-bottom:5px;" onclick="appLogic.deleteStore('${pin}')">
                                     <i class="fa-solid fa-trash"></i>
                                 </button>
@@ -3768,6 +3769,58 @@ window.appLogic = {
         } catch (err) {
             console.error('[Admin] Create Store failed:', err);
             alert('فشل في إنشاء الحساب الجديد.');
+        }
+    },
+
+    async triggerFactoryReset(pin) {
+        try {
+            const storeSnap = await firebase.database().ref(`admin/stores/${pin}`).once('value');
+            if (!storeSnap.exists()) return alert('المتجر غير موجود.');
+            const storeData = storeSnap.val();
+            const storeUID = storeData.uid;
+            
+            if (!storeUID) return alert('هذا المتجر غير مرتبط بحساب (UID مفقود).');
+
+            const result = await Swal.fire({
+                title: 'أنواع مسح البيانات (Factory Reset)',
+                text: 'اختر نوع ضبط المصنع الذي ترغب به لهذا الحساب:',
+                icon: 'warning',
+                showCancelButton: true,
+                showDenyButton: true,
+                confirmButtonText: 'مسح جزئي (احتفاظ بالإعدادات)',
+                denyButtonText: 'مسح شامل (نفس القديم)',
+                cancelButtonText: 'إلغاء الأمر',
+                customClass: {
+                    confirmButton: 'swal2-confirm swal2-styled',
+                    denyButton: 'swal2-deny swal2-styled',
+                    cancelButton: 'swal2-cancel swal2-styled'
+                }
+            });
+
+            if (!result.isConfirmed && !result.isDenied) return;
+
+            const isSoft = result.isConfirmed;
+            const newResetToken = (isSoft ? 'SOFT_' : 'HARD_') + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            
+            // Wipe Cloud Collections
+            const collectionsToWipe = ['invoices', 'expenses', 'customers', 'journal_entries', 'tax_records', 'zreports', 'reports', 'archived_z_reports', 'laundry_balances', 'invoiceCounter'];
+            
+            // Wipe settings if Hard
+            if (!isSoft) collectionsToWipe.push('settings');
+            
+            const deletePromises = collectionsToWipe.map(col => 
+                firebase.database().ref(`users/${storeUID}/${col}`).remove()
+            );
+            await Promise.all(deletePromises);
+            
+            // Set reset token so devices wipe localDB
+            await firebase.database().ref(`users/${storeUID}/accountDetails/resetToken`).set(newResetToken);
+            
+            Swal.fire('تم المسح', isSoft ? 'تم المسح الجزئي للبيانات والأرصدة (مع الاحتفاظ بالإعدادات)' : 'تم المسح الشامل (الضبط الكامل) بنجاح', 'success');
+
+        } catch (err) {
+            console.error('Error in factory reset:', err);
+            alert('حدث خطأ أثناء ضبط المصنع');
         }
     },
 
@@ -4096,6 +4149,47 @@ window.appLogic = {
                     expiredOverlay.style.display = 'none';
                 }
                 if (banner) banner.classList.add('hidden');
+            }
+            // 4. RESET TOKEN WATCHER
+            const currentSessionToken = localStorage.getItem('sahab_reset_token') || '';
+            const dbToken = data.resetToken || '';
+            
+            if (dbToken && currentSessionToken && currentSessionToken !== dbToken) {
+                console.warn("[SECURITY] Reset token mismatch detected! Forcing local wipe.");
+                const isSoft = dbToken.startsWith('SOFT_');
+                
+                // Clear localStorage items except user session and settings if soft
+                for (let i = localStorage.length - 1; i >= 0; i--) {
+                    const key = localStorage.key(i);
+                    // Critical: Do NOT wipe the session UID, otherwise login breaks
+                    if (key === 'sahab_session_uid') continue;
+                    
+                    if (isSoft && (key === 'sahab_services' || key.startsWith('sahab_settings') || key.startsWith('invoiceCity') || key.startsWith('invoiceStreet') || key.startsWith('invoiceNeighborhood') || key.startsWith('logo_'))) {
+                        continue; // Keep settings and UI preferences on Soft Reset
+                    }
+                    localStorage.removeItem(key);
+                }
+
+                // Clear IndexedDB via localforage
+                const collectionsToWipeLocally = ['invoices', 'expenses', 'customers', 'journal_entries', 'tax_records', 'zreports', 'reports', 'archived_z_reports', 'laundry_balances', 'invoiceCounter'];
+                
+                if (!isSoft) {
+                    collectionsToWipeLocally.push('settings');
+                    collectionsToWipeLocally.push('inventory');
+                }
+                
+                for (let col of collectionsToWipeLocally) {
+                    await localforage.removeItem(col);
+                }
+                
+                localStorage.setItem('sahab_reset_token', dbToken); // acknowledge new token
+
+                alert(isSoft ? 'تم تحديث أرقام الفواتير ومسح السجلات (إعادة ضبط جزئية). سيتم إعادة تحميل النظام.' : 'تم إعادة ضبط المصنع ومسح كافة البيانات. سيتم إعادة تحميل النظام.');
+                window.location.reload();
+                return;
+            } else if (dbToken && !currentSessionToken) {
+                // First time login after a reset, just acknowledge it.
+                localStorage.setItem('sahab_reset_token', dbToken);
             }
         });
     },
