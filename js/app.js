@@ -1127,13 +1127,14 @@ window.appLogic = {
             });
         }
 
-        // CLOSE PAYMENT MODAL IMMEDIATELY
-        this.closePaymentModal();
-
-        // WAIT 100ms FOR QR TO RENDER, THEN AUTO-CHECKOUT (TRUE)
+        // WE DELAY THE MODAL CLOSE UNTIL CHECKOUT COMPLETES TO PREVENT UI FLICKER/JUMP
         setTimeout(async () => {
             await this.confirmCheckout(true);
-        }, 100);
+            // Close the modal smoothly only after rendering resolves
+            setTimeout(() => {
+                this.closePaymentModal();
+            }, 300);
+        }, 50);
     },
 
     setPaymentMethod(method) {
@@ -1851,50 +1852,61 @@ window.appLogic = {
             var origHTML = originalBtn ? originalBtn.innerHTML : '';
             if (originalBtn) originalBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري الطباعة...';
 
-            const tempContainer = document.createElement('div');
-            tempContainer.innerHTML = this.generateThermalHTML(data, 'temp-qr-render');
+            // Find or create a persistent hidden div for printing to avoid iframe overhead
+            let printDiv = document.getElementById('persistent-print-div');
+            if (!printDiv) {
+                printDiv = document.createElement('div');
+                printDiv.id = 'persistent-print-div';
+                printDiv.style.position = 'fixed';
+                printDiv.style.left = '-9999px';
+                printDiv.style.top = '0';
+                printDiv.style.width = '400px';
+                printDiv.style.backgroundColor = '#ffffff';
+                printDiv.style.color = '#000000';
+                printDiv.style.direction = 'rtl';
+                printDiv.style.opacity = '0';
+                printDiv.style.pointerEvents = 'none';
+                printDiv.style.zIndex = '-999';
+                document.body.appendChild(printDiv);
+            }
+
+            printDiv.innerHTML = `
+                <style>
+                @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@700;900&display=swap');
+                #persistent-print-div, #persistent-print-div * { font-family: 'Tajawal', sans-serif !important; color: black !important; }
+                #persistent-print-div { padding: 10px; box-sizing: border-box; background: white; }
+                /* FORCE UPSCALING FOR THERMAL CLARITY */
+                #persistent-print-div table { width: 100% !important; border-collapse: collapse; }
+                #persistent-print-div td, #persistent-print-div th { font-size: 20px !important; font-weight: 900 !important; padding: 8px 2px !important; border-color: #000 !important; }
+                #persistent-print-div .receipt-header { text-align: center; border-bottom: 2px dashed #000; padding-bottom: 10px; margin-bottom: 10px; }
+                #persistent-print-div .receipt-header div:nth-child(2) { font-size: 32px !important; font-weight: 900 !important; margin-bottom: 5px !important; }
+                #persistent-print-div .receipt-header p, #persistent-print-div .receipt-header div { font-size: 18px !important; font-weight: bold !important; }
+                #temp-qr-render { margin-top: 15px; text-align: center; }
+                #temp-qr-render img { display: block; margin: 0 auto; width: 180px !important; height: 180px !important; }
+                </style>
+                <div id="rtl-wrapper">${this.generateThermalHTML(data, 'temp-qr-render')}</div>
+            `;
             
             const bizName = (window.tenantSettings || {}).name || 'سحاب POS';
             const zatcaQRBase64 = generateZatcaBase64(bizName, (window.tenantSettings || {}).taxNumber || "000000000000000", data.timestamp, data.grandTotal, data.vatAmount);
-            new QRCode(tempContainer.querySelector('#temp-qr-render'), {
+            new QRCode(printDiv.querySelector('#temp-qr-render'), {
                 text: zatcaQRBase64, width: 150, height: 150, colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L
             });
 
-            // Create hidden iframe with strict 400px width for perfect 80mm proportions
-            const iframe = document.createElement('iframe');
-            iframe.style.width = '400px';
-            iframe.style.position = 'absolute';
-            iframe.style.left = '-9999px';
-            document.body.appendChild(iframe);
+            // Wait less time since we are in the same DOM
+            await new Promise(r => setTimeout(r, 400));
 
-            const doc = iframe.contentWindow.document;
-            doc.open();
-            doc.write(`
-            <html dir="rtl"><head><style>
-            @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@700;900&display=swap');
-            body { margin: 0; padding: 0; width: 400px; background: white; color: black; font-family: 'Tajawal', sans-serif; }
-            * { color: black !important; }
-            #rtl-wrapper { padding: 10px; box-sizing: border-box; }
-            /* FORCE UPSCALING FOR THERMAL CLARITY */
-            table { width: 100% !important; border-collapse: collapse; }
-            td, th { font-size: 20px !important; font-weight: 900 !important; padding: 8px 2px !important; border-color: #000 !important; }
-            .receipt-header { text-align: center; border-bottom: 2px dashed #000; padding-bottom: 10px; margin-bottom: 10px; }
-            .receipt-header div:nth-child(2) { font-size: 32px !important; font-weight: 900 !important; margin-bottom: 5px !important; }
-            .receipt-header p, .receipt-header div { font-size: 18px !important; font-weight: bold !important; }
-            #temp-qr-render { margin-top: 15px; text-align: center; }
-            #temp-qr-render img { display: block; margin: 0 auto; width: 180px !important; height: 180px !important; }
-            </style></head><body>
-            <div id="rtl-wrapper">${tempContainer.innerHTML}</div>
-            </body></html>
-            `);
-            doc.close();
-
-            // Wait for fonts and QR code to render fully
-            await new Promise(r => setTimeout(r, 700));
-
-            // Capture with scale: 1.5 to create a 600px image (Perfect for 203 DPI 80mm printers)
-            const canvas = await html2canvas(doc.body, { width: 400, windowWidth: 400, scale: 1.5, useCORS: true });
-            document.body.removeChild(iframe);
+            // Capture with user's specified optimized config to eliminate flicker
+            const canvas = await html2canvas(printDiv, { 
+                width: 400, 
+                windowWidth: 400, 
+                scale: 1.5, 
+                useCORS: true,
+                logging: false,
+                backgroundColor: '#ffffff',
+                removeContainer: true,
+                imageTimeout: 0
+            });
 
             const base64ImageString = canvas.toDataURL('image/png');
 
