@@ -3257,52 +3257,45 @@ window.appLogic = {
 
             // Today's sales honors the Z-Report wipe (matchesShift) per user preference
             if (isInRange && matchesShift) {
+                salesToday += netAmt; // ✅ Total Sales ALWAYS includes everything (Cash + Card + Pay Later)
                 if (isUnpaid) {
-                    totalUncollected += netAmt;
+                    totalUncollected += netAmt; // ✅ Uncollected (Pay Later)
                 } else {
-                    salesToday += netAmt;
-                    totalCollected += netAmt; // ✅ Collected (paid invoices only)
+                    totalCollected += netAmt;   // ✅ Collected (Paid)
                 }
             }
 
             // 7/30/365 metrics ignore Z-Report wipe and accumulate ALL historical data in range
             const isBeforeOrOnEnd = (endBound === Infinity || rTime <= endBound);
-            if (!isUnpaid) {
-                if (rTime >= weekAgo && isBeforeOrOnEnd) salesWeek += netAmt;
-                if (rTime >= monthAgo && isBeforeOrOnEnd) salesMonth += netAmt;
-                if (rTime >= yearAgo && isBeforeOrOnEnd) salesYear += netAmt;
+            if (isBeforeOrOnEnd) {
+                if (rTime >= weekAgo) salesWeek += netAmt;
+                if (rTime >= monthAgo) salesMonth += netAmt;
+                if (rTime >= yearAgo) salesYear += netAmt;
             }
 
             // 🌟 EXCEPTION: MONTHLY SALES BREAKDOWN
             // DO NOT RESET: Must calculate sum of ALL invoices (historical + active) for calendar reporting
-            if (!isUnpaid) {
-                const d = new Date(i.date || i.timestamp);
-                const mIdx = d.getMonth();
-                const year = d.getFullYear();
-                const key = `${year}-${String(mIdx + 1).padStart(2, '0')}`;
-                const monthName = (this.currentLang === 'en') ? monthsEn[mIdx] : monthsAr[mIdx];
-                const label = `${monthName} ${year.toString()}`;
-                if (!monthlyMap[key]) monthlyMap[key] = { label, total: 0, sortKey: key };
-                monthlyMap[key].total += netAmt;
-            }
-
+            const d = new Date(i.date || i.timestamp);
+            const mIdx = d.getMonth();
+            const year = d.getFullYear();
+            const key = `${year}-${String(mIdx + 1).padStart(2, '0')}`;
+            const monthName = (this.currentLang === 'en') ? monthsEn[mIdx] : monthsAr[mIdx];
+            const label = `${monthName} ${year.toString()}`;
+            if (!monthlyMap[key]) monthlyMap[key] = { label, total: 0, sortKey: key };
+            monthlyMap[key].total += netAmt;
 
             // ACTIVE DASHBOARD FILTER (Selected Date)
             if (isInRange && matchesShift) {
-                if (!isUnpaid) {
-                    totalAllInvoices += amt;
-                    totalRefunds += refundAmt;
+                totalAllInvoices += amt;     // Gross Sales (includes Pay Later)
+                totalRefunds += refundAmt;   // Gross Refunds
 
-                    if (i.isCancelled === true) {
-                        // Handled inside totalRefunds already
-                    } else {
-                        // Track Payment Methods for Z-Report Sync
-                        const pMethod = i.paymentMethod || 'cash';
-                        if (pMethod === 'cash') cashTotal += netAmt;
-                        else if (pMethod === 'mada' || pMethod === 'network') madaTotal += netAmt;
-                        else if (pMethod === 'visa') visaTotal += netAmt;
-                        else if (pMethod === 'mastercard') mastercardTotal += netAmt;
-                    }
+                if (i.isCancelled !== true && !isUnpaid) {
+                    // Track Payment Methods for Z-Report Sync (Only for Collected amounts)
+                    const pMethod = i.paymentMethod || 'cash';
+                    if (pMethod === 'cash') cashTotal += netAmt;
+                    else if (pMethod === 'mada' || pMethod === 'network') madaTotal += netAmt;
+                    else if (pMethod === 'visa') visaTotal += netAmt;
+                    else if (pMethod === 'mastercard') mastercardTotal += netAmt;
                 }
             }
         });
