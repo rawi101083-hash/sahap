@@ -3421,7 +3421,8 @@ window.appLogic = {
         let totalRefunds = 0;
         let totalOperatingExpenses = 0;
         let totalLaundryDebt = 0;
-        let totalUncollected = 0; // NEW TRACKER
+        let totalUncollected = 0; // مبالغ غير محصلة
+        let totalCollected = 0;   // مبالغ محصلة (مقبوضات)
 
         // 1. Process Invoices
         let cashTotal = 0, madaTotal = 0, visaTotal = 0, mastercardTotal = 0;
@@ -3448,6 +3449,7 @@ window.appLogic = {
                     totalUncollected += netAmt;
                 } else {
                     salesToday += netAmt;
+                    totalCollected += netAmt; // ✅ Collected (paid invoices only)
                 }
             }
 
@@ -3566,6 +3568,12 @@ window.appLogic = {
             <div style="background:var(--bg-surface); border:1px solid rgba(255, 69, 58, 0.2); border-radius:var(--radius-md); padding:20px; text-align:center; box-shadow:var(--shadow-sm);">
                 <h3 style="color:var(--text-muted); font-size:13px; margin-bottom:5px;">${lang === 'en' ? 'Total Operating Expenses' : 'إجمالي المصاريف التشغيلية'}</h3>
                 <div id="db-op-expenses-display" style="font-size:24px; font-weight:800; direction:ltr; color:#ff453a;">- ${totalOperatingExpenses.toFixed(2)} ر.س</div>
+            </div>
+
+            <!-- Collected Amounts (Paid Invoices) -->
+            <div style="background:var(--bg-surface); border:1px solid rgba(14, 165, 233, 0.2); border-radius:var(--radius-md); padding:20px; text-align:center; box-shadow:var(--shadow-sm);">
+                <h3 style="color:var(--text-muted); font-size:13px; margin-bottom:5px;">${lang === 'en' ? 'Collected Amounts' : 'المبالغ المحصلة (مقبوضات)'}</h3>
+                <div id="db-collected-display" style="font-size:24px; font-weight:800; direction:ltr; color:#0ea5e9;">${totalCollected.toFixed(2)} ر.س</div>
             </div>
 
             <!-- Uncollected Amounts (Pay Later) -->
