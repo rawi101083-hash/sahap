@@ -1336,12 +1336,12 @@ window.appLogic = {
         // Final hard reset for next checkout cycle
         this.deliveryFee = 0;
         this.cart = [];
-        
+
         // Reset Fast Checkout UI Inputs
         const cNameInp = document.getElementById('checkout-customer-name');
         const cPhoneInp = document.getElementById('checkout-customer-phone');
-        if(cNameInp) cNameInp.value = '';
-        if(cPhoneInp) cPhoneInp.value = '';
+        if (cNameInp) cNameInp.value = '';
+        if (cPhoneInp) cPhoneInp.value = '';
 
         this.updateCartUI();
     },
@@ -1850,74 +1850,69 @@ window.appLogic = {
         try {
             var originalBtn = document.querySelector('button[onclick="appLogic.printThermalReceipt()"]');
             var origHTML = originalBtn ? originalBtn.innerHTML : '';
-            if (originalBtn) originalBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري الطباعة...';
+            if (originalBtn) originalBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري تجهيز الفاتورة...';
 
-            // Find or create a persistent hidden div for printing to avoid iframe overhead
-            let printDiv = document.getElementById('persistent-print-div');
-            if (!printDiv) {
-                printDiv = document.createElement('div');
-                printDiv.id = 'persistent-print-div';
-                printDiv.style.position = 'fixed';
-                printDiv.style.left = '-9999px';
-                printDiv.style.top = '0';
-                printDiv.style.width = '400px';
-                printDiv.style.backgroundColor = '#ffffff';
-                printDiv.style.color = '#000000';
-                printDiv.style.direction = 'rtl';
-                printDiv.style.opacity = '0';
-                printDiv.style.pointerEvents = 'none';
-                printDiv.style.zIndex = '-999';
-                document.body.appendChild(printDiv);
-            }
-
-            printDiv.innerHTML = `
-                <style>
-                @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@700;900&display=swap');
-                #persistent-print-div, #persistent-print-div * { font-family: 'Tajawal', sans-serif !important; color: black !important; }
-                #persistent-print-div { padding: 10px; box-sizing: border-box; background: white; }
-                /* FORCE UPSCALING FOR THERMAL CLARITY */
-                #persistent-print-div table { width: 100% !important; border-collapse: collapse; }
-                #persistent-print-div td, #persistent-print-div th { font-size: 20px !important; font-weight: 900 !important; padding: 8px 2px !important; border-color: #000 !important; }
-                #persistent-print-div .receipt-header { text-align: center; border-bottom: 2px dashed #000; padding-bottom: 10px; margin-bottom: 10px; }
-                #persistent-print-div .receipt-header div:nth-child(2) { font-size: 32px !important; font-weight: 900 !important; margin-bottom: 5px !important; }
-                #persistent-print-div .receipt-header p, #persistent-print-div .receipt-header div { font-size: 18px !important; font-weight: bold !important; }
-                #temp-qr-render { margin-top: 15px; text-align: center; }
-                #temp-qr-render img { display: block; margin: 0 auto; width: 180px !important; height: 180px !important; }
-                </style>
-                <div id="rtl-wrapper">${this.generateThermalHTML(data, 'temp-qr-render')}</div>
-            `;
+            const tempContainer = document.createElement('div');
+            tempContainer.innerHTML = this.generateThermalHTML(data, 'temp-qr-render');
             
             const bizName = (window.tenantSettings || {}).name || 'سحاب POS';
             const zatcaQRBase64 = generateZatcaBase64(bizName, (window.tenantSettings || {}).taxNumber || "000000000000000", data.timestamp, data.grandTotal, data.vatAmount);
-            new QRCode(printDiv.querySelector('#temp-qr-render'), {
-                text: zatcaQRBase64, width: 150, height: 150, colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L
+            
+            // Generate QR Code
+            new QRCode(tempContainer.querySelector('#temp-qr-render'), {
+                text: zatcaQRBase64, width: 170, height: 170, colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L
             });
 
-            // Wait less time since we are in the same DOM
-            await new Promise(r => setTimeout(r, 400));
+            // Setup isolated iframe for perfect 80mm layout (400px width)
+            const iframe = document.createElement('iframe');
+            iframe.style.width = '400px';
+            iframe.style.position = 'absolute';
+            iframe.style.left = '-9999px';
+            document.body.appendChild(iframe);
 
-            // Capture with user's specified optimized config to eliminate flicker
-            const canvas = await html2canvas(printDiv, { 
-                width: 400, 
-                windowWidth: 400, 
-                scale: 1.5, 
-                useCORS: true,
-                logging: false,
-                backgroundColor: '#ffffff',
-                removeContainer: true,
-                imageTimeout: 0
-            });
+            const doc = iframe.contentWindow.document;
+            doc.open();
+            doc.write(`
+            <html dir="rtl"><head><style>
+            @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@700;900&display=swap');
+            body { margin: 0; padding: 0; width: 400px; background: white; color: black; font-family: 'Tajawal', sans-serif; }
+            * { color: black !important; }
+            #rtl-wrapper { padding: 10px; box-sizing: border-box; width: 100%; }
+            
+            /* MASSIVELY INCREASED FONT SIZES FOR THERMAL CLARITY */
+            table { width: 100% !important; border-collapse: collapse; margin-bottom: 15px; }
+            td, th { font-size: 24px !important; font-weight: 900 !important; padding: 10px 2px !important; border-bottom: 2px dashed #000; text-align: center; }
+            
+            .receipt-header { text-align: center; border-bottom: 2px dashed #000; padding-bottom: 15px; margin-bottom: 15px; }
+            .receipt-header div:nth-child(2) { font-size: 40px !important; font-weight: 900 !important; margin-bottom: 8px !important; }
+            .receipt-header p, .receipt-header div { font-size: 22px !important; font-weight: bold !important; line-height: 1.4; }
+            
+            /* QR CODE CENTERING */
+            #temp-qr-render { margin-top: 20px; display: flex; justify-content: center; width: 100%; }
+            #temp-qr-render img { width: 180px !important; height: 180px !important; display: block; margin: 0 auto; }
+            </style></head><body>
+            <div id="rtl-wrapper">${tempContainer.innerHTML}</div>
+            </body></html>
+            `);
+            doc.close();
+
+            // CRITICAL FIX: Wait 850ms to GUARANTEE QR code and custom fonts load completely before capturing. Prevents blank pages!
+            await new Promise(r => setTimeout(r, 850));
+
+            // Capture the canvas with stable scale
+            const canvas = await html2canvas(doc.body, { width: 400, windowWidth: 400, scale: 1.5, useCORS: true, logging: false });
+            document.body.removeChild(iframe);
 
             const base64ImageString = canvas.toDataURL('image/png');
 
-            // Send to RawBT silently
+            // Send to RawBT
             window.location.href = "intent:" + base64ImageString + "#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;";
             
             if (originalBtn) originalBtn.innerHTML = origHTML;
         } catch (err) {
             console.error('Print Error:', err);
-            alert('خطأ في الطباعة: ' + err.message);
-            if (originalBtn) originalBtn.innerHTML = '<i class="fa-solid fa-print"></i> <span>طباعة إيصال حراري</span>';
+            alert('حدث خطأ أثناء الطباعة: ' + err.message);
+            if (originalBtn) originalBtn.innerHTML = '<i class="fa-solid fa-print"></i> <span>طباعة</span>';
         }
     },
 
@@ -2712,7 +2707,7 @@ window.appLogic = {
                     let iron = parseFloat(p.iron) || 0;
                     let washIron = parseFloat(p.wash_iron) || 0;
                     let wash = parseFloat(p.wash) || 0;
-                    
+
                     if (isVatActive) {
                         iron *= 1.15;
                         washIron *= 1.15;
@@ -3726,7 +3721,7 @@ window.appLogic = {
             if (!storeSnap.exists()) return alert('المتجر غير موجود.');
             const storeData = storeSnap.val();
             const storeUID = storeData.uid;
-            
+
             if (!storeUID) return alert('هذا المتجر غير مرتبط بحساب (UID مفقود).');
 
             const result = await Swal.fire({
@@ -3749,21 +3744,21 @@ window.appLogic = {
 
             const isSoft = result.isConfirmed;
             const newResetToken = (isSoft ? 'SOFT_' : 'HARD_') + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-            
+
             // Wipe Cloud Collections
             const collectionsToWipe = ['invoices', 'expenses', 'customers', 'journal_entries', 'tax_records', 'zreports', 'reports', 'archived_z_reports', 'laundry_balances', 'invoiceCounter'];
-            
+
             // Wipe settings if Hard
             if (!isSoft) collectionsToWipe.push('settings');
-            
-            const deletePromises = collectionsToWipe.map(col => 
+
+            const deletePromises = collectionsToWipe.map(col =>
                 firebase.database().ref(`users/${storeUID}/${col}`).remove()
             );
             await Promise.all(deletePromises);
-            
+
             // Set reset token so devices wipe localDB
             await firebase.database().ref(`users/${storeUID}/accountDetails/resetToken`).set(newResetToken);
-            
+
             Swal.fire('تم المسح', isSoft ? 'تم المسح الجزئي للبيانات والأرصدة (مع الاحتفاظ بالإعدادات)' : 'تم المسح الشامل (الضبط الكامل) بنجاح', 'success');
 
         } catch (err) {
@@ -4101,17 +4096,17 @@ window.appLogic = {
             // 4. RESET TOKEN WATCHER
             const currentSessionToken = localStorage.getItem('sahab_reset_token') || '';
             const dbToken = data.resetToken || '';
-            
+
             if (dbToken && currentSessionToken && currentSessionToken !== dbToken) {
                 console.warn("[SECURITY] Reset token mismatch detected! Forcing local wipe.");
                 const isSoft = dbToken.startsWith('SOFT_');
-                
+
                 // Clear localStorage items except user session and settings if soft
                 for (let i = localStorage.length - 1; i >= 0; i--) {
                     const key = localStorage.key(i);
                     // Critical: Do NOT wipe the session UID, otherwise login breaks
                     if (key === 'sahab_session_uid') continue;
-                    
+
                     if (isSoft && (key === 'sahab_services' || key.startsWith('sahab_settings') || key.startsWith('invoiceCity') || key.startsWith('invoiceStreet') || key.startsWith('invoiceNeighborhood') || key.startsWith('logo_'))) {
                         continue; // Keep settings and UI preferences on Soft Reset
                     }
@@ -4120,16 +4115,16 @@ window.appLogic = {
 
                 // Clear IndexedDB via localforage
                 const collectionsToWipeLocally = ['invoices', 'expenses', 'customers', 'journal_entries', 'tax_records', 'zreports', 'reports', 'archived_z_reports', 'laundry_balances', 'invoiceCounter'];
-                
+
                 if (!isSoft) {
                     collectionsToWipeLocally.push('settings');
                     collectionsToWipeLocally.push('inventory');
                 }
-                
+
                 for (let col of collectionsToWipeLocally) {
                     await localforage.removeItem(col);
                 }
-                
+
                 localStorage.setItem('sahab_reset_token', dbToken); // acknowledge new token
 
                 alert(isSoft ? 'تم تحديث أرقام الفواتير ومسح السجلات (إعادة ضبط جزئية). سيتم إعادة تحميل النظام.' : 'تم إعادة ضبط المصنع ومسح كافة البيانات. سيتم إعادة تحميل النظام.');
