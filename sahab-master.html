@@ -739,29 +739,95 @@
 
                 if (!result.isConfirmed) return;
 
-                try {
-                    const updates = {};
-                    
-                    if (uid && uid !== 'undefined') {
-                        // 1. Wipe Transactional Data
-                        const collectionsToWipe = ['invoices', 'expenses', 'customers', 'journal_entries', 'tax_records', 'zreports', 'reports'];
-                        collectionsToWipe.forEach(col => {
-                            updates[`users/${uid}/${col}`] = null;
-                        });
-                        
-                        // 2. Reset Invoice Counters to 0
-                        updates[`users/${uid}/settings/lastInvoice`] = 0;
-                        updates[`users/${uid}/settings/invoiceCount`] = 0;
-                        updates[`users/${uid}/settings/invoiceCounter`] = 0;
-                        updates[`users/${uid}/accountDetails/invoiceCounter`] = 0;
-                    }
+                if (!uid || uid === 'undefined') {
+                    Swal.fire('خطأ', 'معرّف الحساب (UID) غير متوفر. يرجى إعادة تحميل الصفحة.', 'error');
+                    return;
+                }
 
-                    await db.ref().update(updates);
-                    console.log(`[Master-Sync] FACTORY RESET successful for UID: ${uid}`);
-                    Swal.fire('تم التنفيذ!', 'تمت إعادة ضبط المصنع بنجاح ومسح البيانات المؤقتة. الحساب جاهز الآن.', 'success');
+                // Show loading state
+                Swal.fire({
+                    title: 'جارٍ تنفيذ إعادة الضبط...',
+                    text: 'يتم مسح جميع البيانات من الخادم. يرجى الانتظار.',
+                    allowOutsideClick: false,
+                    didOpen: () => { Swal.showLoading(); }
+                });
+
+                try {
+                    // ================================================================
+                    // COMPLETE FACTORY RESET v3 — TRUE BLANK SLATE
+                    // Wipe EVERYTHING. Only PIN + activation status are preserved.
+                    // Name, phone, tax number, logo — all wiped.
+                    // ================================================================
+
+                    // Step 1: Preserve ONLY what's needed to keep the account working
+                    const accountSnap = await db.ref(`users/${uid}/accountDetails`).once('value');
+                    const currentAccount = accountSnap.val() || {};
+                    const settingsSnap = await db.ref(`users/${uid}/settings`).once('value');
+                    const currentSettings = settingsSnap.val() || {};
+
+                    // Only keep PIN + activation/trial/subscription booleans
+                    const savedPin = currentSettings.pin || currentAccount.pin || pin;
+                    const savedIsActivated = currentAccount.isActivated !== false;
+                    const savedIsTrial = currentAccount.isTrial === true;
+                    const savedTrialEndDate = currentAccount.trialEndDate || null;
+                    const savedIsSubscribed = currentAccount.isSubscribed === true;
+
+                    // Step 2: Wipe transactional & financial data only.
+                    // ⚠️ DO NOT add: 'services', 'delivery_options', 'inventory'
+                    // These belong to the user and must NEVER be deleted by factory reset.
+                    const collectionsToWipe = [
+                        'invoices',
+                        'expenses',
+                        'customers',
+                        'journal_entries',
+                        'tax_records',
+                        'zreports',
+                        'reports',
+                        'archived_z_reports',
+                        'laundry_balances',
+                        'settings',
+                        'accountDetails'  // Wipe accountDetails too — rebuilt below
+                    ];
+
+                    const deletePromises = collectionsToWipe.map(col =>
+                        db.ref(`users/${uid}/${col}`).set(null)
+                    );
+                    await Promise.all(deletePromises);
+
+                    // Step 3: Rebuild accountDetails as a blank new account
+                    // Name = empty, phone = empty, tax = empty, logo = gone
+                    await db.ref(`users/${uid}/accountDetails`).set({
+                        isActivated: savedIsActivated,
+                        isTrial: savedIsTrial,
+                        trialEndDate: savedTrialEndDate,
+                        isSubscribed: savedIsSubscribed,
+                        invoiceCounter: 0,
+                        lastInvoice: 0
+                    });
+
+                    // Step 4: Rebuild settings as blank with resetToken
+                    // resetToken triggers ALL connected cashier devices to wipe local cache
+                    const newResetToken = 'reset_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                    await db.ref(`users/${uid}/settings`).set({
+                        pin: savedPin,
+                        status: 'active',
+                        lastInvoice: 0,
+                        invoiceCount: 0,
+                        invoiceCounter: 0,
+                        resetToken: newResetToken
+                    });
+
+                    console.log('[Master-Sync] FACTORY RESET v3 COMPLETE for UID: ' + uid + ' (PIN: ' + pin + ')');
+
+                    Swal.fire(
+                        'تم التنفيذ! ✅',
+                        'تمت إعادة ضبط المصنع بالكامل. تم مسح كل شيء: الفواتير، العملاء، الاسم، الجوال، الرقم الضريبي، الشعار، المصروفات، والتقارير. الحساب الآن حساب جديد تماماً.',
+                        'success'
+                    );
+                    this.fetchData();
                 } catch (e) {
-                    console.error("Factory Reset failed:", e);
-                    Swal.fire('خطأ', 'فشل في التنفيذ. يرجى التأكد من الصلاحيات.', 'error');
+                    console.error('Factory Reset failed:', e);
+                    Swal.fire('خطأ', 'فشل في التنفيذ: ' + e.message + '. يرجى التأكد من الصلاحيات.', 'error');
                 }
             },
 

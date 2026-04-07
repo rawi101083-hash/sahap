@@ -282,7 +282,7 @@ if (typeof firebase !== 'undefined' && !firebase.apps.length) {
     }
 }
 
-const collectionsToSync = ['customers', 'invoices', 'journal_entries', 'tax_records', 'inventory', 'services', 'expenses', 'delivery_options'];
+const collectionsToSync = ['customers', 'invoices', 'journal_entries', 'tax_records', 'inventory', 'services', 'expenses', 'delivery_options', 'zreports', 'reports', 'archived_z_reports'];
 const originalSetItem = localforage.setItem;
 const originalGetItem = localforage.getItem;
 const originalRemoveItem = localforage.removeItem;
@@ -376,24 +376,26 @@ async function initFirebaseSync() {
                     await originalSetItem.call(localforage, getTenantKey(key), cloudData);
                     window.__syncingFromFirebase = false;
                 } else {
-                    console.log(`[Multi-Tenant] Cloud is empty for ${key}. Checking local redundancy.`);
+                    console.log(`[Multi-Tenant] Cloud is empty for ${key}. Enforcing zero state.`);
 
-                    // REDUNDANCY CHECK: If local storage has data, don't zero it yet!
-                    const localBackup = localStorage.getItem(getDbPath(key)) || localStorage.getItem(key);
-                    if (localBackup && (key === 'expenses' || key === 'invoices')) {
-                        try {
-                            const parsed = JSON.parse(localBackup);
-                            if (parsed && parsed.length > 0) {
-                                console.log(`[Recovery] Cloud empty but localStorage has ${key}. Using local data.`);
-                                await originalSetItem.call(localforage, getTenantKey(key), parsed);
-                                resolve();
-                                return;
-                            }
-                        } catch (e) { }
+                    // If invoices are empty on Cloud, it means a Factory Reset occurred!
+                    // Wipe all legacy localStorage caches and auxiliary local-only states.
+                    if (key === 'invoices') {
+                        console.warn('⚠️ Factory Reset detected from Cloud! Wiping all auxiliary local caches...');
+                        localStorage.removeItem('laundryHistory');
+                        localStorage.removeItem('laundry_balances');
+                        originalRemoveItem.call(localforage, getTenantKey('laundry_balances')).catch(e=>console.warn(e));
+                        localStorage.removeItem('sahab_invoiceCounter');
+                        originalRemoveItem.call(localforage, getTenantKey('invoiceCounter')).catch(e=>console.warn(e));
+                        
+                        collectionsToSync.forEach(c => {
+                            localStorage.removeItem(c);
+                            localStorage.removeItem(getDbPath(c));
+                        });
                     }
 
                     window.__syncingFromFirebase = true;
-                    await originalSetItem.call(localforage, getTenantKey(key), []); // ZERO STATE PROMISE!
+                    await originalSetItem.call(localforage, getTenantKey(key), []); // STRICT ZERO STATE
                     window.__syncingFromFirebase = false;
                 }
                 resolve();
@@ -412,6 +414,18 @@ async function initFirebaseSync() {
                     if (typeof cloudData === 'object' && !Array.isArray(cloudData)) sanitized = Object.values(cloudData);
                     else if (Array.isArray(cloudData)) sanitized = cloudData;
                     sanitized = sanitized.filter(item => item !== null && typeof item === 'object');
+                } else {
+                    // cloudData === null means this node was DELETED from Firebase (factory reset!)
+                    console.warn(`[Factory-Reset-Detected] "${key}" was deleted from cloud. Wiping local cache...`);
+                    sanitized = []; // Force empty
+
+                    // If invoices wiped → full auxiliary local wipe
+                    if (key === 'invoices') {
+                        localStorage.removeItem('laundryHistory');
+                        localStorage.removeItem('laundry_balances');
+                        localStorage.removeItem('sahab_invoiceCounter');
+                        originalRemoveItem.call(localforage, getTenantKey('laundry_balances')).catch(() => {});
+                    }
                 }
 
                 console.log(`[Realtime-Sync] Update received for ${key}: ${sanitized.length} items.`);
@@ -435,6 +449,70 @@ async function initFirebaseSync() {
     await Promise.all(fetchPromises);
     window.isDataInitialized = true;
     console.log("[Recovery] --- SYSTEM READY (READ-WRITE ENABLED) ---");
+
+    // ⚡ START RESET TOKEN WATCHER
+    // This listens for factory-reset signals from the admin panel.
+    // When the resetToken changes, wipe all local caches and reload.
+    startResetTokenWatcher();
+}
+
+// ==========================================================
+// RESET TOKEN WATCHER — Detects Admin Factory Reset in realtime
+// ==========================================================
+function startResetTokenWatcher() {
+    if (!window.currentUID || typeof firebase === 'undefined') return;
+
+    const resetTokenRef = firebase.database().ref(getDbPath('settings/resetToken'));
+    // Use SAME key as the boot-time check in firebase.auth().onAuthStateChanged
+    const localResetKey = 'sahab_reset_token_' + window.currentUID;
+
+    // Watch for changes in real-time (catches admin factory-reset while cashier is logged in)
+    resetTokenRef.on('value', function(snap) {
+        const newToken = snap.val();
+        if (!newToken) return;
+
+        const lastToken = localStorage.getItem(localResetKey);
+
+        // If this is a new token different from what we saw at startup, WIPE & RELOAD
+        if (lastToken && newToken !== lastToken) {
+            console.warn('[Factory-Reset-Watcher] New resetToken detected! Wiping local caches and reloading...');
+
+            // Save the new token first so after reload we don't loop
+            localStorage.setItem(localResetKey, newToken);
+
+            // Wipe transactional/financial local cache only.
+            // ⚠️ DO NOT wipe: 'services', 'delivery_options', 'inventory'
+            // These belong to the user and must survive factory reset.
+            var allCollections = [
+                'invoices', 'expenses', 'customers', 'journal_entries',
+                'tax_records', 'zreports', 'reports', 'archived_z_reports',
+                'laundry_balances', 'invoiceCounter', 'settings'
+            ];
+            var wipePromises = allCollections.map(function(col) {
+                return originalRemoveItem.call(localforage, getTenantKey(col)).catch(function() {});
+            });
+
+            Promise.all(wipePromises).then(function() {
+                // Also clear relevant localStorage keys
+                localStorage.removeItem('laundryHistory');
+                localStorage.removeItem('laundry_balances');
+                localStorage.removeItem('sahab_invoiceCounter');
+
+                // Show a brief toast then reload to fetch fresh data from Firebase
+                if (window.appLogic && window.appLogic.showToast) {
+                    window.appLogic.showToast('تم تطبيق إعادة ضبط المصنع. سيتم إعادة تحميل النظام...');
+                }
+                setTimeout(function() {
+                    window.location.reload();
+                }, 1500);
+            });
+        } else if (!lastToken) {
+            // First time this session — just store it
+            localStorage.setItem(localResetKey, newToken);
+        }
+    });
+
+    console.log('[Reset-Watcher] Watching settings/resetToken for factory reset signals...');
 }
 // ---------------------------------------------
 
@@ -5072,6 +5150,51 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Load tenant settings & apply branding BEFORE init
             await appLogic.loadTenantSettings(user.uid);
+
+            // ═══ FACTORY RESET TOKEN CHECK ═══
+            // If admin did a factory reset, the cloud resetToken will differ from
+            // our locally-stored one. Force-wipe ALL local data before booting.
+            try {
+                const tokenSnap = await firebase.database().ref(`users/${user.uid}/settings/resetToken`).once('value');
+                const cloudToken = tokenSnap.val();
+                const localToken = localStorage.getItem(`sahab_reset_token_${user.uid}`);
+
+                if (cloudToken && cloudToken !== localToken) {
+                    console.warn('[FactoryReset] Reset token mismatch! Wiping ALL local data for UID:', user.uid);
+
+                    // 1. Wipe transactional/financial localforage keys only.
+                    // ⚠️ DO NOT add: 'services', 'delivery_options', 'inventory'
+                    // These are user-owned setup data — must survive factory reset.
+                    const collectionsToWipeLocally = [
+                        'customers', 'invoices', 'journal_entries', 'tax_records',
+                        'expenses', 'zreports', 'reports', 'archived_z_reports',
+                        'laundry_balances', 'settings'
+                    ];
+                    for (const col of collectionsToWipeLocally) {
+                        await originalRemoveItem.call(localforage, `${user.uid}_${col}`);
+                    }
+
+                    // 2. Wipe all relevant localStorage keys
+                    const lsKeysToWipe = [
+                        'laundryHistory', 'laundry_balances', 'sahab_invoiceCounter',
+                        ...collectionsToWipeLocally
+                    ];
+                    lsKeysToWipe.forEach(k => {
+                        localStorage.removeItem(k);
+                        localStorage.removeItem(`users/${user.uid}/${k}`);
+                    });
+
+                    // 3. Save the new token locally so we don't re-wipe next time
+                    localStorage.setItem(`sahab_reset_token_${user.uid}`, cloudToken);
+                    console.log('[FactoryReset] Local wipe complete. System will boot clean.');
+                } else if (cloudToken && !localToken) {
+                    // First login after token was set — save it
+                    localStorage.setItem(`sahab_reset_token_${user.uid}`, cloudToken);
+                }
+            } catch (tokenErr) {
+                console.warn('[FactoryReset] Token check failed (non-critical):', tokenErr.message);
+            }
+            // ═══════════════════════════════════
 
             // Deploy Realtime SaaS Daemons (Kill Switch listener)
             appLogic.initRealtimeSecurity(user.uid);
