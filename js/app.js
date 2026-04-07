@@ -1470,7 +1470,6 @@ window.appLogic = {
 
     async printThermalReceipt() {
         if (!this.currentInvoice) return;
-
         try {
             var container = document.getElementById('invoice-preview-container');
             var originalBtn = document.querySelector('button[onclick="appLogic.printThermalReceipt()"]');
@@ -1480,7 +1479,8 @@ window.appLogic = {
             var invoiceInnerHTML = container.innerHTML;
 
             var iframe = document.createElement('iframe');
-            iframe.style.width = '768px';
+            // 576px is the exact pixel width for 80mm thermal paper at 203 DPI
+            iframe.style.width = '576px';
             iframe.style.position = 'absolute';
             iframe.style.left = '-9999px';
             document.body.appendChild(iframe);
@@ -1493,57 +1493,52 @@ window.appLogic = {
             <style>
             @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@700;900&display=swap');
             body {
-            margin: 0; padding: 0; width: 768px;
-            background: white; color: black;
-            direction: ltr; /* FIX FOR HTML2CANVAS RTL BUG */
+                margin: 0; padding: 0; width: 576px;
+                background: white; color: black;
+                direction: ltr;
             }
             #rtl-wrapper {
-            direction: rtl;
-            padding: 20px;
-            width: 728px; /* 768 - 40 padding */
-            font-family: 'Tajawal', sans-serif;
-            font-size: 48px; font-weight: 900;
+                direction: rtl;
+                padding: 5px;
+                width: 100%;
+                box-sizing: border-box;
+                font-family: 'Tajawal', sans-serif;
             }
-            h1, h2, h3 { font-size: 64px; margin: 10px 0; text-align: center; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 44px; }
-            th, td { border-bottom: 4px dashed #000; padding: 10px 0; text-align: center; }
-            .total { font-size: 56px; font-weight: 900; text-align: left; margin-top: 20px; }
-            img { max-width: 300px; display: block; margin: 0 auto; }
+            /* Override inline widths to fill the 576px canvas perfectly */
+            #rtl-wrapper > div { width: 100% !important; margin: 0 !important; padding: 10px !important; }
+            table { width: 100% !important; }
             </style>
             </head>
             <body>
             <div id="rtl-wrapper">
-            ${invoiceInnerHTML}
+                ${invoiceInnerHTML}
             </div>
             </body>
             </html>
             `);
             doc.close();
 
-            await new Promise(function (resolve) { setTimeout(resolve, 400); });
+            await new Promise(function (resolve) { setTimeout(resolve, 500); });
 
             var canvas = await html2canvas(doc.body, {
-                width: 768,
-                windowWidth: 768,
+                width: 576,
+                windowWidth: 576,
                 scale: 1,
-                useCORS: true,
-                x: 0,
-                y: 0,
-                scrollX: 0,
-                scrollY: 0
+                useCORS: true
             });
 
             document.body.removeChild(iframe);
 
             var base64ImageString = canvas.toDataURL('image/png');
 
+            // Send to RawBT via Intent
             window.location.href = "intent:" + base64ImageString + "#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;";
 
             if (originalBtn) originalBtn.innerHTML = origHTML;
         } catch (err) {
             alert('حدث خطأ أثناء الطباعة: ' + err.message);
             var btn = document.querySelector('button[onclick="appLogic.printThermalReceipt()"]');
-            if (btn) btn.innerHTML = '<i class="fa-solid fa-print"></i> <span>طباعة إيصال حراري</span>';
+            if (btn) btn.innerHTML = '<i class="fa-solid fa-print"></i> <span>طباعة إيصال حراري (80mm)</span>';
         }
     },
 
