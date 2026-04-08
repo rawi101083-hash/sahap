@@ -1087,10 +1087,8 @@ window.appLogic = {
             invs[idx].paymentStatus = 'paid';
             invs[idx].paymentMethod = method;
 
-            // 🔄 CRITICAL LOGIC: Overwrite the timestamp & date
-            invs[idx].timestamp = Date.now();
-            invs[idx].date = getLocalYMD();
-
+            // 🌟 FIXED: Strictly KEEP original timestamp/date. It correctly drops from active unpaid list seamlessly.
+            
             await localforage.setItem('invoices', invs);
             await manualSyncToCloud('invoices', invs);
 
@@ -1951,23 +1949,27 @@ window.appLogic = {
         let invoices = [];
         const activeInvs = await localforage.getItem('invoices') || [];
 
-        if (isLiveShift) {
-            invoices = activeInvs;
-        } else {
-            // Historical View: Retrieve from active (if unclosed) + archives
-            const targetDateStr = this.currentViewDate;
-            invoices = [].concat(activeInvs);
+        // If a search term exists (like from Customer Log), we must fetch everything (archives + active)
+        const fetchAll = !!searchTerm;
 
+        invoices = [].concat(activeInvs);
+
+        if (!isLiveShift || fetchAll) {
+            // Retrieve archives for History Date or Search Matches
             const archives = await localforage.getItem('archived_z_reports') || [];
             archives.forEach(arc => {
                 if (arc.invoices) { Array.prototype.push.apply(invoices, arc.invoices); }
             });
         }
+
         // 📅 GLOBAL DATE FILTER: Strictly isolate Live Shift from Archived data
         invoices = invoices.filter(inv => {
             if (!inv) return false;
 
-            // If we are looking at the LIVE shift, completely hide closed/archived invoices
+            // If a custom search term is used, bypass timezone/date limits entirely to allow deep searching
+            if (searchTerm) return true;
+
+            // If we are looking at the LIVE shift without search, completely hide closed/archived invoices
             if (isLiveShift && inv.isZReported) return false;
 
             const isUnpaid = inv.paymentStatus === 'unpaid';
@@ -2401,9 +2403,31 @@ window.appLogic = {
 
     // Helper: Aggregates customer data from all non-cancelled invoices
     async _getAggregatedCustomers() {
-        const invs = await localforage.getItem('invoices') || [];
-        const validInvoices = (Array.isArray(invs) ? invs : Object.values(invs))
-            .filter(i => i && i.id); // Relaxed filter: include all entries with an ID
+        const currentInvs = await localforage.getItem('invoices') || [];
+        const archivedData = await localforage.getItem('archived_z_reports') || [];
+        
+        let allInvoices = Array.isArray(currentInvs) ? currentInvs : Object.values(currentInvs);
+        
+        // Aggregate all lifetime history from archives to ensure customers never disappear
+        const validArchives = Array.isArray(archivedData) ? archivedData : Object.values(archivedData);
+        validArchives.forEach(arc => {
+            if (arc.invoices) {
+                const arcInvs = Array.isArray(arc.invoices) ? arc.invoices : Object.values(arc.invoices);
+                Array.prototype.push.apply(allInvoices, arcInvs);
+            }
+        });
+
+        // Deduplicate invoices by ID (prioritizing the live/updated version)
+        const uniqueInvoicesMap = new Map();
+        allInvoices.forEach(i => {
+            if (i && i.id) {
+                if (!uniqueInvoicesMap.has(i.id) || i.isZReported === false) {
+                    uniqueInvoicesMap.set(i.id, i);
+                }
+            }
+        });
+
+        const validInvoices = Array.from(uniqueInvoicesMap.values());
 
         const customersMap = {};
 
@@ -3227,7 +3251,15 @@ window.appLogic = {
                 Array.prototype.push.apply(Math_exps, arcExps); 
             }
         });
-        const invoices = Math_invoices;
+
+        // 🌟 CRITICAL BUG FIX: Deduplicate Financial Lists to prevent archived Unpaid clones from stacking Gross Sales indefinitely
+        const uInvMap = new Map();
+        Math_invoices.forEach(inv => {
+            if (inv && inv.id) {
+                if (!uInvMap.has(inv.id) || inv.isZReported === false) uInvMap.set(inv.id, inv);
+            }
+        });
+        const invoices = Array.from(uInvMap.values());
         const exps = Math_exps;
         let taxRecords = await localforage.getItem('tax_records') || [];
         // ---------------------------------------------------------
@@ -3235,6 +3267,12 @@ window.appLogic = {
         // ---------------------------------------------------------
         const todayYMD = getLocalYMD();
         const isLiveShift = !this.currentViewDate || this.currentViewDate === todayYMD;
+
+        let shiftCutoff = 0;
+        if (isLiveShift) {
+            const cutoffStr = localStorage.getItem('shiftCutoff_' + todayYMD);
+            if (cutoffStr) shiftCutoff = parseInt(cutoffStr);
+        }
 
         // Sync reportFilterDate with currentViewDate for backward compatibility
         this.reportFilterDate = isLiveShift ? null : this.currentViewDate;
@@ -3295,7 +3333,7 @@ window.appLogic = {
 
             // If Live Shift: only show what hasn't been closed AND is newer than the last shift wipe.
             // If History: show everything for that selected date.
-            const matchesShift = isLiveShift ? !i.isZReported : true;
+            const matchesShift = isLiveShift ? (!i.isZReported && rTime >= shiftCutoff) : true;
 
             // DYNAMIC ROLLING TOTALS
             const isInRange = (rTime >= startBound && (endBound === Infinity || rTime <= endBound));
@@ -4911,6 +4949,9 @@ window.appLogic = {
         // === مسح الذاكرة المحلية بالقوة ===
         localStorage.setItem('invoices', '[]');
         localStorage.setItem('expenses', '[]');
+
+        // 🌟 CRITICAL FIX: Save the cutoff time so the active dashboard forcefully zero-outs (clean slate)
+        localStorage.setItem('shiftCutoff_' + getLocalYMD(), Date.now().toString());
 
         // === رسالة النجاح ===
         const msg = this.currentLang === 'en' ? '✅ Day closed successfully. Records zeroed.' : '✅ تم إغلاق اليومية بنجاح وتصفير السجل.';
