@@ -1971,8 +1971,16 @@ window.appLogic = {
             // If we are looking at the LIVE shift, completely hide closed/archived invoices
             if (isLiveShift && inv.isZReported) return false;
 
+            const isUnpaid = inv.paymentStatus === 'unpaid';
+
             // Normalize dates to KSA Local YYYY-MM-DD for comparison ensuring 100% strict match
             const invDate = getLocalYMD(inv.timestamp || inv.date);
+            
+            // EXCEPTION: Unpaid invoices MUST ALWAYS show in Live Shift regardless of their creation date
+            if (isLiveShift && isUnpaid && !inv.isCancelled) {
+                return true;
+            }
+
             return invDate === (this.currentViewDate || todayYMD);
         });
 
@@ -1993,10 +2001,7 @@ window.appLogic = {
             let filteredInvoices = Array.isArray(invoices) ? invoices : Object.values(invoices);
             let validInvoices = filteredInvoices.filter(i => i && i.id && typeof i.grandTotal !== 'undefined');
 
-            // Cleanup corrupted ghosts permanently from DB
-            if (validInvoices.length !== (Array.isArray(invoices) ? invoices.length : Object.keys(invoices).length)) {
-                await localforage.setItem('invoices', validInvoices);
-            }
+            // REMOVED Ghost cleanup that was destroying historical data by overwriting the DB with filtered view data
 
             let html = '';
             const lang = this.currentLang || 'ar';
@@ -3202,18 +3207,27 @@ window.appLogic = {
 
     async renderReports() {
         const lang = this.currentLang || 'ar';
-        const activeInvs = await localforage.getItem('invoices') || [];
-        const activeExps = await localforage.getItem('expenses') || [];
-        const archives = await localforage.getItem('archived_z_reports') || [];
+        const rawInvs = await localforage.getItem('invoices') || [];
+        const rawExps = await localforage.getItem('expenses') || [];
+        const rawArchives = await localforage.getItem('archived_z_reports') || [];
 
-        let Math_invoices = [].concat(activeInvs);
-        let Math_exps = [].concat(activeExps);
+        const activeInvs = Array.isArray(rawInvs) ? rawInvs : Object.values(rawInvs);
+        const activeExps = Array.isArray(rawExps) ? rawExps : Object.values(rawExps);
+        const archives = Array.isArray(rawArchives) ? rawArchives : Object.values(rawArchives);
+
+        let Math_invoices = [...activeInvs];
+        let Math_exps = [...activeExps];
 
         archives.forEach(arc => {
-            if (arc.invoices) { Array.prototype.push.apply(Math_invoices, arc.invoices); }
-            if (arc.expenses) { Array.prototype.push.apply(Math_exps, arc.expenses); }
+            if (arc.invoices) { 
+                const arcInvs = Array.isArray(arc.invoices) ? arc.invoices : Object.values(arc.invoices);
+                Array.prototype.push.apply(Math_invoices, arcInvs); 
+            }
+            if (arc.expenses) { 
+                const arcExps = Array.isArray(arc.expenses) ? arc.expenses : Object.values(arc.expenses);
+                Array.prototype.push.apply(Math_exps, arcExps); 
+            }
         });
-
         const invoices = Math_invoices;
         const exps = Math_exps;
         let taxRecords = await localforage.getItem('tax_records') || [];
@@ -3260,8 +3274,18 @@ window.appLogic = {
         let totalRefunds = 0;
         let totalOperatingExpenses = 0;
         let totalLaundryDebt = 0;
-        let totalUncollected = 0; // NEW TRACKER
+        let totalUncollected = 0; // GLOBAL UNCOLLECTED
         let totalCollected = 0;   // Collected amounts
+
+        // 🌟 CRITICAL BUG FIX: Compute Global Uncollected Amounts from Active Invoices ONLY
+        // Debts MUST survive the daily reset (shiftCutoff) and carry over indefinitely.
+        (Array.isArray(activeInvs) ? activeInvs : Object.values(activeInvs)).forEach(i => {
+            if (i && i.paymentStatus === 'unpaid' && !i.isCancelled) {
+                const amt = parseFloat(i.total || i.grandTotal || 0);
+                const refundAmt = i.isCancelled ? amt : parseFloat(i.refundAmount || 0);
+                totalUncollected += (amt - refundAmt);
+            }
+        });
 
         // 1. Process Invoices
         let cashTotal = 0, madaTotal = 0, visaTotal = 0, mastercardTotal = 0;
@@ -3270,7 +3294,7 @@ window.appLogic = {
             const amt = parseFloat(i.total || i.grandTotal || 0);
             const rTime = new Date(i.date || i.timestamp).getTime();
 
-            // If Live Shift: only show what hasn't been closed.
+            // If Live Shift: only show what hasn't been closed AND is newer than the last shift wipe.
             // If History: show everything for that selected date.
             const matchesShift = isLiveShift ? !i.isZReported : true;
 
@@ -3285,10 +3309,8 @@ window.appLogic = {
             // Today's sales honors the Z-Report wipe (matchesShift) per user preference
             if (isInRange && matchesShift) {
                 salesToday += netAmt; // ✅ Total Sales ALWAYS includes everything (Cash + Card + Pay Later)
-                if (isUnpaid) {
-                    totalUncollected += netAmt; // ✅ Uncollected (Pay Later)
-                } else {
-                    totalCollected += netAmt;   // ✅ Collected (Paid)
+                if (!isUnpaid) {
+                    totalCollected += netAmt;   // ✅ Collected (Paid amounts only)
                 }
             }
 
