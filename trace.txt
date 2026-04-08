@@ -1,0 +1,15 @@
+evalmachine.<anonymous>:53
+window.addEventListener('beforeinstallprompt', (e) => {
+       ^
+
+TypeError: window.addEventListener is not a function
+    at evalmachine.<anonymous>:53:8
+    at Script.runInContext (node:vm:149:12)
+    at Script.runInNewContext (node:vm:154:17)
+    at Object.<anonymous> (C:\Users\rawi1\Desktop\Sahab_POS\dump_trace.js:27:10)
+    at Module._compile (node:internal/modules/cjs/loader:1812:14)
+    at Object..js (node:internal/modules/cjs/loader:1943:10)
+    at Module.load (node:internal/modules/cjs/loader:1533:32)
+    at Module._load (node:internal/modules/cjs/loader:1335:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)

@@ -132,6 +132,8 @@
                 </div>
             </div>
 
+
+
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <h2 style="font-size: 20px; color: #fff;">المنشآت المسجلة والشبكة</h2>
                 <div style="display: flex; gap: 10px;">
@@ -448,8 +450,42 @@
                 this.fetchData();
             },
 
+            togglePerTenantImport(tenantId) {
+                const isToggled = !(localStorage.getItem('import_enabled_' + tenantId) === 'true');
+                localStorage.setItem('import_enabled_' + tenantId, isToggled ? 'true' : 'false');
+                console.log(`Import Tool for User ${tenantId} is now:`, isToggled);
+                
+                // Refresh table to update button UI
+                this.fetchData();
+                
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        icon: 'success',
+                        title: isToggled ? 'تم تفعيل الاستيراد للمنشأة' : 'تم إخفاء الاستيراد للمنشأة',
+                        text: 'يمكنك الآن تسجيل الدخول للنظام (POS) ورؤية الأداة في صفحة المخزون.',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                }
+            },
+
             logout() {
+                // Preserve import_enabled_ state across logouts
+                const preservedKeys = {};
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('import_enabled_')) {
+                        preservedKeys[key] = localStorage.getItem(key);
+                    }
+                }
+                
                 localStorage.clear();
+                
+                // Restore preserved keys
+                Object.keys(preservedKeys).forEach(key => {
+                    localStorage.setItem(key, preservedKeys[key]);
+                });
+                
                 window.location.href = 'index.html';
             },
 
@@ -559,6 +595,10 @@
                     const canInstallPWA = storeInfo.canInstallPWA === true;
                     const pwaToggleBtn = `<button class="btn-action" style="background:${canInstallPWA ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)'}; color:${canInstallPWA ? '#22c55e' : '#f59e0b'}; margin-top:5px; border:1px solid ${canInstallPWA ? 'rgba(34,197,94,0.3)' : 'rgba(245,158,11,0.3)'}; display:block; width:100%; border-radius:4px; font-weight:bold; cursor:pointer;" onclick="masterApp.togglePWAStatus('${pin}', '${uid}', ${canInstallPWA})" title="تفعيل تطبيق الجوال (PWA)"><i class="fa-solid ${canInstallPWA ? 'fa-mobile-screen' : 'fa-mobile'}"></i> تطبيق الجوال (PWA)</button>`;
                     
+                    const tenantId = uid;
+                    const isEnabled = localStorage.getItem('import_enabled_' + tenantId) === 'true';
+                    const importToggleBtn = `<button class="btn-action" style="background:${isEnabled ? 'rgba(34,197,94,0.1)' : 'rgba(139,92,246,0.05)'}; color:${isEnabled ? '#22c55e' : '#8b5cf6'}; margin-top:5px; border:1px solid ${isEnabled ? 'rgba(34,197,94,0.3)' : 'rgba(139,92,246,0.3)'}; display:block; width:100%; border-radius:4px; font-weight:bold; cursor:pointer;" onclick="masterApp.togglePerTenantImport('${tenantId}')" title="تفعيل أداة الاستيراد"><i class="fa-solid ${isEnabled ? 'fa-eye-slash' : 'fa-file-import'}"></i> ${isEnabled ? 'أداة الاستيراد (مفعل)' : 'تفعيل أداة الاستيراد'}</button>`;
+                    
                     const deleteBtn = `<button class="btn-action" style="background:var(--danger); border:none; color:white; display:block; width:100%; margin-top:5px; border-radius:4px; font-weight:bold; cursor:pointer;" onclick="masterApp.deleteStore('${uid}', '${pin}')" title="خيارات ضبط المصنع"><i class="fa-solid fa-skull-crossbones"></i> ضبط المصنع</button>`;
                     
                     const permanentDeleteBtn = `<button class="btn-action" style="background:#b91c1c; border:1px solid #7f1d1d; color:white; display:block; width:100%; margin-top:5px; border-radius:4px; font-weight:bold; cursor:pointer;" onclick="masterApp.permanentlyDeleteStore('${uid}', '${pin}')" title="حذف المغسلة نهائياً"><i class="fa-solid fa-trash-can"></i> حذف نهائي</button>`;
@@ -583,7 +623,7 @@
                         </td>
                         <td>${badge}</td>
                         <td style="text-align: center;">${subToggleBtn}</td>
-                        <td style="text-align: center;">${actionBtn}${deleteBtn}${permanentDeleteBtn}${pwaToggleBtn}</td>
+                        <td style="text-align: center;">${actionBtn}${deleteBtn}${permanentDeleteBtn}${pwaToggleBtn}${importToggleBtn}</td>
                     `;
                     tbody.appendChild(tr);
                 });

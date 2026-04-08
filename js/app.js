@@ -2681,11 +2681,16 @@ window.appLogic = {
 
             const lang = this.currentLang || 'ar';
             let html = '';
+            
+            const services = window.appLogic.services || [];
 
-            // Consumables Section
+            // 📦 2. Consumables Section
             html += `
             <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px; margin-bottom:20px;">
-                <h3 style="margin-bottom:15px; border-bottom:1px solid var(--border); padding-bottom:10px;">${lang === 'en' ? 'Consumables' : 'المواد الاستهلاكية (Consumables)'}</h3>
+                <h3 style="margin-bottom:15px; border-bottom:1px solid var(--border); padding-bottom:10px;">
+                    ${lang === 'en' ? 'Consumables' : 'المواد الاستهلاكية (Consumables)'}
+                    <span style="display:inline-block; margin:0 8px; background:var(--primary); color:#fff; padding:2px 10px; border-radius:12px; font-size:14px; font-weight:bold;">${trackedInv.length}</span>
+                </h3>
                 ${trackedInv.length === 0 ? `<p style="color:var(--text-muted); text-align:center;">${lang === 'en' ? 'No consumables added currently.' : 'لا توجد مواد استهلاكية مضافة حالياً. أضف الجِير، الأكياس، الشماعات ليتم خصمها آلياً يدوياً.'}</p>` : ''}
             `;
 
@@ -2728,7 +2733,10 @@ window.appLogic = {
             // Laundry Services Section
             html += `
             <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px;">
-                <h3 style="margin-bottom:15px; border-bottom:1px solid var(--border); padding-bottom:10px;">${lang === 'en' ? 'Laundry Services & Prices' : 'خدمات المغسلة وأسعارها (Laundry Services)'}</h3>
+                <h3 style="margin-bottom:15px; border-bottom:1px solid var(--border); padding-bottom:10px;">
+                    ${lang === 'en' ? 'Laundry Services & Prices' : 'خدمات المغسلة وأسعارها (Laundry Services)'}
+                    <span style="display:inline-block; margin:0 8px; background:var(--primary); color:#fff; padding:2px 10px; border-radius:12px; font-size:14px; font-weight:bold;">${services.length}</span>
+                </h3>
                 <div style="overflow-x: auto;">
                     <table class="inventory-table">
                         <thead>
@@ -2746,7 +2754,6 @@ window.appLogic = {
                         <tbody>
                 `;
 
-            const services = window.appLogic.services || [];
             if (Array.isArray(services)) {
                 services.forEach(item => {
                     if (!item) return;
@@ -2790,11 +2797,140 @@ window.appLogic = {
             }
             html += `</tbody></table></div></div>`;
 
+            // 📥 SMART BULK IMPORT SECTION (Admin-Only — hidden by default)
+            const importEnabled = localStorage.getItem('import_enabled_' + window.currentUID) === 'true';
+            html += `
+            <div id="admin-bulk-import-container" style="display:${importEnabled ? 'block' : 'none'}; background:var(--bg-surface); border:2px dashed var(--primary); border-radius:var(--radius-md); padding:20px; margin-top:20px;">
+                <h3 style="margin-bottom:8px; border-bottom:1px solid var(--border); padding-bottom:8px;">
+                    <i class="fa-solid fa-file-import" style="color:var(--primary);"></i>
+                    ${lang === 'en' ? 'Smart Bulk Import' : 'استيراد جماعي ذكي'}
+                    <span style="font-size:11px; background:#c62828; color:#fff; padding:2px 8px; border-radius:10px; margin:0 8px; vertical-align:middle;">${lang === 'en' ? 'ADMIN' : 'أدمن'}</span>
+                </h3>
+                <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">
+                    ${lang === 'en'
+                        ? 'Paste rows from Excel or WhatsApp, one item per line. Format: <b>Name | WashPrice | WashIronPrice | IronPrice</b>'
+                        : 'الصق البيانات من Excel أو واتسآب. التنسيق: <b>الاسم | سعر الغسيل | سعر غ+ك | سعر الكوي</b>'}
+                </p>
+                <textarea id="bulk-import-textarea" rows="6" placeholder="${lang === 'en' ? 'Example:\nThobe | 10 | 20 | 15\nShmagh | 8 | 0 | 10' : 'مثال:\nثوب | 10 | 20 | 15\nشماغ | 8 | 0 | 10'}" style="width:100%; box-sizing:border-box; padding:12px; border-radius:8px; border:1px solid var(--border); background:var(--bg-body); color:var(--text-primary); font-family:inherit; font-size:14px; resize:vertical;"></textarea>
+                <div style="margin-top:12px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+                    <button onclick="appLogic.bulkImportServices()" style="background:var(--primary); color:#000; border:none; padding:10px 22px; border-radius:8px; font-weight:800; font-size:15px; cursor:pointer;">
+                        <i class="fa-solid fa-file-import"></i> ${lang === 'en' ? 'Import' : 'استيراد'}
+                    </button>
+                    <span id="bulk-import-status" style="font-size:13px; color:var(--text-muted);"></span>
+                </div>
+            </div>
+            `;
+
+
             container.innerHTML = html;
             console.log('[UI] renderInventory completed successfully.');
         } catch (err) {
             console.error('[UI] Critical failure in renderInventory:', err);
             container.innerHTML = `<div style="color:red; padding:20px;">خطأ في تحميل الجدول: ${err.message}</div>`;
+        }
+    },
+
+    // 🔐 ADMIN TOGGLE: Show/Hide the Bulk Import tool for laundry owners
+    toggleImportTool() {
+        const current = localStorage.getItem('enableImportTool') === 'true';
+        const next = !current;
+        localStorage.setItem('enableImportTool', next ? 'true' : 'false');
+        
+        console.log('Import Tool is now:', next);
+
+        // Update toggle button label
+        const btn = document.getElementById('toggle-import-tool-btn');
+        if (btn) {
+            btn.innerHTML = next
+                ? '<i class="fa-solid fa-eye-slash"></i> إخفاء أداة الاستيراد الجماعي'
+                : '<i class="fa-solid fa-eye"></i> إظهار أداة الاستيراد الجماعي';
+            btn.style.color = next ? '#ef4444' : '#22c55e';
+            btn.style.borderColor = next ? '#ef4444' : '#22c55e';
+        }
+
+        // Instantly show/hide the container if we're already on the inventory page
+        const container = document.getElementById('admin-bulk-import-container');
+        if (container) container.style.display = next ? 'block' : 'none';
+
+        this.showToast(next ? '✅ تم تفعيل أداة الاستيراد للمغسلة' : '🔒 تم إخفاء أداة الاستيراد');
+    },
+
+    // 🎨 AUTO-ICON HELPER — maps Arabic/English keyword to Font Awesome class
+    getIconForName(name) {
+        const n = (name || '');
+        if (/ثوب|جلبية|thobe|dishdasha/i.test(n)) return 'fa-shirt';
+        if (/شماغ|غترة|كوفية|shemagh|gutrah|kufiyya/i.test(n)) return 'fa-hat-cowboy-side';
+        if (/عباية|عباء|abaya/i.test(n)) return 'fa-person-dress';
+        if (/فستان|فستآن|dress/i.test(n)) return 'fa-person-dress';
+        if (/بطانية|لحاف|duvet|blanket/i.test(n)) return 'fa-bed';
+        if (/سجادة|سجاد|carpet|rug/i.test(n)) return 'fa-rug';
+        if (/مفرش|شرشف|ستائر|ستارة|curtain|tablecloth/i.test(n)) return 'fa-table';
+        if (/جذاء|حذاء|حذاء|shoe|sandal/i.test(n)) return 'fa-shoe-prints';
+        if (/بدلة|suit|jacket|كوت/i.test(n)) return 'fa-user-tie';
+        if (/سروال|بنطال|بنطلون|pant|trouser/i.test(n)) return 'fa-socks';
+        if (/فنيلة|تيشيرت|tshirt|shirt|blouse/i.test(n)) return 'fa-shirt';
+        if (/كنزة|كنزات|جزمة|bag/i.test(n)) return 'fa-bag-shopping';
+        if (/فوطة|منشفة|towel/i.test(n)) return 'fa-scroll';
+        if (/غترة|عقال/i.test(n)) return 'fa-hat-cowboy-side';
+        return 'fa-water'; // default: laundry/water icon
+    },
+
+    // 📥 BULK IMPORT — parses pasted text and pushes new services
+    async bulkImportServices() {
+        const textarea = document.getElementById('bulk-import-textarea');
+        const statusEl = document.getElementById('bulk-import-status');
+        if (!textarea) return;
+
+        const raw = textarea.value.trim();
+        if (!raw) {
+            if (statusEl) statusEl.textContent = '⚠️ لا يوجد بيانات للاستيراد';
+            return;
+        }
+
+        const lines = raw.split('\n').filter(l => l.trim());
+        let imported = 0;
+        let skipped = 0;
+
+        for (const line of lines) {
+            // Support Tab, pipe (|), comma as delimiters
+            const parts = line.split(/[\t|,]/).map(p => p.trim()).filter(Boolean);
+            if (parts.length < 2) { skipped++; continue; }
+
+            const name = parts[0] || '';
+            if (!name) { skipped++; continue; }
+
+            const wash      = parseFloat(parts[1]) || 0;
+            const wash_iron = parseFloat(parts[2]) || 0;
+            const iron      = parseFloat(parts[3]) || 0;
+            const icon      = this.getIconForName(name);
+
+            // Auto-detect category
+            let cat = 'men';
+            if (/عباية|فستان|نسائ|women/i.test(name)) cat = 'women';
+
+            const newService = {
+                id: `SRV-BULK-${Date.now()}-${Math.random().toString(36).substr(2,5)}`,
+                name, cat, icon,
+                prices: { iron, wash_iron, wash },
+                expressFee: 0
+            };
+
+            // Prevent duplicates by exact name match
+            const exists = this.services.some(s => s.name.trim().toLowerCase() === name.toLowerCase());
+            if (exists) { skipped++; continue; }
+
+            this.services.push(newService);
+            imported++;
+        }
+
+        if (imported > 0) {
+            await localforage.setItem('services', this.services);
+            await manualSyncToCloud('services', this.services);
+            this.renderInventory();
+            this.renderItems();
+            this.showToast(`✅ تم استيراد ${imported} خدمة بنجاح!`);
+        } else {
+            if (statusEl) statusEl.textContent = `⚠️ لم يتم استيراد أي بيانات. (متجاهل مكرر: ${skipped})`;
         }
     },
 
@@ -3692,7 +3828,16 @@ window.appLogic = {
             const snap = await firebase.database().ref('admin/stores').once('value');
             const stores = snap.val() || {};
 
+            const isImportEnabled = localStorage.getItem('enableImportTool') === 'true';
             let html = `
+                <div style="margin-bottom:20px; padding:15px; background:rgba(139,92,246,0.1); border:2px dashed #8b5cf6; border-radius:var(--radius-md); text-align:center;">
+                    <h4 style="color:#8b5cf6; margin-bottom:10px;">أدوات الإدارة المتقدمة</h4>
+                    <button id="toggle-import-tool-btn" class="btn" style="background:${isImportEnabled ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)'}; color:${isImportEnabled ? '#ef4444' : '#22c55e'}; border:2px solid ${isImportEnabled ? '#ef4444' : '#22c55e'}; padding:10px 20px; font-size:16px; font-weight:bold; border-radius:8px; cursor:pointer;" onclick="appLogic.toggleImportTool()">
+                        ${isImportEnabled ? '<i class="fa-solid fa-eye-slash"></i> إخفاء أداة الاستيراد الجماعي' : '<i class="fa-solid fa-eye"></i> إظهار أداة الاستيراد الجماعي'}
+                    </button>
+                    <p style="font-size:12px; color:var(--text-muted); margin-top:8px;">(يتحكم هذا الزر بظهور أداة الاستيراد الذكي في قسم "المخزون" لك كأدمن)</p>
+                </div>
+
                 <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px; box-shadow:var(--shadow-sm);">
                     <h3 style="margin-bottom:15px; border-bottom:1px solid var(--border); padding-bottom:10px; color:var(--primary);">قائمة المشتركين النشطة (${Object.keys(stores).length} مغسلة)</h3>
                     <div style="overflow-x: auto;">
@@ -3744,6 +3889,9 @@ window.appLogic = {
                                 </button>
                                 <button class="btn" style="background:${s.canInstallPWA ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)'}; color:${s.canInstallPWA ? '#22c55e' : '#f59e0b'}; padding:5px 10px; border:1px solid ${s.canInstallPWA ? 'rgba(34,197,94,0.2)' : 'rgba(245,158,11,0.2)'}; border-radius:4px; font-size:11px; cursor:pointer; margin-right:5px; margin-bottom:5px;" onclick="appLogic.togglePWAStatus('${pin}', ${!!s.canInstallPWA})">
                                     <i class="fa-solid ${s.canInstallPWA ? 'fa-mobile-screen' : 'fa-mobile'}"></i> ${s.canInstallPWA ? 'منع PWA' : 'سماح PWA'}
+                                </button>
+                                <button class="btn" style="background:${s.importToolEnabled ? 'rgba(139,92,246,0.2)' : 'rgba(139,92,246,0.05)'}; color:#8b5cf6; padding:5px 10px; border:1px solid rgba(139,92,246,0.3); border-radius:4px; font-size:11px; cursor:pointer; margin-right:5px; margin-bottom:5px;" onclick="appLogic.toggleImportToolForStore('${pin}', ${!!s.importToolEnabled})" title="أداة الاستيراد الجماعي">
+                                    <i class="fa-solid fa-file-import"></i> ${s.importToolEnabled ? 'إخفاء الاستيراد' : 'إظهار الاستيراد'}
                                 </button>
                                 <button class="btn" style="background:rgba(245,158,11,0.1); color:#f59e0b; padding:5px 10px; border:1px solid rgba(245,158,11,0.2); border-radius:4px; font-size:11px; cursor:pointer; margin-right:5px; margin-bottom:5px;" onclick="appLogic.triggerFactoryReset('${pin}')" title="ضبط المصنع"><i class="fa-solid fa-rotate-left"></i></button>
                                 <button class="btn" style="background:rgba(239,68,68,0.1); color:#ef4444; padding:5px 10px; border:1px solid rgba(239,68,68,0.2); border-radius:4px; font-size:11px; cursor:pointer; margin-right:5px; margin-bottom:5px;" onclick="appLogic.deleteStore('${pin}')">
@@ -3877,6 +4025,29 @@ window.appLogic = {
         } catch (err) {
             console.error('[Admin] PWA toggle failed:', err);
             alert('فشل في تحديث إذن التثبيت.');
+        }
+    },
+
+    // 🔐 ADMIN: Toggle Smart Bulk Import visibility for a specific store
+    async toggleImportToolForStore(pin, currentEnabled) {
+        const newEnabled = !currentEnabled;
+        try {
+            // Save flag in Firebase under admin/stores/pin
+            await firebase.database().ref(`admin/stores/${pin}/importToolEnabled`).set(newEnabled);
+
+            // Also push to the store's own user data so the POS app can read it on login
+            const storeSnap = await firebase.database().ref(`admin/stores/${pin}`).once('value');
+            const storeData = storeSnap.val() || {};
+            const uid = storeData.uid;
+            if (uid) {
+                await firebase.database().ref(`users/${uid}/accountDetails/importToolEnabled`).set(newEnabled);
+            }
+
+            this.showToast(newEnabled ? '✅ تم تفعيل أداة الاستيراد للمغسلة' : '🔒 تم إخفاء أداة الاستيراد');
+            this.renderAdmin();
+        } catch (err) {
+            console.error('[Admin] Import tool toggle failed:', err);
+            alert('فشل في تحديث إعداد أداة الاستيراد.');
         }
     },
 
@@ -4238,7 +4409,7 @@ window.appLogic = {
         if (departsUID) {
             for (let i = localStorage.length - 1; i >= 0; i--) {
                 const key = localStorage.key(i);
-                if (key && key.endsWith('_' + departsUID)) {
+                if (key && key.endsWith('_' + departsUID) && !key.startsWith('import_enabled_')) {
                     localStorage.removeItem(key);
                 }
             }
@@ -4707,6 +4878,17 @@ window.appLogic = {
 
         window.tenantSettings = settings || { name: '', phone: '', taxNumber: '' };
         this.applyBranding();
+
+        // 🔐 Sync Admin-controlled Import Tool flag to localStorage for renderInventory to use
+        if (uid && typeof firebase !== 'undefined') {
+            try {
+                const importSnap = await firebase.database().ref(`users/${uid}/accountDetails/importToolEnabled`).once('value');
+                const isEnabled = importSnap.val() === true;
+                localStorage.setItem('enableImportTool', isEnabled ? 'true' : 'false');
+            } catch (e) {
+                // Silent fail — default remains as-is
+            }
+        }
     },
 
     applyBranding() {
