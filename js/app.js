@@ -1887,14 +1887,44 @@ window.appLogic = {
             <head>
                 <title>فاتورة سحاب</title>
                 <style>
-                    @page { margin: 0; }
-                    body { margin: 0; padding: 0; background: white; display: flex; justify-content: center; font-family: system-ui, sans-serif; }
-                    #receipt-wrapper { width: 100% !important; max-width: 70mm !important; margin: 0 auto; padding: 2mm; box-sizing: border-box; overflow: hidden; color: black; }
+                    body { background: white; display: flex; justify-content: center; font-family: system-ui, sans-serif; }
                     * { color: black !important; font-size: 11px; }
                     .qr-container { text-align: center; margin-top: 10px; padding-bottom: 20px; }
-                    /* STRICTLY SMALL QR CODE */
                     .qr-container img { display: block; margin: 0 auto; width: 90px; height: 90px; }
                     #sunmi-native-qr { display: none; }
+
+                    @media print {
+                        @page {
+                            margin: 0 !important;
+                        }
+                        html, body {
+                            width: 70mm !important;
+                            max-width: 70mm !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            overflow-x: hidden !important;
+                        }
+                        #receipt-wrapper, body > div { 
+                            width: 100% !important;
+                            max-width: 260px !important;
+                            margin: 0 auto !important;
+                            padding: 2px !important;
+                            box-sizing: border-box !important;
+                            direction: rtl !important;
+                        }
+                        * {
+                            box-sizing: border-box !important;
+                            word-wrap: break-word !important;
+                        }
+                        table {
+                            width: 100% !important;
+                            table-layout: fixed !important;
+                        }
+                        th, td {
+                            padding: 2px !important;
+                            font-size: 11px !important;
+                        }
+                    }
                 </style>
             </head>
             <body>
