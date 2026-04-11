@@ -232,6 +232,8 @@ window.addEventListener('unhandledrejection', function(event) {
                                 onclick="appLogic.setFastBatchType('iron', this)">كوي فقط</button>
                             <button class="btn-toggle" id="fb-type-wash"
                                 onclick="appLogic.setFastBatchType('wash', this)">غسيل فقط</button>
+                            <button class="btn-toggle" id="fb-type-dry_clean" onclick="appLogic.setFastBatchType('dry_clean', this)">غسيل جاف</button>
+                            <button class="btn-toggle" id="fb-type-steam" onclick="appLogic.setFastBatchType('steam', this)">بخار</button>
                         </div>
                         <div class="fb-group group-speeds">
                             <button class="btn-toggle btn-speed-normal active" id="fb-speed-normal"
@@ -424,8 +426,9 @@ window.addEventListener('unhandledrejection', function(event) {
                             onclick="appLogic.setModalType('iron', this)">كوي فقط</button>
                         <button class="btn-toggle" id="btn-type-wash_iron"
                             onclick="appLogic.setModalType('wash_iron', this)">غسيل وكوي</button>
-                        <button class="btn-toggle" id="btn-type-wash" onclick="appLogic.setModalType('wash', this)">غسيل
-                            فقط</button>
+                        <button class="btn-toggle" id="btn-type-wash" onclick="appLogic.setModalType('wash', this)">غسيل فقط</button>
+                        <button class="btn-toggle" id="btn-type-dry_clean" onclick="appLogic.setModalType('dry_clean', this)">غسيل جاف</button>
+                        <button class="btn-toggle" id="btn-type-steam" onclick="appLogic.setModalType('steam', this)">بخار</button>
                     </div>
                 </div>
                 <div class="selector-group">
@@ -776,6 +779,17 @@ window.addEventListener('unhandledrejection', function(event) {
                         <input type="number" id="price-express-fee" value="0.00" step="0.5" class="w-100"
                             style="padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm);"
                             dir="ltr">
+                    </div>
+                </div>
+
+                <div class="pricing-grid" style="margin-bottom: 25px;">
+                    <div class="form-group">
+                        <label class="form-field-label">سعر الغسيل الجاف</label>
+                        <input type="number" id="price-dry-clean" value="0.00" step="0.5" class="w-100" style="padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm);" dir="ltr">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-field-label">سعر البخار</label>
+                        <input type="number" id="price-steam" value="0.00" step="0.5" class="w-100" style="padding:10px; background:var(--bg-body); border:1px solid var(--border); color:#fff; border-radius:var(--radius-sm);" dir="ltr">
                     </div>
                 </div>
 

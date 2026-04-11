@@ -106,38 +106,38 @@ const DefaultDeliveryOptions = [
 ];
 
 const DefaultServices = [
-    { id: 'thobe', cat: 'men', name: 'ثوب', icon: 'fa-user-tie', prices: { iron: 2, wash_iron: 5, wash: 3 }, expressFee: { iron: 2, wash_iron: 2, wash: 2 } },
-    { id: 'thobe_cotton', cat: 'men', name: 'ثوب قطن', icon: 'fa-user-tie', prices: { iron: 3, wash_iron: 6, wash: 3 }, expressFee: { iron: 2, wash_iron: 2, wash: 2 } },
-    { id: 'thobe_wool', cat: 'men', name: 'ثوب صوف', icon: 'fa-user-tie', prices: { iron: 3, wash_iron: 6, wash: 3 }, expressFee: { iron: 2, wash_iron: 2, wash: 2 } },
-    { id: 'shemagh', cat: 'men', name: 'الشماغ', icon: 'fa-hat-cowboy', prices: { iron: 2, wash_iron: 4, wash: 2 }, expressFee: { iron: 2, wash_iron: 2, wash: 2 } },
-    { id: 'ghutra', cat: 'men', name: 'غترة', icon: 'fa-hat-cowboy', prices: { iron: 2, wash_iron: 4, wash: 2 }, expressFee: { iron: 2, wash_iron: 2, wash: 2 } },
-    { id: 'mishlah', cat: 'men', name: 'مشلح', icon: 'fa-vest', prices: { iron: 11, wash_iron: 22, wash: 11 }, expressFee: { iron: 10, wash_iron: 10, wash: 2 } },
-    { id: 'underwear', cat: 'men', name: 'ملابس داخلية', icon: 'fa-shirt', prices: { iron: 2, wash_iron: 4, wash: 2 }, expressFee: { iron: 2, wash_iron: 2, wash: 2 } },
-    { id: 'pants_short', cat: 'men', name: 'سروال قصير', icon: 'fa-box', prices: { iron: 1, wash_iron: 2.5, wash: 1.5 }, expressFee: { iron: 0.5, wash_iron: 0.5, wash: 2 } },
-    { id: 'pants_long', cat: 'men', name: 'سروال طويل', icon: 'fa-boxes-stacked', prices: { iron: 1.5, wash_iron: 3, wash: 1.5 }, expressFee: { iron: 0.5, wash_iron: 1, wash: 2 } },
-    { id: 'undershirt', cat: 'men', name: 'فنيله', icon: 'fa-shirt', prices: { iron: 1, wash_iron: 2.5, wash: 1.5 }, expressFee: { iron: 0.5, wash_iron: 0.5, wash: 2 } },
-    { id: 'trousers', cat: 'men', name: 'بنطلون', icon: 'fa-person', prices: { iron: 2, wash_iron: 4, wash: 2 }, expressFee: { iron: 3, wash_iron: 3, wash: 2 } },
-    { id: 'shirt', cat: 'men', name: 'قميص', icon: 'fa-shirt', prices: { iron: 2, wash_iron: 4, wash: 2 }, expressFee: { iron: 2, wash_iron: 2, wash: 2 } },
-    { id: 'jacket', cat: 'men', name: 'جاكيت', icon: 'fa-user-secret', prices: { iron: 6, wash_iron: 12, wash: 6 }, expressFee: { iron: 4, wash_iron: 4, wash: 2 } },
-    { id: 'military_suit', cat: 'men', name: 'بدله عسكرية', icon: 'fa-user-shield', prices: { iron: 3, wash_iron: 7, wash: 4 }, expressFee: { iron: 7, wash_iron: 7, wash: 2 } },
-    { id: 'work_suit', cat: 'men', name: 'بدلة عمل', icon: 'fa-user-nurse', prices: { iron: 5, wash_iron: 9, wash: 4 }, expressFee: { iron: 4, wash_iron: 4, wash: 2 } },
-    { id: 'overalls', cat: 'men', name: 'فرهول', icon: 'fa-socks', prices: { iron: 4, wash_iron: 9, wash: 5 }, expressFee: { iron: 3, wash_iron: 3, wash: 2 } },
-    { id: 'coat', cat: 'men', name: 'بالطو', icon: 'fa-user-doctor', prices: { iron: 2, wash_iron: 5, wash: 3 }, expressFee: { iron: 2, wash_iron: 2, wash: 2 } },
-    { id: 'towel', cat: 'misc', name: 'فوطة', icon: 'fa-rug', prices: { iron: 2, wash_iron: 4, wash: 2 }, expressFee: { iron: 2, wash_iron: 2, wash: 2 } },
-    { id: 'pajamas', cat: 'men', name: 'بجامه', icon: 'fa-bed', prices: { iron: 3, wash_iron: 6, wash: 3 }, expressFee: { iron: 1, wash_iron: 2, wash: 2 } },
-    { id: 'blouse', cat: 'women', name: 'بلوزه', icon: 'fa-shirt', prices: { iron: 2, wash_iron: 5, wash: 3 }, expressFee: { iron: 2, wash_iron: 2, wash: 2 } },
-    { id: 'blouse_wool', cat: 'women', name: 'بلوزه صوف', icon: 'fa-shirt', prices: { iron: 3, wash_iron: 8, wash: 5 }, expressFee: { iron: 2, wash_iron: 2, wash: 2 } },
-    { id: 'ihram', cat: 'men', name: 'احرام', icon: 'fa-blanket', prices: { iron: 3, wash_iron: 8, wash: 5 }, expressFee: { iron: 4, wash_iron: 4, wash: 2 } },
-    { id: 'pakistani_suit', cat: 'men', name: 'بدلة باكستانية', icon: 'fa-user-tie', prices: { iron: 3, wash_iron: 8, wash: 5 }, expressFee: { iron: 2, wash_iron: 2, wash: 2 } },
-    { id: 'socks', cat: 'misc', name: 'شراب', icon: 'fa-socks', prices: { iron: 1, wash_iron: 1.5, wash: 0.5 }, expressFee: { iron: 0.5, wash_iron: 0.5, wash: 2 } },
-    { id: 'cap', cat: 'misc', name: 'قبوع', icon: 'fa-hat-cowboy', prices: { iron: 0, wash_iron: 3, wash: 3 }, expressFee: { iron: 0, wash_iron: 1, wash: 2 } },
-    { id: 'abaya', cat: 'women', name: 'عبايه', icon: 'fa-person-dress', prices: { iron: 5, wash_iron: 11, wash: 6 }, expressFee: { iron: 5, wash_iron: 5, wash: 2 } },
-    { id: 'scarf', cat: 'women', name: 'طرحه', icon: 'fa-mitten', prices: { iron: 1, wash_iron: 2, wash: 1 }, expressFee: { iron: 1, wash_iron: 1, wash: 2 } },
-    { id: 'women_robe', cat: 'women', name: 'روب نسائي', icon: 'fa-person-dress', prices: { iron: 2, wash_iron: 5, wash: 3 }, expressFee: { iron: 2, wash_iron: 2, wash: 2 } },
-    { id: 'dress_normal', cat: 'women', name: 'فستان عادي', icon: 'fa-person-dress', prices: { iron: 11, wash_iron: 22, wash: 11 }, expressFee: { iron: 5, wash_iron: 5, wash: 2 } },
-    { id: 'dress_embroidered', cat: 'women', name: 'فستان مطرز', icon: 'fa-person-dress', prices: { iron: 31, wash_iron: 52, wash: 21 }, expressFee: { iron: 10, wash_iron: 10, wash: 2 } },
-    { id: 'dress_evening', cat: 'women', name: 'فستان سهرة', icon: 'fa-person-dress', prices: { iron: 21, wash_iron: 42, wash: 21 }, expressFee: { iron: 10, wash_iron: 10, wash: 2 } },
-    { id: 'dress_wedding', cat: 'women', name: 'فستان فرح', icon: 'fa-person-dress', prices: { iron: 51, wash_iron: 152, wash: 101 }, expressFee: { iron: 10, wash_iron: 10, wash: 2 } }
+    { id: 'thobe', cat: 'men', name: 'ثوب', icon: 'fa-user-tie', prices: { iron: 2, wash_iron: 5, wash: 3, dry_clean: 2, steam: 2 }, expressFee: { iron: 2, wash_iron: 2, wash: 2, dry_clean: 2, steam: 2 } },
+    { id: 'thobe_cotton', cat: 'men', name: 'ثوب قطن', icon: 'fa-user-tie', prices: { iron: 3, wash_iron: 6, wash: 3, dry_clean: 3, steam: 3 }, expressFee: { iron: 2, wash_iron: 2, wash: 2, dry_clean: 2, steam: 2 } },
+    { id: 'thobe_wool', cat: 'men', name: 'ثوب صوف', icon: 'fa-user-tie', prices: { iron: 3, wash_iron: 6, wash: 3, dry_clean: 3, steam: 3 }, expressFee: { iron: 2, wash_iron: 2, wash: 2, dry_clean: 2, steam: 2 } },
+    { id: 'shemagh', cat: 'men', name: 'الشماغ', icon: 'fa-hat-cowboy', prices: { iron: 2, wash_iron: 4, wash: 2, dry_clean: 2, steam: 2 }, expressFee: { iron: 2, wash_iron: 2, wash: 2, dry_clean: 2, steam: 2 } },
+    { id: 'ghutra', cat: 'men', name: 'غترة', icon: 'fa-hat-cowboy', prices: { iron: 2, wash_iron: 4, wash: 2, dry_clean: 2, steam: 2 }, expressFee: { iron: 2, wash_iron: 2, wash: 2, dry_clean: 2, steam: 2 } },
+    { id: 'mishlah', cat: 'men', name: 'مشلح', icon: 'fa-vest', prices: { iron: 11, wash_iron: 22, wash: 11, dry_clean: 11, steam: 11 }, expressFee: { iron: 10, wash_iron: 10, wash: 2, dry_clean: 10, steam: 10 } },
+    { id: 'underwear', cat: 'men', name: 'ملابس داخلية', icon: 'fa-shirt', prices: { iron: 2, wash_iron: 4, wash: 2, dry_clean: 2, steam: 2 }, expressFee: { iron: 2, wash_iron: 2, wash: 2, dry_clean: 2, steam: 2 } },
+    { id: 'pants_short', cat: 'men', name: 'سروال قصير', icon: 'fa-box', prices: { iron: 1, wash_iron: 2.5, wash: 1.5, dry_clean: 1, steam: 1 }, expressFee: { iron: 0.5, wash_iron: 0.5, wash: 2, dry_clean: 0.5, steam: 0.5 } },
+    { id: 'pants_long', cat: 'men', name: 'سروال طويل', icon: 'fa-boxes-stacked', prices: { iron: 1.5, wash_iron: 3, wash: 1.5, dry_clean: 1.5, steam: 1.5 }, expressFee: { iron: 0.5, wash_iron: 1, wash: 2, dry_clean: 0.5, steam: 0.5 } },
+    { id: 'undershirt', cat: 'men', name: 'فنيله', icon: 'fa-shirt', prices: { iron: 1, wash_iron: 2.5, wash: 1.5, dry_clean: 1, steam: 1 }, expressFee: { iron: 0.5, wash_iron: 0.5, wash: 2, dry_clean: 0.5, steam: 0.5 } },
+    { id: 'trousers', cat: 'men', name: 'بنطلون', icon: 'fa-person', prices: { iron: 2, wash_iron: 4, wash: 2, dry_clean: 2, steam: 2 }, expressFee: { iron: 3, wash_iron: 3, wash: 2, dry_clean: 3, steam: 3 } },
+    { id: 'shirt', cat: 'men', name: 'قميص', icon: 'fa-shirt', prices: { iron: 2, wash_iron: 4, wash: 2, dry_clean: 2, steam: 2 }, expressFee: { iron: 2, wash_iron: 2, wash: 2, dry_clean: 2, steam: 2 } },
+    { id: 'jacket', cat: 'men', name: 'جاكيت', icon: 'fa-user-secret', prices: { iron: 6, wash_iron: 12, wash: 6, dry_clean: 6, steam: 6 }, expressFee: { iron: 4, wash_iron: 4, wash: 2, dry_clean: 4, steam: 4 } },
+    { id: 'military_suit', cat: 'men', name: 'بدله عسكرية', icon: 'fa-user-shield', prices: { iron: 3, wash_iron: 7, wash: 4, dry_clean: 3, steam: 3 }, expressFee: { iron: 7, wash_iron: 7, wash: 2, dry_clean: 7, steam: 7 } },
+    { id: 'work_suit', cat: 'men', name: 'بدلة عمل', icon: 'fa-user-nurse', prices: { iron: 5, wash_iron: 9, wash: 4, dry_clean: 5, steam: 5 }, expressFee: { iron: 4, wash_iron: 4, wash: 2, dry_clean: 4, steam: 4 } },
+    { id: 'overalls', cat: 'men', name: 'فرهول', icon: 'fa-socks', prices: { iron: 4, wash_iron: 9, wash: 5, dry_clean: 4, steam: 4 }, expressFee: { iron: 3, wash_iron: 3, wash: 2, dry_clean: 3, steam: 3 } },
+    { id: 'coat', cat: 'men', name: 'بالطو', icon: 'fa-user-doctor', prices: { iron: 2, wash_iron: 5, wash: 3, dry_clean: 2, steam: 2 }, expressFee: { iron: 2, wash_iron: 2, wash: 2, dry_clean: 2, steam: 2 } },
+    { id: 'towel', cat: 'misc', name: 'فوطة', icon: 'fa-rug', prices: { iron: 2, wash_iron: 4, wash: 2, dry_clean: 2, steam: 2 }, expressFee: { iron: 2, wash_iron: 2, wash: 2, dry_clean: 2, steam: 2 } },
+    { id: 'pajamas', cat: 'men', name: 'بجامه', icon: 'fa-bed', prices: { iron: 3, wash_iron: 6, wash: 3, dry_clean: 3, steam: 3 }, expressFee: { iron: 1, wash_iron: 2, wash: 2, dry_clean: 1, steam: 1 } },
+    { id: 'blouse', cat: 'women', name: 'بلوزه', icon: 'fa-shirt', prices: { iron: 2, wash_iron: 5, wash: 3, dry_clean: 2, steam: 2 }, expressFee: { iron: 2, wash_iron: 2, wash: 2, dry_clean: 2, steam: 2 } },
+    { id: 'blouse_wool', cat: 'women', name: 'بلوزه صوف', icon: 'fa-shirt', prices: { iron: 3, wash_iron: 8, wash: 5, dry_clean: 3, steam: 3 }, expressFee: { iron: 2, wash_iron: 2, wash: 2, dry_clean: 2, steam: 2 } },
+    { id: 'ihram', cat: 'men', name: 'احرام', icon: 'fa-blanket', prices: { iron: 3, wash_iron: 8, wash: 5, dry_clean: 3, steam: 3 }, expressFee: { iron: 4, wash_iron: 4, wash: 2, dry_clean: 4, steam: 4 } },
+    { id: 'pakistani_suit', cat: 'men', name: 'بدلة باكستانية', icon: 'fa-user-tie', prices: { iron: 3, wash_iron: 8, wash: 5, dry_clean: 3, steam: 3 }, expressFee: { iron: 2, wash_iron: 2, wash: 2, dry_clean: 2, steam: 2 } },
+    { id: 'socks', cat: 'misc', name: 'شراب', icon: 'fa-socks', prices: { iron: 1, wash_iron: 1.5, wash: 0.5, dry_clean: 1, steam: 1 }, expressFee: { iron: 0.5, wash_iron: 0.5, wash: 2, dry_clean: 0.5, steam: 0.5 } },
+    { id: 'cap', cat: 'misc', name: 'قبوع', icon: 'fa-hat-cowboy', prices: { iron: 0, wash_iron: 3, wash: 3, dry_clean: 0, steam: 0 }, expressFee: { iron: 0, wash_iron: 1, wash: 2, dry_clean: 0, steam: 0 } },
+    { id: 'abaya', cat: 'women', name: 'عبايه', icon: 'fa-person-dress', prices: { iron: 5, wash_iron: 11, wash: 6, dry_clean: 5, steam: 5 }, expressFee: { iron: 5, wash_iron: 5, wash: 2, dry_clean: 5, steam: 5 } },
+    { id: 'scarf', cat: 'women', name: 'طرحه', icon: 'fa-mitten', prices: { iron: 1, wash_iron: 2, wash: 1, dry_clean: 1, steam: 1 }, expressFee: { iron: 1, wash_iron: 1, wash: 2, dry_clean: 1, steam: 1 } },
+    { id: 'women_robe', cat: 'women', name: 'روب نسائي', icon: 'fa-person-dress', prices: { iron: 2, wash_iron: 5, wash: 3, dry_clean: 2, steam: 2 }, expressFee: { iron: 2, wash_iron: 2, wash: 2, dry_clean: 2, steam: 2 } },
+    { id: 'dress_normal', cat: 'women', name: 'فستان عادي', icon: 'fa-person-dress', prices: { iron: 11, wash_iron: 22, wash: 11, dry_clean: 11, steam: 11 }, expressFee: { iron: 5, wash_iron: 5, wash: 2, dry_clean: 5, steam: 5 } },
+    { id: 'dress_embroidered', cat: 'women', name: 'فستان مطرز', icon: 'fa-person-dress', prices: { iron: 31, wash_iron: 52, wash: 21, dry_clean: 31, steam: 31 }, expressFee: { iron: 10, wash_iron: 10, wash: 2, dry_clean: 10, steam: 10 } },
+    { id: 'dress_evening', cat: 'women', name: 'فستان سهرة', icon: 'fa-person-dress', prices: { iron: 21, wash_iron: 42, wash: 21, dry_clean: 21, steam: 21 }, expressFee: { iron: 10, wash_iron: 10, wash: 2, dry_clean: 10, steam: 10 } },
+    { id: 'dress_wedding', cat: 'women', name: 'فستان فرح', icon: 'fa-person-dress', prices: { iron: 51, wash_iron: 152, wash: 101, dry_clean: 51, steam: 51 }, expressFee: { iron: 10, wash_iron: 10, wash: 2, dry_clean: 10, steam: 10 } }
 ];
 
 const AvailableIcons = [
@@ -272,7 +272,7 @@ if (typeof firebase !== 'undefined' && !firebase.apps.length) {
     }
 }
 
-const collectionsToSync = ['customers', 'invoices', 'journal_entries', 'tax_records', 'inventory', 'services', 'expenses', 'delivery_options'];
+const collectionsToSync = ['customers', 'invoices', 'journal_entries', 'tax_records', 'inventory', 'services', 'expenses', 'delivery_options', 'laundry_balances', 'archived_z_reports'];
 const originalSetItem = localforage.setItem;
 window.isDataInitialized = false; // THE MASTER LOCK: App starts in strict READ-ONLY mode
 window.__syncingFromFirebase = false;
@@ -333,18 +333,9 @@ async function initFirebaseSync() {
         window.isDataInitialized = true;
         return;
     }
-
-    const fourHundredDaysAgo = Date.now() - (400 * 24 * 60 * 60 * 1000);
-
     const fetchPromises = collectionsToSync.map(key => {
         return new Promise((resolve) => {
             let dbRef = firebase.database().ref(getDbPath(key));
-
-            // OPTIMIZATION: Only fetch last 400 days for heavy transactional collections
-            if (key === 'invoices' || key === 'expenses') {
-                console.log(`[Recovery] Applying 400-day optimization for ${key}...`);
-                dbRef = dbRef.orderByChild('timestamp').startAt(fourHundredDaysAgo);
-            }
 
             console.log(`[Recovery] Requesting ${key} from cloud...`);
 
@@ -702,6 +693,15 @@ window.appLogic = {
     },
     switchView(viewId) {
         console.log('Switching to view:', viewId);
+        
+        // 🚨 SECURITY LOCK: Prevent historical data contamination
+        if (viewId !== 'reports' && viewId !== 'history') {
+            const todayYMD = getLocalYMD();
+            if (this.currentViewDate && this.currentViewDate !== todayYMD) {
+                console.log('Exiting history mode, auto-restoring Live Shift boundaries.');
+                this.resetReportFilter(); 
+            }
+        }
         try {
             // Remove active from all views and nav buttons
             document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
@@ -788,7 +788,7 @@ window.appLogic = {
 
     // --- FAST BATCH ENTRY OPERATIONS ---
     setFastBatchType(type, btn) {
-        document.querySelectorAll('#fb-type-wash_iron, #fb-type-iron, #fb-type-wash').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('#fb-type-wash_iron, #fb-type-iron, #fb-type-wash, #fb-type-dry_clean, #fb-type-steam').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         this.fastBatchState.type = type;
     },
@@ -848,7 +848,7 @@ window.appLogic = {
 
         // Optional quick tap feedback:
         if (this.showToast) {
-            let tLbl = type === 'iron' ? 'كوي' : (type === 'wash_iron' ? 'غسيل وكوي' : 'غسيل');
+            let tLbl = type === 'iron' ? 'كوي' : (type === 'wash_iron' ? 'غسيل وكوي' : (type === 'dry_clean' ? 'غسيل جاف' : (type === 'steam' ? 'بخار' : 'غسيل فقط')));
             let sLbl = speed === 'normal' ? 'عادي' : 'مستعجل';
             this.showToast(`تمت إضافة: ${item.name} (${tLbl} - ${sLbl})`);
         }
@@ -874,7 +874,7 @@ window.appLogic = {
     },
 
     setModalType(type, btn) {
-        document.querySelectorAll('#btn-type-iron, #btn-type-wash_iron, #btn-type-wash').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('#btn-type-iron, #btn-type-wash_iron, #btn-type-wash, #btn-type-dry_clean, #btn-type-steam').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         this.modalState.type = type;
         this.evalModalPrice();
@@ -993,8 +993,8 @@ window.appLogic = {
         } else {
             this.cart.forEach((item, index) => {
                 let tLbl = this.currentLang === 'en'
-                    ? (item.type === 'iron' ? 'Iron Only' : (item.type === 'wash_iron' ? 'Wash & Iron' : 'Wash Only'))
-                    : (item.type === 'iron' ? 'كوي فقط' : (item.type === 'wash_iron' ? 'غسيل وكوي' : 'غسيل فقط'));
+                    ? (item.type === 'iron' ? 'Iron Only' : (item.type === 'wash_iron' ? 'Wash & Iron' : (item.type === 'dry_clean' ? 'Dry Clean' : (item.type === 'steam' ? 'Steam' : 'Wash Only'))))
+                    : (item.type === 'iron' ? 'كوي فقط' : (item.type === 'wash_iron' ? 'غسيل وكوي' : (item.type === 'dry_clean' ? 'غسيل جاف' : (item.type === 'steam' ? 'بخار' : 'غسيل فقط'))));
                 let sLbl = this.currentLang === 'en'
                     ? (item.speed === 'normal' ? 'Normal' : 'Express')
                     : (item.speed === 'normal' ? 'عادي' : 'مستعجل');
@@ -1088,7 +1088,7 @@ window.appLogic = {
             invs[idx].paymentMethod = method;
 
             // 🌟 FIXED: Strictly KEEP original timestamp/date. It correctly drops from active unpaid list seamlessly.
-            
+
             await localforage.setItem('invoices', invs);
             await manualSyncToCloud('invoices', invs);
 
@@ -1220,15 +1220,34 @@ window.appLogic = {
         let newInvId = this.editingInvoiceId;
 
         if (!newInvId) {
-            let max = 100;
+            let max = parseInt(localStorage.getItem('sahab_invoiceCounter') || '100', 10);
+            
+            // Check current active invoices
             invoices.forEach(i => {
                 if (i && i.id) {
-                    let num = parseInt(i.id.replace('INV-', ''));
-                    if (num > max) max = num;
+                    let num = parseInt(String(i.id).replace(/\D/g, ''), 10);
+                    if (!isNaN(num) && num > max) max = num;
                 }
             });
-            newInvId = String(max + 1).padStart(6, '0');
-            localStorage.setItem('sahab_invoiceCounter', max + 1);
+
+            // Prevent collisions with ANY archived invoices after a Daily Close
+            let archivedReports = await localforage.getItem('archived_z_reports') || [];
+            let validArchives = Array.isArray(archivedReports) ? archivedReports : Object.values(archivedReports);
+            validArchives.forEach(arc => {
+                if (arc && arc.invoices) {
+                    let arcInvs = Array.isArray(arc.invoices) ? arc.invoices : Object.values(arc.invoices);
+                    arcInvs.forEach(i => {
+                        if (i && i.id) {
+                            let num = parseInt(String(i.id).replace(/\D/g, ''), 10);
+                            if (!isNaN(num) && num > max) max = num;
+                        }
+                    });
+                }
+            });
+
+            max++;
+            newInvId = String(max).padStart(6, '0');
+            localStorage.setItem('sahab_invoiceCounter', max);
         }
 
         // Prepare Invoice Details (Not Saved Yet)
@@ -1507,7 +1526,7 @@ window.appLogic = {
         let _itemRows = '', _rn = 1;
         data.items.forEach(it => {
             if (!it) return;
-            let tLbl = it.type === 'iron' ? 'كوي' : (it.type === 'wash_iron' ? 'غسيل وكوي' : 'غسيل فقط');
+            let tLbl = it.type === 'iron' ? 'كوي' : (it.type === 'wash_iron' ? 'غسيل وكوي' : (it.type === 'dry_clean' ? 'غسيل جاف' : (it.type === 'steam' ? 'بخار' : 'غسيل فقط')));
             let sLbl = it.speed === 'normal' ? 'عادي' : 'سريع';
             _itemRows += `<tr style="border-bottom:1px solid #eee;">
                 <td style="padding:9px 0; text-align:center; color:#555;">${_rn++}</td>
@@ -1731,7 +1750,7 @@ window.appLogic = {
         let itemsHtml = '';
         data.items.forEach(item => {
             if (!item) return;
-            let tLbl = item.type === 'iron' ? 'كوي' : (item.type === 'wash_iron' ? 'غسيل وكوي' : 'غسيل');
+            let tLbl = item.type === 'iron' ? 'كوي' : (item.type === 'wash_iron' ? 'غسيل وكوي' : (item.type === 'dry_clean' ? 'غسيل جاف' : (item.type === 'steam' ? 'بخار' : 'غسيل فقط')));
             let sLbl = item.speed === 'normal' ? 'عادي' : 'سريع';
             itemsHtml += `
             <tr>
@@ -1854,10 +1873,10 @@ window.appLogic = {
 
             const bizName = (window.tenantSettings || {}).name || 'سحاب POS';
             const zatcaQRBase64 = generateZatcaBase64(bizName, (window.tenantSettings || {}).taxNumber || "000000000000000", data.timestamp, data.grandTotal, data.vatAmount);
-            
+
             const tempQrDiv = document.createElement('div');
             new QRCode(tempQrDiv, { text: zatcaQRBase64, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.L });
-            
+
             await new Promise(r => setTimeout(r, 100));
             const qrCanvas = tempQrDiv.querySelector('canvas');
             const qrDataUrl = qrCanvas ? qrCanvas.toDataURL('image/png') : '';
@@ -1937,7 +1956,7 @@ window.appLogic = {
             </body>
             </html>
             `;
-            
+
             doc.write(printContent);
             doc.close();
 
@@ -1968,21 +1987,31 @@ window.appLogic = {
         const todayYMD = getLocalYMD();
         const isLiveShift = !this.currentViewDate || this.currentViewDate === todayYMD;
 
-        let invoices = [];
-        const activeInvs = await localforage.getItem('invoices') || [];
+        let activeInvs = await localforage.getItem('invoices') || [];
+        let invoices = Array.isArray(activeInvs) ? activeInvs : Object.values(activeInvs);
 
-        // If a search term exists (like from Customer Log), we must fetch everything (archives + active)
-        const fetchAll = !!searchTerm;
+        // Unconditionally fetch archives to properly aggregate older unpaid debt that might be lingering.
+        const archivedData = await localforage.getItem('archived_z_reports') || [];
+        const validArchives = Array.isArray(archivedData) ? archivedData : Object.values(archivedData);
+        validArchives.slice().reverse().forEach(arc => {
+            if (arc.invoices) { 
+                const arcInvs = Array.isArray(arc.invoices) ? arc.invoices : Object.values(arc.invoices);
+                Array.prototype.push.apply(invoices, arcInvs);
+            }
+        });
 
-        invoices = [].concat(activeInvs);
-
-        if (!isLiveShift || fetchAll) {
-            // Retrieve archives for History Date or Search Matches
-            const archives = await localforage.getItem('archived_z_reports') || [];
-            archives.forEach(arc => {
-                if (arc.invoices) { Array.prototype.push.apply(invoices, arc.invoices); }
-            });
-        }
+        // Deduplicate robustly: keep the very first (newest) definition of each invoice
+        // Since the array starts with Active Shift then goes backwards in time through archives, this perfectly guarantees the latest state always lives.
+        const uniqueInvoicesMap = new Map();
+        invoices.forEach(i => {
+            if (i && i.id) {
+                const uniqueKey = `${i.id}_${i.timestamp || 0}`;
+                if (!uniqueInvoicesMap.has(uniqueKey)) {
+                    uniqueInvoicesMap.set(uniqueKey, i);
+                }
+            }
+        });
+        invoices = Array.from(uniqueInvoicesMap.values());
 
         // 📅 GLOBAL DATE FILTER: Strictly isolate Live Shift from Archived data
         invoices = invoices.filter(inv => {
@@ -1991,18 +2020,18 @@ window.appLogic = {
             // If a custom search term is used, bypass timezone/date limits entirely to allow deep searching
             if (searchTerm) return true;
 
-            // If we are looking at the LIVE shift without search, completely hide closed/archived invoices
-            if (isLiveShift && inv.isZReported) return false;
-
             const isUnpaid = inv.paymentStatus === 'unpaid';
 
-            // Normalize dates to KSA Local YYYY-MM-DD for comparison ensuring 100% strict match
-            const invDate = getLocalYMD(inv.timestamp || inv.date);
-            
-            // EXCEPTION: Unpaid invoices MUST ALWAYS show in Live Shift regardless of their creation date
+            // EXCEPTION: Unpaid invoices MUST ALWAYS show in Live Shift regardless of their creation date or Z-Report status
             if (isLiveShift && isUnpaid && !inv.isCancelled) {
                 return true;
             }
+
+            // If we are looking at the LIVE shift without search, completely hide closed/archived invoices (paid only, since unpaid just matched above)
+            if (isLiveShift && inv.isZReported) return false;
+
+            // Normalize dates to KSA Local YYYY-MM-DD for comparison ensuring 100% strict match
+            const invDate = getLocalYMD(inv.timestamp || inv.date);
 
             return invDate === (this.currentViewDate || todayYMD);
         });
@@ -2081,11 +2110,11 @@ window.appLogic = {
                             ? `<span style="text-decoration:line-through; color:#f44336">${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${rsLabel}</span> <span style="display:inline-block; background:#c62828; color:#fff; font-size:11px; font-weight:900; padding:2px 8px; border-radius:12px; margin-right:6px;">${cancelL}</span>`
                             : `${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${rsLabel} ${refundBadge} ${partnerBadge}`;
 
-                        const cancelBtn = isCancelled
+                        const cancelBtn = (isCancelled || !isLiveShift)
                             ? ''
                             : `<button class="btn-action-icon btn-action-delete" type="button" data-action="cancel_inv" data-id="${i.id}" title="${actCancelTitle}"><i class="fa-solid fa-ban" style="pointer-events:none;"></i></button>`;
 
-                        const markPaidBtn = (isUnpaidSection && !isCancelled)
+                        const markPaidBtn = (isUnpaidSection && !isCancelled && isLiveShift)
                             ? `<button class="btn-action-icon" type="button" data-action="mark_paid" data-id="${i.id}" style="color: #fff; background: #22c55e; border: none; padding: 10px 25px; min-width: 100px; border-radius: 8px; font-weight: 900; font-size: 14px; box-shadow: 0 4px 10px rgba(34,197,94,0.4);" title="${lang === 'en' ? 'Mark as Paid' : 'تسديد الفاتورة'}"><i class="fa-solid fa-check" style="pointer-events:none; margin-left:6px;"></i> ${lang === 'en' ? 'Pay' : 'تسديد'}</button>`
                             : '';
 
@@ -2427,24 +2456,25 @@ window.appLogic = {
     async _getAggregatedCustomers() {
         const currentInvs = await localforage.getItem('invoices') || [];
         const archivedData = await localforage.getItem('archived_z_reports') || [];
-        
+
         let allInvoices = Array.isArray(currentInvs) ? currentInvs : Object.values(currentInvs);
-        
+
         // Aggregate all lifetime history from archives to ensure customers never disappear
         const validArchives = Array.isArray(archivedData) ? archivedData : Object.values(archivedData);
-        validArchives.forEach(arc => {
+        validArchives.slice().reverse().forEach(arc => {
             if (arc.invoices) {
                 const arcInvs = Array.isArray(arc.invoices) ? arc.invoices : Object.values(arc.invoices);
                 Array.prototype.push.apply(allInvoices, arcInvs);
             }
         });
 
-        // Deduplicate invoices by ID (prioritizing the live/updated version)
+        // Deduplicate invoices by ID keeping the newest chronological version
         const uniqueInvoicesMap = new Map();
         allInvoices.forEach(i => {
             if (i && i.id) {
-                if (!uniqueInvoicesMap.has(i.id) || i.isZReported === false) {
-                    uniqueInvoicesMap.set(i.id, i);
+                const uniqueKey = `${i.id}_${i.timestamp || 0}`;
+                if (!uniqueInvoicesMap.has(uniqueKey)) {
+                    uniqueInvoicesMap.set(uniqueKey, i);
                 }
             }
         });
@@ -2452,6 +2482,21 @@ window.appLogic = {
         const validInvoices = Array.from(uniqueInvoicesMap.values());
 
         const customersMap = {};
+
+        // Fix: Seed with explicit persisting customers array (Guarantees customers survive resets)
+        const explicitCustomers = await localforage.getItem('customers') || [];
+        explicitCustomers.forEach(ec => {
+            if (ec.phone && ec.phone !== '0000000000') {
+                customersMap[ec.phone] = {
+                    name: ec.name || 'عميل دون اسم',
+                    phone: ec.phone,
+                    orderCount: 0,
+                    totalSpent: 0,
+                    latestTimestamp: ec.timestamp || 0,
+                    isWalkIn: false
+                };
+            }
+        });
 
         validInvoices.forEach(inv => {
             const isCancelled = inv.isCancelled === true || inv.status === 'cancelled';
@@ -2468,7 +2513,8 @@ window.appLogic = {
             } else if (phone && phone !== '0000000000') {
                 key = phone;
             } else {
-                key = name || `UNKNOWN_${inv.id}`;
+                key = `NAME_ONLY_${name}_${inv.id}`;
+                isWalkIn = true;
             }
 
             if (!customersMap[key]) {
@@ -2537,7 +2583,7 @@ window.appLogic = {
             const thSpent = lang === 'en' ? 'Total Spent' : 'إجمالي المشتريات';
             const thAct = lang === 'en' ? 'Actions' : 'إجراءات';
 
-            let html = '<table style="width:100%; border-collapse:collapse; margin-top:20px; background:var(--bg-surface); border-radius:12px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.5)">';
+            let html = '<div style="max-height: 60vh; overflow-y: auto; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.5)"><table style="width:100%; border-collapse:collapse; margin-top:20px; background:var(--bg-surface);">';
             html += `<thead>
                 <tr style="background:#111; color:var(--primary)">
                     <th style="padding:15px; text-align:right;">${thCust}</th>
@@ -2582,7 +2628,7 @@ window.appLogic = {
                     </tr>`;
                 });
             }
-            html += '</tbody></table>';
+            html += '</tbody></table></div>';
             const container = document.getElementById('customers-content');
             if (container) container.innerHTML = html;
         } catch (err) {
@@ -2703,7 +2749,7 @@ window.appLogic = {
 
             const lang = this.currentLang || 'ar';
             let html = '';
-            
+
             const services = window.appLogic.services || [];
 
             // 📦 2. Consumables Section
@@ -2830,8 +2876,8 @@ window.appLogic = {
                 </h3>
                 <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">
                     ${lang === 'en'
-                        ? 'Paste rows from Excel or WhatsApp, one item per line. Format: <b>Name | WashPrice | WashIronPrice | IronPrice</b>'
-                        : 'الصق البيانات من Excel أو واتسآب. التنسيق: <b>الاسم | سعر الغسيل | سعر غ+ك | سعر الكوي</b>'}
+                    ? 'Paste rows from Excel or WhatsApp, one item per line. Format: <b>Name | WashPrice | WashIronPrice | IronPrice</b>'
+                    : 'الصق البيانات من Excel أو واتسآب. التنسيق: <b>الاسم | سعر الغسيل | سعر غ+ك | سعر الكوي</b>'}
                 </p>
                 <textarea id="bulk-import-textarea" rows="6" placeholder="${lang === 'en' ? 'Example:\nThobe | 10 | 20 | 15\nShmagh | 8 | 0 | 10' : 'مثال:\nثوب | 10 | 20 | 15\nشماغ | 8 | 0 | 10'}" style="width:100%; box-sizing:border-box; padding:12px; border-radius:8px; border:1px solid var(--border); background:var(--bg-body); color:var(--text-primary); font-family:inherit; font-size:14px; resize:vertical;"></textarea>
                 <div style="margin-top:12px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
@@ -2857,7 +2903,7 @@ window.appLogic = {
         const current = localStorage.getItem('enableImportTool') === 'true';
         const next = !current;
         localStorage.setItem('enableImportTool', next ? 'true' : 'false');
-        
+
         console.log('Import Tool is now:', next);
 
         // Update toggle button label
@@ -2921,17 +2967,17 @@ window.appLogic = {
             const name = parts[0] || '';
             if (!name) { skipped++; continue; }
 
-            const wash      = parseFloat(parts[1]) || 0;
+            const wash = parseFloat(parts[1]) || 0;
             const wash_iron = parseFloat(parts[2]) || 0;
-            const iron      = parseFloat(parts[3]) || 0;
-            const icon      = this.getIconForName(name);
+            const iron = parseFloat(parts[3]) || 0;
+            const icon = this.getIconForName(name);
 
             // Auto-detect category
             let cat = 'men';
             if (/عباية|فستان|نسائ|women/i.test(name)) cat = 'women';
 
             const newService = {
-                id: `SRV-BULK-${Date.now()}-${Math.random().toString(36).substr(2,5)}`,
+                id: `SRV-BULK-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
                 name, cat, icon,
                 prices: { iron, wash_iron, wash },
                 expressFee: 0
@@ -2978,6 +3024,8 @@ window.appLogic = {
         document.getElementById('price-iron').value = service.prices.iron;
         document.getElementById('price-wash-iron').value = service.prices.wash_iron;
         document.getElementById('price-wash').value = service.prices.wash;
+        document.getElementById('price-dry-clean').value = service.prices.dry_clean || 0;
+        document.getElementById('price-steam').value = service.prices.steam || 0;
         document.getElementById('price-express-fee').value = service.expressFee;
 
         this.renderIconPicker(service.icon);
@@ -2995,6 +3043,8 @@ window.appLogic = {
         document.getElementById('price-iron').value = '0.00';
         document.getElementById('price-wash-iron').value = '0.00';
         document.getElementById('price-wash').value = '0.00';
+        document.getElementById('price-dry-clean').value = '0.00';
+        document.getElementById('price-steam').value = '0.00';
         document.getElementById('price-express-fee').value = '0.00';
     },
 
@@ -3022,13 +3072,15 @@ window.appLogic = {
         const pWashIron = parseFloat(document.getElementById('price-wash-iron').value);
         const pWash = parseFloat(document.getElementById('price-wash').value);
         const pExpFee = parseFloat(document.getElementById('price-express-fee').value);
+        const pDryClean = parseFloat(document.getElementById('price-dry-clean').value || 0);
+        const pSteam = parseFloat(document.getElementById('price-steam').value || 0);
 
         if (!name) { alert('يرجى إدخال اسم الخدمة'); return; }
 
         let newService = {
             id: id || `SRV-${Date.now()}`,
             name, cat, icon,
-            prices: { iron: pIron, wash_iron: pWashIron, wash: pWash },
+            prices: { iron: pIron, wash_iron: pWashIron, wash: pWash, dry_clean: pDryClean, steam: pSteam },
             expressFee: pExpFee
         };
 
@@ -3400,13 +3452,13 @@ window.appLogic = {
         let Math_exps = [...activeExps];
 
         archives.forEach(arc => {
-            if (arc.invoices) { 
+            if (arc.invoices) {
                 const arcInvs = Array.isArray(arc.invoices) ? arc.invoices : Object.values(arc.invoices);
-                Array.prototype.push.apply(Math_invoices, arcInvs); 
+                Array.prototype.push.apply(Math_invoices, arcInvs);
             }
-            if (arc.expenses) { 
+            if (arc.expenses) {
                 const arcExps = Array.isArray(arc.expenses) ? arc.expenses : Object.values(arc.expenses);
-                Array.prototype.push.apply(Math_exps, arcExps); 
+                Array.prototype.push.apply(Math_exps, arcExps);
             }
         });
 
@@ -3504,7 +3556,7 @@ window.appLogic = {
             // 🌟 BUSINESS LOGIC RULE 1 & 2 REFACTOR 🌟
             // RULE 1: Daily Sales ONLY includes invoices created today (isInRange)
             // RULE 2: Collected Cash INCLUDES old invoices paid today (belongsToDrawer)
-            
+
             // If History: fallback to isInRange since we don't have exact payment timestamps.
             const belongsToDrawer = isLiveShift ? (!i.isZReported && !isUnpaid) : (isInRange && !isUnpaid);
 
@@ -3518,7 +3570,7 @@ window.appLogic = {
             // 2. COLLECTED METRICS (Drawer Cash tracking decoupling)
             if (belongsToDrawer) {
                 totalCollected += netAmt;    // ✅ Collected (Paid amounts only)
-                
+
                 if (i.isCancelled !== true) {
                     const pMethod = i.paymentMethod || 'cash';
                     if (pMethod === 'cash') cashTotal += netAmt;
@@ -3592,7 +3644,7 @@ window.appLogic = {
                 <p style="font-size:12px; color:var(--text-muted); margin:0;">${lang === 'en' ? 'Select a date to review past financial operations and performance.' : 'اختر تاريخاً لمراجعة الأداء والعمليات المالية السابقة.'}</p>
             </div>
             <div style="display:flex; gap:10px; align-items:center;">
-                <input type="date" lang="en" dir="ltr" value="${currentTargetDate}" onchange="appLogic.filterReportsByDate(this.value)" style="color-scheme: dark; cursor: pointer; background:#000; color:#fff; border:1px solid var(--border); padding:10px; border-radius:8px; font-size:14px; outline:none; text-align:center; font-family: system-ui, -apple-system, Arial, sans-serif !important; font-variant-numeric: tabular-nums;">
+                <input type="date" max="${getLocalYMD()}" lang="en" dir="ltr" value="${currentTargetDate}" onchange="appLogic.filterReportsByDate(this.value)" style="color-scheme: dark; cursor: pointer; background:#000; color:#fff; border:1px solid var(--border); padding:10px; border-radius:8px; font-size:14px; outline:none; text-align:center; font-family: system-ui, -apple-system, Arial, sans-serif !important; font-variant-numeric: tabular-nums;">
                 <button class="btn" style="background:rgba(253,184,19,0.1); color:var(--primary); padding:10px 15px; font-size:12px; font-weight:bold; border:1px solid var(--primary); border-radius:8px;" onclick="appLogic.resetReportFilter()">${lang === 'en' ? 'Today' : 'اليوم'} <i class="fa-solid fa-rotate-left"></i></button>
             </div>
         </div>
@@ -3661,13 +3713,15 @@ window.appLogic = {
         </div>
 
         <!-- End of Day Closure Button -->
+        ${isLiveShift ? ` 
         <div style="text-align: center; margin-bottom: 40px; background: rgba(87, 67, 177, 0.05); padding: 30px; border-radius: var(--radius-md); border: 2px dashed var(--primary);">
-            <h3 style="color: var(--text-main); margin-bottom: 10px;">${lang === 'en' ? 'Close Accounting Day' : 'إغلاق اليومية (Close Accounting Day)'}</h3>
-            <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 20px;">${lang === 'en' ? 'A Z-Report will be issued and operations archived to start a new day.' : 'سيتم إصدار تقرير Z-Report وأرشفة العمليات الحالية لبدء يوم جديد.'}</p>
+            <h3 style="color: var(--text-main); margin-bottom: 10px;">${lang === 'en' ? 'Close Accounting Day' : 'إغلاق اليومية'}</h3>
+            <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 20px;">${lang === 'en' ? 'A Z-Report will be issued and operations archived to start a new day.' : 'سيتم إصدار Z-Report وأرشفة العمليات لبدء يوم جديد.'}</p>
             <button class="btn btn-primary" onclick="appLogic.showZReportPreview()" style="padding: 16px 50px; font-size: 18px; font-weight: 900; background: var(--primary); color: #000; box-shadow: 0 4px 15px rgba(253, 184, 19, 0.3);">
-                <i class="fa-solid fa-lock" style="margin-left: 10px;"></i> ${lang === 'en' ? 'Close Day (Review Figures)' : 'إغلاق اليومية (مراجعة الأرقام)'}
+                <i class="fa-solid fa-lock" style="margin-left: 10px;"></i> ${lang === 'en' ? 'Close Day (Review Figures)' : 'إغلاق اليوم (مراجعة الأرقام)'}
             </button>
         </div>
+        ` : ''}
 
         <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px; margin-bottom: 30px;">
             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:15px; margin-bottom:20px;">
@@ -3770,18 +3824,41 @@ window.appLogic = {
 
         try {
             let invs = await localforage.getItem('invoices') || [];
+            let archivedLogs = await localforage.getItem('archived_z_reports') || [];
             let updated = false;
 
-            invs.forEach(i => {
+            const checkAndMark = (i) => {
+                if (!i) return;
                 const pName = (i.partnerLaundryName || '').trim().toLowerCase();
                 const pHood = (i.partnerLaundryNeighborhood || '').trim().toLowerCase();
 
-                // Match with robust trim/case comparison
                 if (pName === cleanTargetName && pHood === cleanTargetHood && !i.laundryPaid && parseFloat(i.laundryCost || i.partnerLaundryCost || 0) > 0) {
                     i.laundryPaid = true;
                     updated = true;
                 }
-            });
+            };
+
+            // Deep traverse active invoices
+            invs.forEach(checkAndMark);
+
+            // Deep traverse ALL archives to catch stuck historical debt
+            let archivesUpdated = false;
+            if (Array.isArray(archivedLogs)) {
+                archivedLogs.forEach(arc => {
+                    if (arc && arc.invoices) {
+                        const arcInvs = Array.isArray(arc.invoices) ? arc.invoices : Object.values(arc.invoices);
+                        arcInvs.forEach(inv => {
+                            const pName = (inv.partnerLaundryName || '').trim().toLowerCase();
+                            const pHood = (inv.partnerLaundryNeighborhood || '').trim().toLowerCase();
+                            if (pName === cleanTargetName && pHood === cleanTargetHood && !inv.laundryPaid && parseFloat(inv.laundryCost || inv.partnerLaundryCost || 0) > 0) {
+                                inv.laundryPaid = true;
+                                updated = true;
+                                archivesUpdated = true;
+                            }
+                        });
+                    }
+                });
+            }
 
             if (updated) {
                 // 1. Reset Cumulative Balance
@@ -3797,8 +3874,10 @@ window.appLogic = {
 
                 await localforage.setItem('laundry_balances', balances);
                 localStorage.setItem('laundry_balances', JSON.stringify(balances));
+                await manualSyncToCloud('laundry_balances', balances);
 
                 // 2. Record Settlement as Expense (Payout)
+                const totalDues = currentDue > 0 ? currentDue : 0;
                 if (currentDue > 0) {
                     let exps = await localforage.getItem('expenses') || [];
                     const settlementExpense = {
@@ -3819,6 +3898,12 @@ window.appLogic = {
                 localStorage.setItem('invoices', JSON.stringify(invs)); // Force immediate update
                 await manualSyncToCloud('invoices', invs);
 
+                // Push updated archives if they were modified
+                if (archivesUpdated) {
+                    await localforage.setItem('archived_z_reports', archivedLogs);
+                    await manualSyncToCloud('archived_z_reports', archivedLogs);
+                }
+
                 this.renderHistory();
                 this.renderExpenses();
                 this.renderReports();
@@ -3829,6 +3914,7 @@ window.appLogic = {
                 if (balances[compKey]) balances[compKey].balance = 0;
                 await localforage.setItem('laundry_balances', balances);
                 localStorage.setItem('laundry_balances', JSON.stringify(balances));
+                await manualSyncToCloud('laundry_balances', balances);
 
                 this.renderExpenses();
                 this.showToast(`تم تصفير رصيد '${displayName}' يدوياً`);
@@ -3999,7 +4085,7 @@ window.appLogic = {
             const newResetToken = (isSoft ? 'SOFT_' : 'HARD_') + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 
             // Wipe Cloud Collections
-            const collectionsToWipe = ['invoices', 'expenses', 'customers', 'journal_entries', 'tax_records', 'zreports', 'reports', 'archived_z_reports', 'laundry_balances', 'invoiceCounter'];
+            const collectionsToWipe = ['invoices', 'expenses', 'journal_entries', 'tax_records', 'zreports', 'reports', 'archived_z_reports', 'laundry_balances', 'invoiceCounter'];
 
             // Wipe settings if Hard
             if (!isSoft) collectionsToWipe.push('settings');
@@ -4389,8 +4475,13 @@ window.appLogic = {
                     localStorage.removeItem(key);
                 }
 
+                // Preserve Unpaid Invoices Locally (Debts should not be forgiven)
+                let preservedUnpaidInvoices = [];
+                const currentInvs = await localforage.getItem('invoices') || [];
+                preservedUnpaidInvoices = currentInvs.filter(i => i && i.paymentStatus === 'unpaid' && !i.isCancelled);
+
                 // Clear IndexedDB via localforage
-                const collectionsToWipeLocally = ['invoices', 'expenses', 'customers', 'journal_entries', 'tax_records', 'zreports', 'reports', 'archived_z_reports', 'laundry_balances', 'invoiceCounter'];
+                const collectionsToWipeLocally = ['invoices', 'expenses', 'journal_entries', 'tax_records', 'zreports', 'reports', 'archived_z_reports', 'laundry_balances', 'invoiceCounter'];
 
                 if (!isSoft) {
                     collectionsToWipeLocally.push('settings');
@@ -4399,6 +4490,11 @@ window.appLogic = {
 
                 for (let col of collectionsToWipeLocally) {
                     await localforage.removeItem(col);
+                }
+
+                // Restore Unpaid Invoices Locally
+                if (preservedUnpaidInvoices.length > 0) {
+                    await localforage.setItem('invoices', preservedUnpaidInvoices);
                 }
 
                 localStorage.setItem('sahab_reset_token', dbToken); // acknowledge new token
@@ -5085,34 +5181,16 @@ window.appLogic = {
         const KSA_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'numeric', day: 'numeric', calendar: 'gregory' });
         const targetFormattedDate = getLocalYMD();
 
-        // Filter invoices based on KSA date logi
-        const filteredInvoices = invoices.filter(invoice => {
-            if (!invoice) return false;
-            if (invoice.isZReported) return false;
-
-            // Format match check: Ensure strict alignment with the current shift
-            const dStr = invoice.timestamp || invoice.date || new Date().toISOString();
-            const fallbackStr = getLocalYMD(new Date(dStr));
-            return fallbackStr === targetFormattedDate;
-        });
+        // 🚨 CRITICAL FIX: Archive ALL active shift items regardless of calendar day to support crossing midnights or delayed closures
+        const filteredInvoices = invoices.filter(invoice => invoice && !invoice.isZReported);
         /* End localized date logic */
 
         // Apply identical bounds to expenses
-        const shiftExpenses = exps.filter(e => e && !e.isZReported && (e.date === targetFormattedDate || getLocalYMD(e.timestamp) === targetFormattedDate));
+        const shiftExpenses = exps.filter(e => e && !e.isZReported);
 
         // ═══ CRITICAL FIX: MARK CLOSED STATE *BEFORE* SERIALIZING TO ARCHIVE DB ═══
         filteredInvoices.forEach(i => { if (i && i.paymentStatus !== 'unpaid') i.isZReported = true; });
         shiftExpenses.forEach(e => { if (e) e.isZReported = true; });
-
-        // Wait... there may be invoices that didn't match the KSA date but ARE from today's shift visually?
-        // To be absolutely safe and prevent rogue ghost invoices from persisting: 
-        // EXCEPTION: Unpaid "Pay Later" invoices MUST persist across daily closures.
-        invoices.forEach(i => {
-            if (i && i.paymentStatus !== 'unpaid') {
-                i.isZReported = true;
-            }
-        });
-        exps.forEach(e => { if (e) e.isZReported = true; });
 
         const archiveEntry = {
             id: 'Z-' + Date.now(),
@@ -5146,16 +5224,21 @@ window.appLogic = {
         const previewModal = document.getElementById('z-report-preview-modal');
         if (previewModal) previewModal.classList.add('hidden');
 
-        // Force full re-render: Dashboard → 0.00 SAR, Invoice Table → empty
-        await this.renderReports();
-        await this.renderHistory();
-
-        // === مسح الذاكرة المحلية بالقوة ===
+        // === Clear Local Buffer ===
         localStorage.setItem('invoices', '[]');
         localStorage.setItem('expenses', '[]');
 
-        // 🌟 CRITICAL FIX: Save the cutoff time so the active dashboard forcefully zero-outs (clean slate)
+        // 🚨 CRITICAL FIX: Save the cutoff time FIRST so the active dashboard forcefully zero-outs (clean slate)
         localStorage.setItem('shiftCutoff_' + getLocalYMD(), Date.now().toString());
+
+        // Then Force full re-render: Dashboard -> 0.00 SAR, Invoice Table -> empty
+        await this.renderReports();
+        await this.renderHistory();
+
+        // Force complete DOM refresh of the financials section if active
+        if (this.currentView === 'reports') {
+            this.showView('reports'); 
+        }
 
         // === رسالة النجاح ===
         const msg = this.currentLang === 'en' ? '✅ Day closed successfully. Records zeroed.' : '✅ تم إغلاق اليومية بنجاح وتصفير السجل.';
@@ -5392,3 +5475,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
