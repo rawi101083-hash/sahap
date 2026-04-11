@@ -1,0 +1,1 @@
+const fs = require('fs'); let c = fs.readFileSync('c:/Users/rawi1/Desktop/Sahab_POS/js/app.js', 'utf8'); c = c.replace(/const thDate = lang === 'en' \? 'Date' : ' «—ÌŒ «·›« Ê—…';/g, 'const thDateL = lang === \\'en\\' ? \\'Date\\' : \\' «—ÌŒ «·›« Ê—…\\';'); c = c.replace(/\\\$\{thDate\}/g, '\\'); fs.writeFileSync('c:/Users/rawi1/Desktop/Sahab_POS/js/app.js', c);

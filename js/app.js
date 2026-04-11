@@ -1,4 +1,4 @@
-// Sahab POS - Main Application Logic
+﻿// Sahab POS - Main Application Logic
 (function () {
     // ⚡ FAST GUARD: Prevent Login Flash
     // We check localStorage immediately (before any Firebase calls) to decide which UI to show.
@@ -475,6 +475,66 @@ window.appLogic = {
         }
     },
 
+    async initSmartCustomerAutocomplete(attachListeners) {
+        try {
+            let customers = await this._getAggregatedCustomers();
+            if (!customers) return;
+
+            customers.sort((a, b) => (b.orderCount || 0) - (a.orderCount || 0));
+
+            let htmlNames = '';
+            let htmlPhones = '';
+            let seenNames = new Set();
+            let seenPhones = new Set();
+
+            this._smartCustomersMapByPhone = {};
+            this._smartCustomersMapByName = {};
+
+            customers.forEach(c => {
+                const n = (c.name || '').trim();
+                const p = (c.phone || '').trim();
+
+                if (n && !seenNames.has(n) && n !== 'Unnamed Customer' && n !== 'عميل غير محدد') {
+                    htmlNames += `<option value="${n}"></option>`;
+                    seenNames.add(n);
+                }
+                if (p && p !== '0000000000' && !seenPhones.has(p)) {
+                    htmlPhones += `<option value="${p}"></option>`;
+                    seenPhones.add(p);
+                }
+
+                if (p && p !== '0000000000' && n) this._smartCustomersMapByPhone[p] = n;
+                if (n && p && p !== '0000000000') this._smartCustomersMapByName[n] = p;
+            });
+
+            const dlNames = document.getElementById('smart-customers-names');
+            const dlPhones = document.getElementById('smart-customers-phones');
+
+            if (dlNames) dlNames.innerHTML = htmlNames;
+            if (dlPhones) dlPhones.innerHTML = htmlPhones;
+
+            if (attachListeners) {
+                const inpName = document.getElementById('checkout-customer-name');
+                const inpPhone = document.getElementById('checkout-customer-phone');
+
+                if (inpPhone && inpName) {
+                    inpPhone.addEventListener('input', (e) => {
+                        let pV = e.target.value.trim();
+                        if (this._smartCustomersMapByPhone[pV]) {
+                            inpName.value = this._smartCustomersMapByPhone[pV];
+                        }
+                    });
+
+                    inpName.addEventListener('input', (e) => {
+                        let nV = e.target.value.trim();
+                        if (this._smartCustomersMapByName[nV] && !inpPhone.value.trim()) {
+                            inpPhone.value = this._smartCustomersMapByName[nV];
+                        }
+                    });
+                }
+            }
+        } catch (e) { console.error('Smart Autocomplete Error:', e); }
+    },
     toggleMobileCart() {
         const cartSection = document.getElementById('cart-section');
         const icon = document.getElementById('mobile-cart-icon');
@@ -610,6 +670,7 @@ window.appLogic = {
         console.log("[App] Initialization pulse complete. Data is now protected and loaded.");
 
         await this.updateLaundryDatalist();
+        await this.initSmartCustomerAutocomplete(true);
         this.renderItems();
 
         // i18n auto-apply on load
@@ -635,7 +696,7 @@ window.appLogic = {
             const cost = parseFloat(i.laundryCost || i.partnerLaundryCost || 0);
             if (cost > 0) {
                 if (!balances[key]) balances[key] = { balance: 0 };
-                balances[key].balance += cost;
+                // balances[key].balance += cost; // Replaced by distinct liabilities flow
             }
         });
 
@@ -693,13 +754,13 @@ window.appLogic = {
     },
     switchView(viewId) {
         console.log('Switching to view:', viewId);
-        
+
         // 🚨 SECURITY LOCK: Prevent historical data contamination
         if (viewId !== 'reports' && viewId !== 'history') {
             const todayYMD = getLocalYMD();
             if (this.currentViewDate && this.currentViewDate !== todayYMD) {
                 console.log('Exiting history mode, auto-restoring Live Shift boundaries.');
-                this.resetReportFilter(); 
+                this.resetReportFilter();
             }
         }
         try {
@@ -1221,7 +1282,7 @@ window.appLogic = {
 
         if (!newInvId) {
             let max = parseInt(localStorage.getItem('sahab_invoiceCounter') || '100', 10);
-            
+
             // Check current active invoices
             invoices.forEach(i => {
                 if (i && i.id) {
@@ -1361,6 +1422,7 @@ window.appLogic = {
         if (cPhoneInp) cPhoneInp.value = '';
 
         this.updateCartUI();
+        this.initSmartCustomerAutocomplete(false);
     },
     closeInvoicePreview() {
         document.getElementById('invoice-preview-modal').classList.add('hidden');
@@ -1493,7 +1555,6 @@ window.appLogic = {
     async downloadDigitalPDF(event) {
         console.log('Button Clicked: downloadDigitalPDF - Generating ERP Invoice');
         if (!this.currentInvoice) return;
-
         const data = this.currentInvoice;
         const dObj = new Date(data.timestamp);
         const dStr = dObj.toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
@@ -1503,7 +1564,8 @@ window.appLogic = {
         const _grand = parseFloat(data.grandTotal || data.total || 0);
         const _subtotal = _grand - _vatAmt;
         const _invId = (data.id || '').toString().replace(/^INV-/, '');
-        const _custName = (!data.customer.name || data.customer.name === 'عميل نقدي' || data.customer.name === 'عميل دون اسم') ? '' : data.customer.name;
+        const _customer = data.customer || {};
+        const _custName = (!_customer.name || _customer.name === 'عميل غير محدد' || _customer.name === 'Unnamed Customer' || _customer.name.includes('Unnamed')) ? '' : _customer.name;
         const _storeTax = (data.taxNumber && data.taxNumber.trim() !== '')
             ? `<p style="margin:2px 0; font-size:14px; color:#444;">الرقم الضريبي: &nbsp;&nbsp; <strong style="direction:ltr; display:inline-block;">${data.taxNumber}</strong></p>` : '';
         const _storeWA = (window.tenantSettings || {}).phone
@@ -1524,7 +1586,7 @@ window.appLogic = {
         const _invType = _hasValTax ? 'فاتورة ضريبية مبسطة' : 'فاتورة مبيعات';
 
         let _itemRows = '', _rn = 1;
-        data.items.forEach(it => {
+        (data.items || []).forEach(it => {
             if (!it) return;
             let tLbl = it.type === 'iron' ? 'كوي' : (it.type === 'wash_iron' ? 'غسيل وكوي' : (it.type === 'dry_clean' ? 'غسيل جاف' : (it.type === 'steam' ? 'بخار' : 'غسيل فقط')));
             let sLbl = it.speed === 'normal' ? 'عادي' : 'سريع';
@@ -1578,7 +1640,7 @@ window.appLogic = {
                     <td style="padding:5px 0; color:#555; unicode-bidi:plaintext; direction:rtl;">&#x202B;العميل:&#x200F;</td>
                     <td style="padding:5px 10px; font-weight:bold; color:#000;">${_custName}</td>
                     <td style="padding:5px 0; color:#555; unicode-bidi:plaintext; direction:rtl;">&#x202B;رقم الجوال:&#x200F;</td>
-                    <td style="padding:5px 10px; font-weight:bold; color:#000; direction:ltr; text-align:right;">${data.customer.phone || '-'}</td>
+                    <td style="padding:5px 10px; font-weight:bold; color:#000; direction:ltr; text-align:right;">${(data.customer && data.customer.phone) ? data.customer.phone : '-'}</td>
                 </tr>
                 <tr>
                     <td style="padding:5px 0; color:#555; unicode-bidi:plaintext; direction:rtl;">&#x202B;وقت الطباعة:&#x200F;</td>
@@ -1748,7 +1810,7 @@ window.appLogic = {
 
 
         let itemsHtml = '';
-        data.items.forEach(item => {
+        (data.items || []).forEach(item => {
             if (!item) return;
             let tLbl = item.type === 'iron' ? 'كوي' : (item.type === 'wash_iron' ? 'غسيل وكوي' : (item.type === 'dry_clean' ? 'غسيل جاف' : (item.type === 'steam' ? 'بخار' : 'غسيل فقط')));
             let sLbl = item.speed === 'normal' ? 'عادي' : 'سريع';
@@ -1994,7 +2056,7 @@ window.appLogic = {
         const archivedData = await localforage.getItem('archived_z_reports') || [];
         const validArchives = Array.isArray(archivedData) ? archivedData : Object.values(archivedData);
         validArchives.slice().reverse().forEach(arc => {
-            if (arc.invoices) { 
+            if (arc.invoices) {
                 const arcInvs = Array.isArray(arc.invoices) ? arc.invoices : Object.values(arc.invoices);
                 Array.prototype.push.apply(invoices, arcInvs);
             }
@@ -2066,7 +2128,7 @@ window.appLogic = {
             const generateTableHTML = (sectionInvoices, title, isUnpaidSection) => {
                 let sectionHtml = `<h3 style="color:var(--primary); font-size:18px; margin-top:30px; margin-bottom:15px;"><i class="fa-solid ${isUnpaidSection ? 'fa-clock' : 'fa-check'}"></i> ${title}</h3>`;
                 sectionHtml += '<table onclick="appLogic.handleHistoryAction(event)" style="width:100%; border-collapse:collapse; background:var(--bg-surface); border-radius:12px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.5); margin-bottom:20px;">';
-                sectionHtml += `<thead><tr style="background:#111; color:var(--primary)"><th style="padding:15px; text-align:right;">${thId}</th><th style="padding:15px; text-align:right;">${thCust}</th><th style="padding:15px; text-align:right;">${thAmt}</th><th style="padding:15px; text-align:right;">${thDate}</th><th style="padding:15px; text-align:center;">${thAct}</th></tr></thead><tbody>`;
+                sectionHtml += `<thead><tr style="background:#111; color:var(--primary)"><th style="padding:15px; text-align:right;">${thId}</th><th style="padding:15px; text-align:right;">${thCust}</th><th style="padding:15px; text-align:right;">${thAmt}</th><th style="padding:15px; text-align:right;"></th><th style="padding:15px; text-align:center;">${thAct}</th></tr></thead><tbody>`;
 
                 if (sectionInvoices.length === 0) {
                     const noInv = lang === 'en' ? 'No invoices match your search.' : 'لا توجد فواتير مطابقة للبحث.';
@@ -2136,15 +2198,15 @@ window.appLogic = {
                                 <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:15px; align-items:end;">
                                     <div>
                                         <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px;">${lang === 'en' ? 'Laundry Name' : 'اسم المغسلة'}</label>
-                                        <input type="text" id="partner-name-${i.id}" value="${i.partnerLaundryName || ''}" list="saved-laundries" style="width:100%; background:#000; color:#fff; border:1px solid var(--border); padding:8px; border-radius:4px;">
+                                        <input type="text" id="partner-name-${i.id}" value="${i.partnerLaundryName === '.' ? '' : (i.partnerLaundryName || '')}" placeholder="اسم المغسلة" list="saved-laundries" style="width:100%; background:#000; color:#fff; border:1px solid var(--border); padding:8px; border-radius:4px;">
                                     </div>
                                     <div>
                                         <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px;">${lang === 'en' ? 'Cost (SAR)' : 'حساب المغاسل (ر.س)'}</label>
-                                        <input type="number" id="partner-cost-${i.id}" value="${i.laundryCost || i.partnerLaundryCost || 0}" style="width:100%; background:#000; color:#fff; border:1px solid var(--border); padding:8px; border-radius:4px;">
+                                        <input type="number" id="partner-cost-${i.id}" value="${(i.laundryCost || i.partnerLaundryCost || 0) === 0 ? '' : (i.laundryCost || i.partnerLaundryCost)}" placeholder="المبلغ" style="width:100%; background:#000; color:#fff; border:1px solid var(--border); padding:8px; border-radius:4px;">
                                     </div>
                                     <div>
                                         <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px;">${lang === 'en' ? 'Neighborhood' : 'الحي'}</label>
-                                        <input type="text" id="partner-hood-${i.id}" value="${i.partnerLaundryNeighborhood || ''}" list="saved-neighborhoods" style="width:100%; background:#000; color:#fff; border:1px solid var(--border); padding:8px; border-radius:4px;">
+                                        <input type="text" id="partner-hood-${i.id}" value="${i.partnerLaundryNeighborhood === '.' ? '' : (i.partnerLaundryNeighborhood || '')}" placeholder="الحي" list="saved-neighborhoods" style="width:100%; background:#000; color:#fff; border:1px solid var(--border); padding:8px; border-radius:4px;">
                                     </div>
                                     <div>
                                         <button class="btn btn-primary" style="width:100%; padding:9px;" onclick="appLogic.savePartnerInfo('${i.id}')">${lang === 'en' ? 'Save Details' : 'حفظ التفاصيل'}</button>
@@ -2280,9 +2342,40 @@ window.appLogic = {
         if (this.renderLaundryAccounts) this.renderLaundryAccounts(); // Ensure explicit recalculation
     },
 
+
+    async triggerInvoiceAction(id, actionName) {
+        try {
+            await this.reprintInvoice(id);
+            setTimeout(() => {
+                try {
+                    if (actionName === 'print') {
+                        this.printInvoice();
+                    } else if (actionName === 'pdf') {
+                        this.downloadDigitalPDF(null);
+                    } else if (actionName === 'wa') {
+                        this.shareInvoiceWhatsApp();
+                    }
+                } catch (err) {
+                    console.error("Action Execution Error:", err);
+                    alert("عذراً، حدث خطأ أثناء تنفيذ الإجراء.");
+                }
+            }, 500);
+        } catch (err) {
+            console.error("Action Setup Error:", err);
+        }
+    },
     async reprintInvoice(id) {
         const invs = await localforage.getItem('invoices') || [];
-        const invoiceData = invs.find(i => i.id === id);
+        const arcs = await localforage.getItem('archived_z_reports') || [];
+        let all = Array.isArray(invs) ? invs.slice() : Object.values(invs);
+        const validArcs = Array.isArray(arcs) ? arcs : Object.values(arcs);
+        validArcs.forEach(a => {
+            if (a.invoices) {
+                const aInvs = Array.isArray(a.invoices) ? a.invoices : Object.values(a.invoices);
+                all = all.concat(aInvs);
+            }
+        });
+        const invoiceData = all.find(i => i && i.id === id);
         if (!invoiceData) return;
 
         this.currentInvoice = invoiceData;
@@ -2615,14 +2708,17 @@ window.appLogic = {
                     // Passing invoiceId for walk-ins so logic can filter history by that specific ID
                     const actionParam = isWalkIn ? c.invoiceId : (c.phone || c.name);
 
-                    html += `<tr style="border-bottom:1px solid var(--border); ${isWalkIn ? 'background:rgba(253,184,19,0.03);' : ''}">
+                    const safeN = (n || '').replace(/'/g, "\\'").replace(/"/g, "&quot;");
+                    const safeP = (p || '').replace(/'/g, "\\'").replace(/"/g, "&quot;");
+
+                    html += `<tr style="border-bottom:1px solid var(--border); cursor:pointer; transition:background 0.2s; ${isWalkIn ? 'background:rgba(253,184,19,0.03);' : ''}" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='${isWalkIn ? 'rgba(253,184,19,0.03)' : ''}'" onclick="appLogic.openCustomerProfile('${actionParam}', ${isWalkIn}, '${safeN}', '${safeP}', '${count}', '${spent}')">
                         <td style="padding:15px; font-weight:bold; color:${isWalkIn ? 'var(--primary)' : 'inherit'}">${n}</td>
                         <td style="padding:15px; font-weight:bold; direction:ltr; text-align:right;">${p}</td>
                         <td style="padding:15px; font-weight:bold; color:var(--text-muted);">${count} ${ordersSuffix}</td>
                         <td style="padding:15px; font-weight:bold; color:var(--primary); direction:ltr; text-align:right;">${spent.toLocaleString('en-US', { minimumFractionDigits: 2 })} SAR</td>
                         <td style="padding:15px; text-align:center;">
-                            <button class="btn btn-sm" style="background:var(--primary); color:#000; padding:5px 12px; border-radius:4px; font-weight:bold;" onclick="appLogic.viewCustomerOrders('${actionParam}')">
-                                <i class="fa-solid fa-list-ul"></i> ${viewOrdersTxt}
+                            <button class="btn btn-sm" style="background:var(--primary); color:#000; padding:5px 12px; border-radius:4px; font-weight:bold;" onclick="event.stopPropagation(); appLogic.openCustomerProfile('${actionParam}', ${isWalkIn}, '${safeN}', '${safeP}', '${count}', '${spent}')">
+                                <i class="fa-solid fa-user"></i> عرض ملف العميل
                             </button>
                         </td>
                     </tr>`;
@@ -2635,6 +2731,159 @@ window.appLogic = {
             console.error('Render Customers List Error:', err);
         }
     },
+
+    async openCustomerProfile(identifier, isWalkIn, name, phone, count, spent) {
+        document.getElementById('cp-modal-name').textContent = name || 'عميل نقدي';
+        document.getElementById('cp-modal-phone').textContent = phone && phone !== '0000000000' && !phone.includes('غير مسجل') ? phone : 'بدون رقم';
+        document.getElementById('cp-modal-total-spent').textContent = parseFloat(spent || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }) + ' SAR';
+        document.getElementById('cp-modal-order-count').textContent = count || 0;
+
+        const printBtn = document.getElementById('cp-modal-print-btn');
+        if (printBtn) {
+            printBtn.dataset.id = identifier;
+            printBtn.dataset.walkin = isWalkIn;
+        }
+
+        const tbody = document.getElementById('cp-modal-history-tbody');
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:15px;">جاري جلب السجل التعريفي...</td></tr>';
+        document.getElementById('customer-profile-modal').classList.remove('hidden');
+
+        try {
+            const currentInvs = await localforage.getItem('invoices') || [];
+            const archivedData = await localforage.getItem('archived_z_reports') || [];
+            let allInvoices = Array.isArray(currentInvs) ? currentInvs : Object.values(currentInvs);
+            const validArchives = Array.isArray(archivedData) ? archivedData : Object.values(archivedData);
+            validArchives.slice().reverse().forEach(arc => {
+                if (arc.invoices) {
+                    const arcInvs = Array.isArray(arc.invoices) ? arc.invoices : Object.values(arc.invoices);
+                    Array.prototype.push.apply(allInvoices, arcInvs);
+                }
+            });
+
+            // Deduplicate
+            const uniqueInvoicesMap = new Map();
+            allInvoices.forEach(i => {
+                if (i && i.id) {
+                    const uniqueKey = `${i.id}_${i.timestamp || 0}`;
+                    if (!uniqueInvoicesMap.has(uniqueKey)) {
+                        uniqueInvoicesMap.set(uniqueKey, i);
+                    }
+                }
+            });
+            const validInvoices = Array.from(uniqueInvoicesMap.values()).sort((a, b) => b.timestamp - a.timestamp);
+
+            let customerInvoices = [];
+            validInvoices.forEach(inv => {
+                const cName = (inv.customer && inv.customer.name) ? inv.customer.name.trim() : '';
+                const cPhone = (inv.customer && inv.customer.phone) ? inv.customer.phone.trim() : '';
+
+                // Safely convert isWalkIn string/bool
+                const checkWalkIn = (isWalkIn === 'true' || isWalkIn === true);
+
+                if (checkWalkIn) {
+                    if (identifier === inv.id || identifier === `NAME_ONLY_${cName}_${inv.id}`) {
+                        customerInvoices.push(inv);
+                    } else if (identifier === cName && (!cPhone || cPhone === '0000000000')) {
+                        customerInvoices.push(inv);
+                    }
+                } else {
+                    if (cPhone === identifier) {
+                        customerInvoices.push(inv);
+                    }
+                }
+            });
+
+            if (customerInvoices.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:15px; color:var(--text-muted);">لا توجد فواتير سابقة مسجلة</td></tr>';
+            } else {
+                tbody.innerHTML = customerInvoices.map(i => {
+                    const d = getLocalYMD(i.timestamp) + ' ' + new Date(i.timestamp).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+                    const st = (i.isCancelled || i.status === 'cancelled') ? '<span style="color:var(--danger)"> (ملغاة)</span>' : '';
+                    return `<tr style="border-bottom: 1px solid var(--border); transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'">
+                        <td style="padding: 12px; text-align:right;">${d}</td>
+                        <td style="padding: 12px; text-align:center; direction:ltr; filter: brightness(0.8);">${i.id}${st}</td>
+                        <td style="padding: 12px; text-align:center;">
+                            <span style="background: rgba(253,184,19,0.15); color: var(--primary); padding: 4px 8px; border-radius: 4px; font-weight: bold;">
+                                ${parseFloat(i.grandTotal || i.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} SAR
+                            </span>
+                        </td>
+                        <td style="padding: 12px; text-align:center;">
+                            <div style="display:flex; justify-content:center; gap:8px;">
+                                <button onclick="appLogic.triggerInvoiceAction('${i.id}', 'print')" title="طباعة" style="background:#222; color:#fff; border:1px solid #444; padding:6px 10px; border-radius:4px; margin: 0; display: inline-flex; height: 32px; width: 32px; justify-content: center; align-items: center; cursor:pointer; transition:0.2s;" onmouseover="this.style.background='#333'" onmouseout="this.style.background='#222'"><i class="fa-solid fa-print"></i></button>
+                                <button onclick="appLogic.triggerInvoiceAction('${i.id}', 'pdf')" title="PDF" style="background:#222; color:#ff453a; border:1px solid #444; padding:6px 10px; border-radius:4px; margin: 0; display: inline-flex; height: 32px; width: 32px; justify-content: center; align-items: center; cursor:pointer; transition:0.2s;" onmouseover="this.style.background='#333'" onmouseout="this.style.background='#222'"><i class="fa-solid fa-file-pdf"></i></button>
+                                <button onclick="appLogic.triggerInvoiceAction('${i.id}', 'wa')" title="واتساب" style="background:#222; color:#25D366; border:1px solid #444; padding:6px 10px; border-radius:4px; margin: 0; display: inline-flex; height: 32px; width: 32px; justify-content: center; align-items: center; cursor:pointer; transition:0.2s;" onmouseover="this.style.background='#333'" onmouseout="this.style.background='#222'"><i class="fa-brands fa-whatsapp"></i></button>
+                            </div>
+                        </td>
+                    </tr>`;
+                }).join('');
+            }
+        } catch (e) {
+            console.error('Error fetching profile history', e);
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:15px; color:var(--danger);">حدث خطأ أثناء جلب الفواتير</td></tr>';
+        }
+    },
+
+    async printCustomerStatement(identifier, isWalkIn) {
+        const name = document.getElementById('cp-modal-name').textContent;
+        const phone = document.getElementById('cp-modal-phone').textContent;
+        const total = document.getElementById('cp-modal-total-spent').textContent;
+        const count = document.getElementById('cp-modal-order-count').textContent;
+        const tbodyHtml = document.getElementById('cp-modal-history-tbody').innerHTML;
+
+        const printHtml = `
+            <style>
+                @media print {
+                    @page { size: A4 portrait; margin: 15mm; }
+                    body, html { width: 100% !important; background: #fff !important; color: #000 !important; font-family: 'Tajawal', sans-serif; direction: rtl; }
+                    .statement-box { padding: 20px; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
+                    th, td { border: 1px solid #ccc; padding: 12px; text-align: right; color:#000 !important; }
+                    th { background: #eee !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-weight: bold; }
+                    td { background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                }
+            </style>
+            <div class="statement-box" style="font-family:'Tajawal', sans-serif; direction:rtl; color:#000;">
+                <div style="text-align:center; margin-bottom:30px; border-bottom:2px solid #000; padding-bottom:15px;">
+                    <h1 style="margin:0; font-size:24px;">كشف حساب عميل</h1>
+                    <p style="margin:5px 0 0 0; color:#333; font-size:14px;">تاريخ الإصدار: ${getLocalYMD(Date.now())} ${new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}</p>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:30px; background:#f5f5f5; padding:20px; border:1px solid #ddd; border-radius:8px; -webkit-print-color-adjust: exact; print-color-adjust: exact;">
+                    <div style="width: 48%;">
+                        <h3 style="margin:0 0 10px 0; border-bottom:1px solid #ccc; padding-bottom:5px;">بيانات العميل</h3>
+                        <p style="margin:5px 0; font-size:15px;"><strong>الاسم:</strong> ${name}</p>
+                        <p style="margin:5px 0; font-size:15px;"><strong>رقم التواصل:</strong> <span style="direction:ltr; display:inline-block;">${phone}</span></p>
+                    </div>
+                    <div style="width: 48%; text-align:left;">
+                        <h3 style="margin:0 0 10px 0; border-bottom:1px solid #ccc; padding-bottom:5px; text-align:right;">الخلاصة المالية</h3>
+                        <p style="margin:5px 0; font-size:15px; text-align:right;"><strong>إجمالي المشتريات:</strong> ${total}</p>
+                        <p style="margin:5px 0; font-size:15px; text-align:right;"><strong>عدد الطلبات:</strong> ${count}</p>
+                    </div>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>التاريخ والوقت</th>
+                            <th style="text-align:center;">رقم الفاتورة</th>
+                            <th>المبلغ التقريبي</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tbodyHtml}
+                    </tbody>
+                </table>
+            </div>
+        `;
+
+        const zContainer = document.getElementById('z-report-print-container');
+        const invContainer = document.getElementById('invoice-print-container');
+        if (invContainer) invContainer.innerHTML = '';
+        if (zContainer) zContainer.innerHTML = printHtml;
+
+        setTimeout(() => {
+            window.print();
+        }, 500);
+    },
+
 
     viewCustomerOrders(identifier) {
         // Switch to the history view first
@@ -3246,6 +3495,201 @@ window.appLogic = {
 
     // Consolidated Operating Expenses (Transplanted Table UI)
     // Consolidated Operating Expenses (Dual-Table Layout)
+    async getAllUnpaidLaundries() {
+        const unpaid = [];
+        const currentInvs = await localforage.getItem('invoices') || [];
+        const archivedData = await localforage.getItem('archived_z_reports') || [];
+
+        const processInv = (i) => {
+            if (!i || !i.partnerLaundryName || i.partnerLaundryName.trim() === '' || i.isCancelled || i.status === 'cancelled') return;
+            if (i.laundryPaid === true) return;
+            const cost = parseFloat(i.laundryCost || i.partnerLaundryCost || 0);
+            if (cost <= 0) return;
+
+            unpaid.push({
+                invoiceId: i.id,
+                name: i.partnerLaundryName.trim(),
+                hood: (i.partnerLaundryNeighborhood || '').trim(),
+                amount: cost,
+                date: getLocalYMD(i.timestamp)
+            });
+        };
+
+        currentInvs.forEach(processInv);
+
+        let validArchives = Array.isArray(archivedData) ? archivedData : Object.values(archivedData);
+        validArchives.forEach(arc => {
+            if (arc && arc.invoices) {
+                const arcInvs = Array.isArray(arc.invoices) ? arc.invoices : Object.values(arc.invoices);
+                arcInvs.forEach(processInv);
+            }
+        });
+
+        const unique = {};
+        unpaid.forEach(u => unique[u.invoiceId] = u);
+        return Object.values(unique).sort((a, b) => new Date(b.date) - new Date(a.date));
+    },
+
+    async settleSingleLaundry(invoiceId, name, amount) {
+        const lang = this.currentLang || 'ar';
+        if (!confirm(lang === 'en' ? 'Settle amount ' + amount + ' for ' + name + '?' : 'تأكيد تسديد مبلغ ' + amount + ' ر.س لمغسلة: ' + name + '؟')) return;
+
+        let invs = await localforage.getItem('invoices') || [];
+        let archivedLogs = await localforage.getItem('archived_z_reports') || [];
+        let updated = false;
+
+        const idx = invs.findIndex(i => i.id === invoiceId);
+        if (idx !== -1) {
+            invs[idx].laundryPaid = true;
+            updated = true;
+            await localforage.setItem('invoices', invs);
+            await manualSyncToCloud('invoices', invs);
+        } else {
+            let validArchives = Array.isArray(archivedLogs) ? archivedLogs : Object.values(archivedLogs);
+            for (let arc of validArchives) {
+                if (arc && arc.invoices) {
+                    let arcInvs = Array.isArray(arc.invoices) ? arc.invoices : Object.values(arc.invoices);
+                    let aIdx = arcInvs.findIndex(i => i.id === invoiceId);
+                    if (aIdx !== -1) {
+                        arcInvs[aIdx].laundryPaid = true;
+                        updated = true;
+                        break;
+                    }
+                }
+            }
+            if (updated) {
+                await localforage.setItem('archived_z_reports', archivedLogs);
+                await manualSyncToCloud('archived_z_reports', archivedLogs);
+            }
+        }
+
+        if (updated) {
+            let exps = await localforage.getItem('expenses') || [];
+            exps.push({
+                id: Date.now(),
+                timestamp: Date.now(),
+                category: lang === 'en' ? 'Partner Settlement' : 'حسابات مغاسل',
+                amount: parseFloat(amount),
+                desc: lang === 'en' ? 'Settlement for: ' + name : 'تسديد حساب متعاونة: ' + name,
+                date: getLocalYMD()
+            });
+            await localforage.setItem('expenses', exps);
+            localStorage.setItem('expenses', JSON.stringify(exps));
+            await manualSyncToCloud('expenses', exps);
+
+            this.showToast(lang === 'en' ? 'Settled and added to expenses' : 'تم التسديد وتحويله للمصروفات بنجاح');
+
+            // Adjust cumulative balances to ensure dashboard stays correct
+            let balances = await localforage.getItem('laundry_balances') || {};
+            const keyNames = Object.keys(balances).filter(k => k.startsWith(name + '|'));
+            if (keyNames.length > 0) {
+                balances[keyNames[0]].balance = Math.max(0, balances[keyNames[0]].balance - parseFloat(amount));
+                await localforage.setItem('laundry_balances', balances);
+                localStorage.setItem('laundry_balances', JSON.stringify(balances));
+            }
+
+            this.renderExpenses();
+        } else {
+            alert(lang === 'en' ? 'Invoice not found' : 'الفاتورة غير موجودة');
+        }
+    },
+    async getAllUnpaidLaundries() {
+        const unpaid = [];
+        const currentInvs = await localforage.getItem('invoices') || [];
+        const archivedData = await localforage.getItem('archived_z_reports') || [];
+
+        const processInv = (i) => {
+            if (!i || !i.partnerLaundryName || i.partnerLaundryName.trim() === '' || i.isCancelled || i.status === 'cancelled') return;
+            if (i.laundryPaid === true) return;
+            const cost = parseFloat(i.laundryCost || i.partnerLaundryCost || 0);
+            if (cost <= 0) return;
+
+            unpaid.push({
+                invoiceId: i.id,
+                name: i.partnerLaundryName.trim(),
+                hood: (i.partnerLaundryNeighborhood || '').trim(),
+                amount: cost,
+                date: getLocalYMD(i.timestamp)
+            });
+        };
+
+        currentInvs.forEach(processInv);
+
+        let validArchives = Array.isArray(archivedData) ? archivedData : Object.values(archivedData);
+        validArchives.forEach(arc => {
+            if (arc && arc.invoices) {
+                const arcInvs = Array.isArray(arc.invoices) ? arc.invoices : Object.values(arc.invoices);
+                arcInvs.forEach(processInv);
+            }
+        });
+
+        const unique = {};
+        unpaid.forEach(u => unique[u.invoiceId] = u);
+        return Object.values(unique).sort((a, b) => new Date(b.date) - new Date(a.date));
+    },
+
+    async settleSingleLaundry(invoiceId, name, amount) {
+        const lang = this.currentLang || 'ar';
+        if (!confirm(lang === 'en' ? 'Settle amount ' + amount + ' for ' + name + '?' : 'تأكيد تسديد مبلغ ' + amount + ' ر.س لمغسلة: ' + name + '؟')) return;
+
+        let invs = await localforage.getItem('invoices') || [];
+        let archivedLogs = await localforage.getItem('archived_z_reports') || [];
+        let updated = false;
+
+        const idx = invs.findIndex(i => i.id === invoiceId);
+        if (idx !== -1) {
+            invs[idx].laundryPaid = true;
+            updated = true;
+            await localforage.setItem('invoices', invs);
+            await manualSyncToCloud('invoices', invs);
+        } else {
+            let validArchives = Array.isArray(archivedLogs) ? archivedLogs : Object.values(archivedLogs);
+            for (let arc of validArchives) {
+                if (arc && arc.invoices) {
+                    let arcInvs = Array.isArray(arc.invoices) ? arc.invoices : Object.values(arc.invoices);
+                    let aIdx = arcInvs.findIndex(i => i.id === invoiceId);
+                    if (aIdx !== -1) {
+                        arcInvs[aIdx].laundryPaid = true;
+                        updated = true;
+                        break;
+                    }
+                }
+            }
+            if (updated) {
+                await localforage.setItem('archived_z_reports', archivedLogs);
+                await manualSyncToCloud('archived_z_reports', archivedLogs);
+            }
+        }
+
+        if (updated) {
+            let exps = await localforage.getItem('expenses') || [];
+            exps.push({
+                id: Date.now(),
+                timestamp: Date.now(),
+                category: lang === 'en' ? 'Partner Settlement' : 'حسابات مغاسل',
+                amount: parseFloat(amount),
+                desc: lang === 'en' ? 'Settlement for: ' + name : 'تسديد حساب متعاونة: ' + name,
+                date: getLocalYMD()
+            });
+            await localforage.setItem('expenses', exps);
+            localStorage.setItem('expenses', JSON.stringify(exps));
+            await manualSyncToCloud('expenses', exps);
+
+            this.showToast(lang === 'en' ? 'Settled and added to expenses' : 'تم التسديد وتحويله للمصروفات بنجاح');
+
+            let balances = await localforage.getItem('laundry_balances') || {};
+            const keyNames = Object.keys(balances).filter(k => k.startsWith(name + '|'));
+            if (keyNames.length > 0) {
+                balances[keyNames[0]].balance = Math.max(0, balances[keyNames[0]].balance - parseFloat(amount));
+                await localforage.setItem('laundry_balances', balances);
+                localStorage.setItem('laundry_balances', JSON.stringify(balances));
+            }
+
+            this.renderExpenses();
+        } else {
+            alert(lang === 'en' ? 'Invoice not found' : 'الفاتورة غير موجودة');
+        }
+    },
     async renderExpenses() {
         try {
             const container = document.getElementById('expenses-content');
@@ -3269,14 +3713,15 @@ window.appLogic = {
             html += `
             <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px; margin-bottom:30px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:12px; margin-bottom:15px;">
-                    <h3 style="color:var(--primary); font-size:16px;"><i class="fa-solid fa-receipt"></i> ${expTitle}</h3>
+                    <h3 style="color:var(--primary); font-size:16px;"><i class="fa-solid fa-user"></i> عرض ملف العميل
+                            </h3>
                 </div>
                 ${exps.length === 0 ? `<p style="color:var(--text-muted); text-align:center; padding:10px;">${noExp}</p>` : `
                 <div style="overflow-x: auto;">
                     <table style="width:100%; border-collapse:collapse; text-align:right;">
                         <thead>
                             <tr style="border-bottom:2px solid var(--border); color:var(--text-muted); font-size:12px;">
-                                <th style="padding:10px;">${thDate}</th>
+                                <th style="padding:10px;"></th>
                                 <th style="padding:10px;">${thCat}</th>
                                 <th style="padding:10px;">${thDesc}</th>
                                 <th style="padding:10px; text-align:left;">${thAmt}</th>
@@ -3298,89 +3743,65 @@ window.appLogic = {
             </div>
             `;
 
+
             // --- TABLE 2: PARTNER ACCOUNTS (Laundries) ---
-            const laundryMap = {};
-            Object.keys(laundryBalances).forEach(key => {
-                const [name, hood] = key.split('|');
-                laundryMap[key] = { name, hood, dues: laundryBalances[key].balance || 0, paid: 0 };
-            });
+            const unpaidList = await this.getAllUnpaidLaundries();
 
-            invoices.forEach(i => {
-                if (!i || !i.partnerLaundryName || i.partnerLaundryName.trim() === '') return;
-                const name = i.partnerLaundryName.trim();
-                const hood = (i.partnerLaundryNeighborhood || '').trim();
-                const compKey = `${name}|${hood}`;
-                const cost = parseFloat(i.laundryCost || i.partnerLaundryCost || 0);
-                if (cost <= 0) return;
-                if (!laundryMap[compKey]) laundryMap[compKey] = { name, hood, dues: 0, paid: 0 };
-                if (i.laundryPaid === true) laundryMap[compKey].paid += cost;
-            });
+            const partnerTitle = lang === 'en' ? 'Partner Laundry Accounts' : 'حسابات المغاسل المتعاونة المستحقة';
+            const noPartners = lang === 'en' ? 'No unpaid partner accounts' : 'لا توجد حسابات متعاونة بانتظار التسديد';
+            const thName = lang === 'en' ? 'Laundry Name' : 'اسم المغسلة';
+            const thInv = lang === 'en' ? 'Inv ID' : 'رقم الفاتورة';
 
-            const keys = Object.keys(laundryMap).sort();
-
-            // Calculate column totals
-            let totalDues = 0;
-            let totalPaid = 0;
-            keys.forEach(k => {
-                totalDues += (laundryMap[k].dues || 0);
-                totalPaid += (laundryMap[k].paid || 0);
-            });
-
-            const partnerTitle = lang === 'en' ? 'Partner Laundry Accounts' : 'حسابات المغاسل المتعاونة';
-            const noPartners = lang === 'en' ? 'No partner accounts registered' : 'لا توجد حسابات شركاء مسجلة';
-            const thName = lang === 'en' ? 'Laundry / Neighborhood' : 'اسم المغسلة / الحي';
-            const thDues = lang === 'en' ? 'Dues (Owed)' : 'المستحقات (ذمة)';
-            const thPaid = lang === 'en' ? 'Previous Payments (Paid)' : 'المدفوعات السابقة (Paid)';
+            const thDues = lang === 'en' ? 'Amount (Owed)' : 'مبلغ الاستحقاق (ر.س)';
             const thActions = lang === 'en' ? 'Actions' : 'إجراءات (Actions)';
             const settleBtn = lang === 'en' ? 'Settle' : 'تسديد';
-            const settledLbl = lang === 'en' ? 'Fully Settled' : 'مُسددة بالكامل';
-            const grandTotalLbl = lang === 'en' ? 'Grand Total' : 'المجموع الإجمالي';
+            const grandTotalLbl = lang === 'en' ? 'Grand Total' : 'إجمالي المبالغ المستحقة';
+
+            let totalDues = 0;
+            unpaidList.forEach(u => totalDues += u.amount);
 
             html += `
             <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:20px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:12px; margin-bottom:15px;">
                     <h3 style="color:var(--primary); font-size:16px;"><i class="fa-solid fa-handshake"></i> ${partnerTitle}</h3>
                 </div>
-                ${keys.length === 0 ? `<p style="color:var(--text-muted); text-align:center; padding:10px;">${noPartners}</p>` : `
+                ${unpaidList.length === 0 ? `<p style="color:var(--text-muted); text-align:center; padding:10px;">${noPartners}</p>` : `
                 <div style="overflow-x: auto;">
                     <table style="width:100%; border-collapse:collapse; background:var(--bg-body); border-radius:8px; overflow:hidden;">
                         <thead>
                             <tr style="background:#111; color:var(--primary); font-size:12px;">
                                 <th style="padding:12px; text-align:right;">${thName}</th>
+                                <th style="padding:12px; text-align:center;">${thInv}</th>
+                                <th style="padding:12px; text-align:right;"></th>
                                 <th style="padding:12px; text-align:right;">${thDues}</th>
-                                <th style="padding:12px; text-align:right;">${thPaid}</th>
                                 <th style="padding:12px; text-align:center;">${thActions}</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${keys.map(key => {
-                const data = laundryMap[key];
-                const displayName = data.hood ? `${data.name} <small style="color:#888;">(${data.hood})</small>` : data.name;
-                const safeKey = key.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+                            ${unpaidList.map(item => {
+                const displayName = item.hood ? `${item.name} <small style="color:#888;">(${item.hood})</small>` : item.name;
+                const safeName = item.name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
                 return `
                                 <tr style="border-bottom:1px solid var(--border);">
                                     <td style="padding:15px; font-weight:bold; color:#fff;">${displayName}</td>
-                                    <td style="padding:15px; font-weight:bold; color:${data.dues > 0 ? '#ff4538' : '#fff'}; direction:ltr; text-align:right;">${data.dues.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR</td>
-                                    <td style="padding:15px; font-weight:bold; color:#4CAF50; direction:ltr; text-align:right;">${data.paid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR</td>
+                                    <td style="padding:15px; font-weight:bold; color:var(--text-muted); direction:ltr; text-align:center; font-size:12px;">${item.invoiceId}</td>
+                                    <td style="padding:15px; font-size:13px; color:var(--text-muted); direction:ltr; text-align:right;">${item.date}</td>
+                                    <td style="padding:15px; font-weight:bold; color:#ff4538; direction:ltr; text-align:right;">${item.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })} SAR</td>
                                     <td style="padding:15px; text-align:center;">
-                                        ${data.dues > 0 ? `<button class="btn" style="background:var(--primary); color:#000; padding:8px 16px; font-weight:900; border:none; border-radius:6px; font-size:13px; cursor:pointer;" onclick="appLogic.settleAllLaundryDues('${safeKey}')"><i class="fa-solid fa-money-check-dollar"></i> ${settleBtn}</button>` : `<span style="color:#4CAF50; font-size:12px; font-weight:bold;">${settledLbl} <i class="fa-solid fa-circle-check"></i></span>`}
+                                        <button class="btn" style="background:var(--primary); color:#000; padding:8px 16px; font-weight:900; border:none; border-radius:6px; font-size:13px; cursor:pointer;" onclick="appLogic.settleSingleLaundry('${item.invoiceId}', '${safeName}', ${item.amount})"><i class="fa-solid fa-money-check-dollar"></i> ${settleBtn}</button>
                                     </td>
                                 </tr>
                                 `;
             }).join('')}
                             <tr style="background:#111; border-top:2px solid var(--border); font-weight:900;">
-                                <td style="padding:15px; color:var(--primary);">${grandTotalLbl}</td>
-                                <td style="padding:15px; color:#ff4538; direction:ltr; text-align:right;">${totalDues.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR</td>
-                                <td style="padding:15px; color:#4CAF50; direction:ltr; text-align:right;">${totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR</td>
+                                <td colspan="3" style="padding:15px; color:var(--primary);">${grandTotalLbl}</td>
+                                <td style="padding:15px; color:#ff4538; direction:ltr; text-align:right;">${totalDues.toLocaleString('en-US', { minimumFractionDigits: 2 })} SAR</td>
                                 <td style="padding:15px;">-</td>
                             </tr>
                         </tbody>
                     </table>
-                </div>
-                `}
-            </div>
-            `;
-
+                </div>`}
+            </div>`;
             container.innerHTML = html;
         } catch (err) { console.error('Error rendering consolidated expenses:', err); }
     },
@@ -5237,7 +5658,7 @@ window.appLogic = {
 
         // Force complete DOM refresh of the financials section if active
         if (this.currentView === 'reports') {
-            this.showView('reports'); 
+            this.showView('reports');
         }
 
         // === رسالة النجاح ===

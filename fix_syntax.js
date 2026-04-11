@@ -1,0 +1,1 @@
+const fs = require('fs'); let c = fs.readFileSync('c:/Users/rawi1/Desktop/Sahab_POS/js/app.js', 'utf8'); c = c.replace(/async\s+async getAllUnpaidLaundries/g, 'async getAllUnpaidLaundries'); fs.writeFileSync('c:/Users/rawi1/Desktop/Sahab_POS/js/app.js', c);
