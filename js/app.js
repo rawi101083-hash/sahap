@@ -1,4 +1,4 @@
-﻿// Sahab POS - Main Application Logic
+// Sahab POS - Main Application Logic
 (function () {
     // ⚡ FAST GUARD: Prevent Login Flash
     // We check localStorage immediately (before any Firebase calls) to decide which UI to show.
@@ -2019,15 +2019,24 @@ window.appLogic = {
             </html>
             `;
 
+            // Wait for the iframe to fully load all assets (HTML/CSS/Images)
+            iframe.onload = function() {
+                iframe.contentWindow.focus();
+                
+                // Execute Print Command
+                iframe.contentWindow.print();
+                
+                // Refocus the main application immediately after print is sent to spooler
+                window.focus();
+
+                if (originalBtn) {
+                    originalBtn.innerHTML = origHTML;
+                    originalBtn.disabled = false;
+                }
+            };
+
             doc.write(printContent);
             doc.close();
-
-            // Give it half a second to render, then open PC print dialog
-            setTimeout(() => {
-                iframe.contentWindow.focus();
-                iframe.contentWindow.print();
-                if (originalBtn) originalBtn.innerHTML = origHTML;
-            }, 500);
 
         } catch (err) {
             console.error('Universal Print Error:', err);
