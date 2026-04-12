@@ -212,9 +212,41 @@ button:active {
     height: 100%;
     display: none;
     background-color: var(--bg-body);
-    padding-bottom: 10px; /* Compact */
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
+}
+
+/* Non-POS views (Customers, History, etc.) should scroll freely and use FULL WIDTH */
+#view-history.active,
+#view-inventory.active,
+#view-expenses.active,
+#view-reports.active {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    grid-template-columns: none !important;
+    overflow-y: auto !important;
+    height: 100% !important;
+    padding-bottom: 30px !important;
+}
+
+/* EXACT OVERRIDE FOR CUSTOMERS LOG ONLY */
+#view-customers.active {
+    background: transparent !important; /* Removes any accidental black boxes */
+    height: auto !important;
+    min-height: 100vh !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    grid-template-columns: none !important;
+    overflow: visible !important;
+    padding-bottom: 50px !important;
+}
+
+/* Remove main app wrapper restrictions ONLY for customers page if it extends beyond bounds */
+.view-section#view-customers {
+    /* Base rule when inactive to not break layout */
+    overflow-y: auto;
 }
 
 .view-section.active {
@@ -2076,7 +2108,8 @@ button:active {
     .cart-section {
         margin: 0 !important;
         padding: 0 !important;
-        height: calc(100vh - 50px) !important;
+        height: calc(100vh - 110px) !important;
+        max-height: calc(100vh - 110px) !important;
         top: 50px !important;
         position: sticky !important;
         display: flex !important;
@@ -2105,12 +2138,12 @@ button:active {
         background: #111 !important;
     }
 
-    /* Footer – pinned to bottom, never clips */
+    /* Footer - pinned to bottom, never clips */
     .cart-section .cart-footer {
         flex-shrink: 0 !important;
         margin: 0 !important;
         padding: 12px !important;
-        padding-bottom: 25px !important;
+        padding-bottom: 50px !important;
         background: #161616 !important;
         border-top: 1px solid #252525 !important;
         display: flex !important;
